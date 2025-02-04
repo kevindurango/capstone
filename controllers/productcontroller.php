@@ -38,7 +38,6 @@ class ProductController
         return $this->product->addProduct($farmer_id, $name, $description, $price, $image_path);
     }
 
-    // Edit an existing product
     public function editProduct($id, $name, $description, $price, $image, $current_image)
     {
         // Retain current image if no new image is uploaded
@@ -51,10 +50,11 @@ class ProductController
                 return false; // Stop execution on image upload failure
             }
         }
-
-        // Update product via the Product model
-        return $this->product->updateProduct($id, $name, $description, $price, $image_path, 'pending'); // Default status set to 'pending'
+    
+        // Update product via the Product model (make sure to add the status field)
+        return $this->product->updateProduct($id, $name, $description, $price, $image_path, 'pending'); // Add status argument
     }
+    
 
     // Delete a product
     public function deleteProduct($id)

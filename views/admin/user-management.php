@@ -1,6 +1,16 @@
 <?php
-require_once '../../models/User.php';
+// Start the session to track login status
 session_start();
+
+// Check if the user is logged in
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    // Redirect to login page if not logged in
+    header("Location: admin-login.php");
+    exit();
+}
+
+// Include the User model
+require_once '../../models/User.php';
 
 // Instantiate the User model
 $userClass = new User();
@@ -34,6 +44,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && hash_equals($_SESSION['csrf_token'],
         header("Location: user-management.php");
         exit();
     }
+
+    if (isset($_POST['logout'])) {
+        // Destroy session and log out the user
+        session_unset();
+        session_destroy();
+        header("Location: admin-login.php");
+        exit();
+    }
 }
 ?>
 
@@ -58,9 +76,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && hash_equals($_SESSION['csrf_token'],
       <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
         <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
           <h1 class="h2 text-success">User Management</h1>
-          <button class="btn btn-primary" data-toggle="modal" data-target="#addUserModal">
-            <i class="bi bi-plus-lg"></i> Add New User
-          </button>
+          <div class="d-flex">
+            <button class="btn btn-primary" data-toggle="modal" data-target="#addUserModal">
+              <i class="bi bi-plus-lg"></i> Add New User
+            </button>
+            <form method="POST" class="ml-3">
+              <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+              <button type="submit" name="logout" class="btn btn-danger">
+                <i class="bi bi-box-arrow-right"></i> Logout
+              </button>
+            </form>
+          </div>
         </div>
 
         <!-- User Table -->

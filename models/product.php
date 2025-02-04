@@ -67,22 +67,25 @@ class Product
     }
 
     // Update an existing product
-    public function updateProduct($id, $name, $description, $price, $stock, $image, $status)
+    public function updateProduct($id, $name, $description, $price, $image, $status)
     {
-        $query = "UPDATE products 
-                  SET name = :name, description = :description, price = :price, stock = :stock, image = :image, status = :status, updated_at = NOW() 
-                  WHERE product_id = :id";
+        $query = "UPDATE products SET name = :name, description = :description, price = :price, image = :image, status = :status WHERE product_id = :id";
+        
+        // Prepare the statement
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-        $stmt->bindParam(':name', $name, PDO::PARAM_STR);
-        $stmt->bindParam(':description', $description, PDO::PARAM_STR);
-        $stmt->bindParam(':price', $price, PDO::PARAM_STR);
-        $stmt->bindParam(':stock', $stock, PDO::PARAM_INT);
-        $stmt->bindParam(':image', $image, PDO::PARAM_STR);
-        $stmt->bindParam(':status', $status, PDO::PARAM_STR);
+    
+        // Bind parameters using PDO's bindValue() method
+        $stmt->bindValue(':name', $name, PDO::PARAM_STR);
+        $stmt->bindValue(':description', $description, PDO::PARAM_STR);
+        $stmt->bindValue(':price', $price, PDO::PARAM_STR); // or PDO::PARAM_INT, depending on price format
+        $stmt->bindValue(':image', $image, PDO::PARAM_STR);
+        $stmt->bindValue(':status', $status, PDO::PARAM_STR);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT); // Ensure product_id is an integer
+    
+        // Execute the query and return the result
         return $stmt->execute();
     }
-
+    
     // Delete a product
     public function deleteProduct($id)
     {

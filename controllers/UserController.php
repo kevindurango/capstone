@@ -44,6 +44,20 @@ class UserController {
         }
         return false; // Return false if inputs are missing
     }
+
+    // Logout method
+    public function logout() {
+        // Start session to destroy session variables
+        session_start();
+
+        // Destroy all session data
+        session_unset();
+        session_destroy();
+        
+        // Redirect to the login page
+        header("Location: admin-login.php");
+        exit();
+    }
 }
 
 // Instantiate the controller

@@ -1,4 +1,13 @@
 <?php
+// Start the session to track login status
+session_start();
+
+// Redirect to login page if not logged in
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header("Location: admin-login.php");
+    exit();
+}
+
 require_once '../../models/Database.php';
 
 // Pagination Setup
@@ -60,6 +69,14 @@ $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
 $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Handle logout
+if (isset($_POST['logout'])) {
+    session_unset();
+    session_destroy();
+    header("Location: admin-login.php");
+    exit();
+}
 ?>
 
 <!DOCTYPE html>
@@ -69,6 +86,7 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pickup Management - Admin Dashboard</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="../../public/style/admin.css">
     <link rel="stylesheet" href="../../public/style/sidebar.css"> 
 </head>
@@ -82,6 +100,12 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4 py-1">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2 text-success">Pickup Management</h1>
+                    <!-- Logout Button -->
+                    <form method="POST" class="ml-3">
+                        <button type="submit" name="logout" class="btn btn-danger">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </button>
+                    </form>
                 </div>
 
                 <!-- Search Bar -->

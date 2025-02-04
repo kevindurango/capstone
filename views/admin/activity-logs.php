@@ -1,5 +1,19 @@
 <?php
-require_once '../../models/Log.php';  
+// Start session to check if user is logged in
+session_start();
+
+// Include necessary files
+require_once '../../controllers/UserController.php';  // For user controller functions (like logout)
+require_once '../../models/Log.php';  // For fetching logs
+
+// Create instances of required classes
+$userController = new UserController();
+
+// Check if the user is logged in, otherwise redirect to login page
+if (!isset($_SESSION['admin_logged_in']) || !$_SESSION['admin_logged_in']) {
+    header("Location:admin-login.php");
+    exit();
+}
 
 // Pagination setup
 $limit = 10;
@@ -17,6 +31,11 @@ if (!empty($searchTerm)) {
 }
 
 $totalPages = ceil($totalLogs / $limit);
+
+// Handle logout action
+if (isset($_GET['logout'])) {
+    $userController->logout();
+}
 ?>
 
 <!DOCTYPE html>
@@ -24,7 +43,7 @@ $totalPages = ceil($totalLogs / $limit);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Activity Logs - Admin Dashboard</title>
+    <title>Admin Dashboard - Activity Logs</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../../public/style/admin.css"> 
     <link rel="stylesheet" href="../../public/style/sidebar.css"> 
@@ -40,6 +59,9 @@ $totalPages = ceil($totalLogs / $limit);
             <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4 py-1">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2 text-success">Activity Logs</h1>
+                    
+                    <!-- Logout Button -->
+                    <a href="?logout=true" class="btn btn-danger">Logout</a> <!-- Logout Button -->
                 </div>
 
                 <!-- Search Bar -->
