@@ -1,40 +1,70 @@
 /* General Styles */
 body {
   font-family: "Poppins", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f3f4f6;
-  color: #333;
+  background-color: #f8f4f4; /* Light gray background */
+  color: #1e293b; /* Dark gray for text */
   margin: 0;
   display: flex;
   flex-direction: column;
   min-height: 100vh; /* Ensures content fills at least the viewport height */
+  background-image: url("../../public/assets/farmer-dashboard.svg");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
 }
 
-h1 {
-  color: #22c55e; /* Primary green */
-  font-weight: 700;
-  text-align: center;
+/* Headings */
+h1,
+h2 {
+  color: #fefefe; /* Light color for headings */
+  font-weight: 900;
+  text-align: left;
   margin: 2rem 0 1rem;
   letter-spacing: 1px;
-  font-size: 2.5rem;
+  font-size: 2.8rem;
+}
+
+h2 {
+  font-size: 2.2rem;
+}
+
+h3 {
+  color: #fefefe; /* Light color for h3 headings */
 }
 
 /* Navbar */
 .navbar {
   background: linear-gradient(
     135deg,
-    #34d399,
+    #10b981,
     #059669
   ); /* Modern green gradient */
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
+
 .navbar-brand,
 .nav-link {
   color: white !important;
   font-weight: 600;
   transition: color 0.3s ease;
 }
+
 .navbar a:hover {
   color: #d1fae5 !important; /* Light green hover effect */
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.navbar-brand img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 10px; /* Space between image and text */
 }
 
 /* Cards */
@@ -43,17 +73,19 @@ h1 {
   border-radius: 15px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  background: linear-gradient(135deg, #ffffff, #f9fafb);
+  background: white; /* Solid white background */
 }
+
 .card:hover {
   transform: translateY(-8px);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
 }
+
 .card-header {
   background: linear-gradient(
     to right,
-    #22c55e,
-    #16a34a
+    #10b981,
+    #059669
   ); /* Medium green gradient */
   color: #ffffff;
   font-weight: 600;
@@ -61,29 +93,33 @@ h1 {
   border-radius: 15px 15px 0 0;
   letter-spacing: 0.5px;
 }
+
 .card-body {
   text-align: center;
   padding: 2rem;
 }
+
 .card-icon {
   font-size: 3.5rem;
-  color: #22c55e;
+  color: #10b981; /* Green icon color */
   margin-bottom: 1rem;
   transition: transform 0.3s ease;
 }
+
 .card:hover .card-icon {
   transform: scale(1.1);
 }
+
 .card-text {
   font-size: 1.6rem;
   font-weight: bold;
-  color: #333;
+  color: #1e293b; /* Dark gray for text */
   margin-top: 0.5rem;
 }
 
 /* Buttons */
 .btn-primary {
-  background: linear-gradient(to right, #22c55e, #16a34a);
+  background: linear-gradient(to right, #10b981, #059669);
   border: none;
   padding: 0.75rem 1.5rem;
   font-weight: 600;
@@ -91,6 +127,7 @@ h1 {
   border-radius: 10px;
   transition: all 0.3s ease;
 }
+
 .btn-primary:hover {
   background: #059669;
   transform: scale(1.05);
@@ -104,17 +141,175 @@ h1 {
   text-align: center;
   padding: 1rem 0;
   font-size: 0.9rem;
-  margin-top: auto;
+  margin-top: auto; /* Footer stays at the bottom */
   box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.1);
 }
+
 .footer a {
-  color: #22c55e; /* Green links */
+  color: #10b981; /* Green links */
   text-decoration: none;
   transition: color 0.3s ease;
 }
+
 .footer a:hover {
   color: #34d399;
   text-decoration: underline;
+}
+
+/* Farmer Profile Card */
+.profile-card {
+  margin-bottom: 3rem;
+}
+
+.profile-card .card-body {
+  display: flex;
+  align-items: center; /* Aligns the profile image and text vertically */
+  padding: 1.5rem;
+}
+
+.profile-card img {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  margin-right: 20px;
+  border-radius: 50%;
+}
+
+.profile-card h4 {
+  font-size: 1.8rem;
+  color: #1e293b; /* Dark gray for text */
+  margin-bottom: 0.5rem;
+  margin-top: 0; /* Removes any unnecessary space above */
+}
+
+.profile-card p {
+  font-size: 1.2rem;
+  color: #555;
+  margin-top: 0.5rem; /* Adds spacing between each paragraph */
+}
+
+/* Table Styling */
+/* Table Styling */
+.table-container {
+  position: relative;
+  overflow-y: auto; /* Enable vertical scrolling */
+  max-height: 450px; /* Set a max height for the table container */
+  margin-top: 40px;
+  border-radius: 10px; /* Rounded corners for the table container */
+  overflow: hidden; /* Ensures that the border radius is applied */
+}
+
+.table {
+  background-color: white; /* Set table background to white */
+  border-radius: 0; /* No border radius on the table itself */
+  width: 100%; /* Ensure the table takes full width */
+}
+
+.table th,
+.table td {
+  padding: 15px;
+  text-align: center;
+  border: none; /* Remove default borders to allow for rounded corners */
+}
+
+.table th {
+  position: sticky; /* Make the header sticky */
+  top: 0; /* Stick to the top of the container */
+  background-color: #f8f4f4; /* Background color for the header */
+  z-index: 1; /* Ensure the header is above the content */
+}
+
+.table th:first-child {
+  border-top-left-radius: 10px; /* Round the top-left corner */
+  border-radius: 10px;
+}
+
+.table th:last-child {
+  border-top-right-radius: 10px; /* Round the top-right corner */
+  border-radius: 10px;
+}
+
+.table tr:last-child td:first-child {
+  border-bottom-left-radius: 10px; /* Round the bottom-left corner */
+  border-radius: 10px;
+}
+
+.table tr:last-child td:last-child {
+  border-bottom-right-radius: 10px; /* Round the bottom-right corner */
+  border-radius: 10px;
+}
+
+.table-hover tbody tr:hover {
+  background-color: #f8f9fa; /* Light gray on hover */
+}
+
+.table-bordered {
+  border: 10px solid #ddd; /* Border for the table */
+  border-radius: 10px;
+}
+
+.table-bordered th,
+.table-bordered td {
+  border: 1px solid #dee2e6; /* Border for table cells */
+  border-radius: 10px;
+}
+
+/* Modal Styles */
+.modal-header {
+  background-color: #f7f7f7; /* Light gray for modal header */
+}
+
+.modal-footer button {
+  width: 120px; /* Fixed width for modal buttons */
+}
+
+.modal-title {
+  font-weight: bold; /* Bold title for the modal */
+}
+
+/* Status Select */
+.status-select {
+  padding: 5px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+/* Button Styles */
+.btn-update {
+  background-color: #007bff;
+  color: white;
+  border-radius: 5px;
+  border: none;
+}
+
+.btn-update:hover {
+  background-color: #0056b3;
+}
+
+/* Logout Button Styling */
+.btn-logout {
+  padding: 0.5rem 1.2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem; /* Space between icon and text */
+  background-color: #dc3545; /* Bootstrap danger color */
+  border: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.btn-logout:hover {
+  background-color: #c82333; /* Darker red on hover */
+  transform: translateY(-2px); /* Slight lift effect */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.btn-logout:active {
+  transform: translateY(0); /* Reset lift effect on click */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 /* Responsive Adjustments */
@@ -122,9 +317,11 @@ h1 {
   h1 {
     font-size: 2rem;
   }
+
   .card-text {
     font-size: 1.3rem;
   }
+
   .card-icon {
     font-size: 3rem;
   }
@@ -134,9 +331,11 @@ h1 {
   .card {
     margin-bottom: 1.5rem;
   }
+
   h1 {
     font-size: 1.8rem;
   }
+
   .footer {
     font-size: 0.8rem;
   }
@@ -146,32 +345,30 @@ h1 {
   h1 {
     font-size: 1.5rem;
   }
+
   .card-text {
     font-size: 1.1rem;
   }
+
   .card-icon {
     font-size: 2.5rem;
   }
+
   .btn-primary {
     padding: 0.6rem 1.2rem;
     font-size: 0.9rem;
   }
 }
 
-.navbar-brand {
-  display: flex;
-  align-items: center;
-  font-size: 1.5rem;
-  font-weight: bold;
+/* Badge Styles */
+.badge-warning {
+  background-color: #ffc107; /* Warning badge color */
 }
-.navbar-brand img {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  margin-right: 10px; /* Space between image and text */
+
+.badge-primary {
+  background-color: #007bff; /* Primary badge color */
 }
-.navbar-brand i {
-  font-size: 2rem;
-  margin-right: 10px; /* Space between icon and text */
-  color: #d1fae5; /* Matches the hover effect color */
+
+.badge-success {
+  background-color: #28a745; /* Success badge color */
 }

@@ -50,11 +50,21 @@ class ProductController
                 return false; // Stop execution on image upload failure
             }
         }
-    
+
         // Update product via the Product model (make sure to add the status field)
         return $this->product->updateProduct($id, $name, $description, $price, $image_path, 'pending'); // Add status argument
     }
     
+    // Handle Approve and Reject
+    public function updateProductStatus($product_id, $status)
+    {
+        // Ensure valid status value (approved or rejected)
+        if (!in_array($status, ['approved', 'rejected'])) {
+            return false;
+        }
+
+        return $this->product->updateProductStatus($product_id, $status);
+    }
 
     // Delete a product
     public function deleteProduct($id)

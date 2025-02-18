@@ -12,11 +12,12 @@ class User
         $this->conn = $database->connect();
     }
 
-    // Fetch all users from the database
+    // Fetch all users from the database, including the new personal fields
     public function getUsers()
     {
         try {
-            $query = "SELECT * FROM users";
+            // Modify the query to fetch personal information fields
+            $query = "SELECT user_id, username, email, role_id, first_name, last_name, contact_number, address FROM users";
             $stmt = $this->conn->query($query);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -37,11 +38,12 @@ class User
     }
 
     // Add a new user to the database (with input validation and password hashing)
-    public function addUser($username, $email, $password, $role_id)
+    public function addUser($username, $email, $password, $role_id, $first_name, $last_name, $contact_number = null, $address = null)
     {
         try {
-            $query = "INSERT INTO users (username, email, password, role_id, created_at, updated_at) 
-                      VALUES (:username, :email, :password, :role_id, NOW(), NOW())";
+            // Insert user into the users table with personal information
+            $query = "INSERT INTO users (username, email, password, role_id, first_name, last_name, contact_number, address, created_at, updated_at) 
+                      VALUES (:username, :email, :password, :role_id, :first_name, :last_name, :contact_number, :address, NOW(), NOW())";
             $stmt = $this->conn->prepare($query);
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
@@ -50,6 +52,10 @@ class User
             $stmt->bindParam(':email', $email);
             $stmt->bindParam(':password', $hashedPassword);
             $stmt->bindParam(':role_id', $role_id);
+            $stmt->bindParam(':first_name', $first_name);
+            $stmt->bindParam(':last_name', $last_name);
+            $stmt->bindParam(':contact_number', $contact_number);
+            $stmt->bindParam(':address', $address);
 
             return $stmt->execute();
         } catch (PDOException $e) {
@@ -58,26 +64,12 @@ class User
         }
     }
 
-    // Get role name by role_id
-    public function getRoleName($role_id)
-    {
-        try {
-            $query = "SELECT role_name FROM roles WHERE role_id = :role_id";
-            $stmt = $this->conn->prepare($query);
-            $stmt->bindParam(':role_id', $role_id);
-            $stmt->execute();
-            $role = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $role ? $role['role_name'] : 'Unknown Role';
-        } catch (PDOException $e) {
-            die("Error fetching role: " . $e->getMessage());
-        }
-    }
-
     // Update an existing user (Conditional Password Update)
-    public function updateUser($user_id, $username, $email, $password, $role_id)
+    public function updateUser($user_id, $username, $email, $password, $role_id, $first_name, $last_name, $contact_number = null, $address = null)
     {
         try {
-            $query = "UPDATE users SET username = :username, email = :email, role_id = :role_id, updated_at = NOW()";
+            $query = "UPDATE users SET username = :username, email = :email, role_id = :role_id, first_name = :first_name, 
+                      last_name = :last_name, contact_number = :contact_number, address = :address, updated_at = NOW()";
 
             // Append password update only if provided
             if (!empty($password)) {
@@ -92,6 +84,10 @@ class User
             $stmt->bindParam(':username', $username);
             $stmt->bindParam(':email', $email);
             $stmt->bindParam(':role_id', $role_id);
+            $stmt->bindParam(':first_name', $first_name);
+            $stmt->bindParam(':last_name', $last_name);
+            $stmt->bindParam(':contact_number', $contact_number);
+            $stmt->bindParam(':address', $address);
 
             // Hash and bind the password if provided
             if (!empty($password)) {

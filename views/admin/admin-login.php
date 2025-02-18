@@ -60,11 +60,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../../public/style/admin.css">
-    <link rel="stylesheet" href="../../public/style/sidebar.css">
+    <link rel="stylesheet" href="../../public/style/admin-sidebar.css">
     <style>
         body {
             font-family: 'Poppins', sans-serif;
-            background-image: url('../../public/assets/background.svg'); /* Set background image */
+            background-image: url('../../public/assets/admin-background.svg'); /* Set background image */
             background-size: cover; /* Cover the entire screen */
             background-position: center; /* Center the background image */
             display: flex;

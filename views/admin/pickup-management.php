@@ -88,13 +88,13 @@ if (isset($_POST['logout'])) {
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="../../public/style/admin.css">
-    <link rel="stylesheet" href="../../public/style/sidebar.css"> 
+    <link rel="stylesheet" href="../../public/style/admin-sidebar.css"> 
 </head>
 <body>
     <div class="container-fluid">
         <div class="row">
             <!-- Include Sidebar -->
-            <?php include '../../views/global/sidebar.php'; ?>
+            <?php include '../../views/global/admin-sidebar.php'; ?>
 
             <!-- Main Content -->
             <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4 py-1">

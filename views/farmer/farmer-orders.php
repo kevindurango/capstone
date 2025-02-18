@@ -1,11 +1,25 @@
 <?php
-require_once '../../models/Farmer.php';
 session_start();
+require_once '../../models/Farmer.php';
+require_once '../../controllers/UserController.php'; // Include the UserController
 
-// Sample farmer ID
-$farmer_id = 1;
+// Initialize UserController
+$userController = new UserController();
 
-// Instantiate Farmer model
+// Handle farmer logout functionality
+if (isset($_POST['logout'])) {
+    $userController->farmerLogout(); // Call farmerLogout method
+}
+
+// Check if the user is logged in as a farmer
+if (!isset($_SESSION['farmer_logged_in']) || $_SESSION['farmer_logged_in'] !== true) {
+    header("Location: farmer-login.php");
+    exit();
+}
+
+// Sample farmer ID (for now, this can be replaced with the farmer's session ID)
+$farmer_id = $_SESSION['farmer_id']; // Assuming the farmer's ID is stored in the session
+
 $farmer = new Farmer();
 $orders = $farmer->getOrdersByFarmer($farmer_id); // Fetch farmer's orders
 
@@ -33,24 +47,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'], $_POST['s
 <body>
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark">
-    <a class="navbar-brand d-flex align-items-center" href="#">
-        <!-- Placeholder Image -->
-        <img src="../../public/assets/logo.png" alt="Logo" class="rounded-circle mr-2" style="width: 40px; height: 40px;">
-        Farmer Dashboard
-    </a>
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
-        <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav ml-auto">
-            <li class="nav-item"><a class="nav-link" href="farmer-dashboard.php">Home</a></li>
-            <li class="nav-item"><a class="nav-link" href="products.php">Products</a></li>
-            <li class="nav-item"><a class="nav-link" href="orders.php">Orders</a></li>
-            <li class="nav-item"><a class="nav-link" href="feedback.php">Feedback</a></li>
-            <li class="nav-item"><a class="nav-link" href="#">Logout</a></li>
-        </ul>
-    </div>
-</nav>
+        <a class="navbar-brand d-flex align-items-center" href="#">
+            <img src="../../public/assets/logo.png" alt="Logo" class="rounded-circle mr-2" style="width: 40px; height: 40px;">
+            Farmer Dashboard
+        </a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item"><a class="nav-link" href="farmer-dashboard.php">Home</a></li>
+                <li class="nav-item"><a class="nav-link" href="farmer-products.php">Products</a></li>
+                <li class="nav-item"><a class="nav-link" href="farmer-orders.php">Orders</a></li>
+                <li class="nav-item"><a class="nav-link" href="farmer-feedback.php">Feedback</a></li>
+                <li class="nav-item"><a class="nav-link" href="farmer-profile.php">Profile</a></li>
+                <li class="nav-item">
+                    <form method="POST" class="nav-link p-0 ml-4">
+                        <button type="submit" name="logout" class="btn btn-danger btn-logout">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </button>
+                    </form>
+                </li>  
+            </ul>
+        </div>
+    </nav>
+
     <!-- Page Title -->
     <div class="container mt-5">
         <h1 class="text-center">Manage Your Orders</h1>

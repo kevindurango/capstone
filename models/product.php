@@ -117,6 +117,16 @@ class Product
         return $stmt->execute();
     }
 
+    public function updateProductStatus($product_id, $status)
+    {
+        $query = "UPDATE products SET status = ? WHERE product_id = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([$status, $product_id]);
+
+        return $stmt->rowCount() > 0; // Return true if the update was successful
+    }
+
+
     // Optional: Close database connection
     public function close()
     {

@@ -1,12 +1,10 @@
 <?php
-// File: C:\xampp\htdocs\capstone\admin\index.php
-
 // Start session to check if the user is logged in
 session_start();
 
 // Check if the user is logged in, if not redirect to the login page
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header("Location: login.php");
+    header("Location: admin-login.php");
     exit();
 }
 
@@ -42,7 +40,7 @@ if (isset($_POST['logout'])) {
   <title>Admin Dashboard</title>
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../../public/style/admin.css">
-  <link rel="stylesheet" href="../../public/style/sidebar.css">
+  <link rel="stylesheet" href="../../public/style/admin-sidebar.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
 
@@ -50,38 +48,78 @@ if (isset($_POST['logout'])) {
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
+    /* Full screen layout */
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden; /* Prevent scrolling */
+    }
+
+    .container-fluid {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .dashboard-main {
+      height: 100%;
+      overflow-y: auto; /* Allow scrolling inside the content area */
+      padding: 15px;
+    }
+
     .dashboard-card {
       border-radius: 10px;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
+
     .card-icon {
       font-size: 30px;
       margin-bottom: 10px;
     }
+
     .dashboard-header {
       font-size: 32px;
       font-weight: bold;
     }
+
     .stat-card {
       text-align: center;
       padding: 30px;
       border-radius: 10px;
       background-color: #f9f9f9;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      height: 400px; /* Adjust height for better visualization */
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
+
     .chart-container {
-      height: 400px;
+      height: 100%;
       width: 100%;
       margin-top: 30px;
     }
+
     .row .col-md-4 {
       padding: 15px;
     }
+
     .chart-title {
       font-size: 20px;
       margin-top: 20px;
       font-weight: bold;
       text-align: center;
+    }
+
+    /* Ensure canvas takes the full container size */
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
     }
   </style>
 </head>
@@ -89,7 +127,7 @@ if (isset($_POST['logout'])) {
   <div class="container-fluid">
     <div class="row">
       <!-- Sidebar -->
-      <?php include '../../views/global/sidebar.php'; ?>
+      <?php include '../../views/global/admin-sidebar.php'; ?>
 
       <!-- Main Content -->
       <main role="main" class="col-md-9 ml-sm-auto col-lg-10 dashboard-main">
@@ -98,7 +136,9 @@ if (isset($_POST['logout'])) {
 
           <!-- Logout Button -->
           <form method="POST" action="" class="form-inline">
-            <button type="submit" name="logout" class="btn btn-danger">Logout</button>
+            <button type="submit" name="logout" class="btn btn-danger">
+              <i class="bi bi-box-arrow-right"></i> Logout
+            </button>
           </form>
         </div>
 
@@ -184,6 +224,7 @@ if (isset($_POST['logout'])) {
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false, // Allow chart to resize and stretch
         plugins: {
           legend: {
             position: 'top',
@@ -206,6 +247,7 @@ if (isset($_POST['logout'])) {
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false, // Allow chart to resize and stretch
         plugins: {
           legend: {
             position: 'top',

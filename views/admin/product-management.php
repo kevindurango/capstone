@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once '../../controllers/ProductController.php';
 
 $productController = new ProductController();
@@ -6,30 +7,18 @@ $productController = new ProductController();
 // Fetch products
 $products = $productController->getAllProducts();
 
-// Fetch farmers (for dropdown selection in Add Product modal)
-$farmers = $productController->getAllFarmers();
-
-// Handle POST requests for editing and deleting products
+// Handle POST requests for approving and rejecting products
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Handle product deletion
-    if (isset($_POST['delete_product']) && !empty($_POST['product_id'])) {
-        $productController->deleteProduct($_POST['product_id']);
+    // Handle product rejection
+    if (isset($_POST['reject_product']) && !empty($_POST['product_id'])) {
+        $productController->updateProductStatus($_POST['product_id'], 'rejected');
         header("Location: product-management.php");
         exit();
     }
 
-    // Handle product editing
-    if (isset($_POST['edit_product'])) {
-        $productId = $_POST['product_id'];
-        $name = $_POST['name'];
-        $description = $_POST['description'];
-        $price = $_POST['price'];
-        $farmerId = $_POST['farmer_id'];
-        $image = $_FILES['image'] ?? null;
-        $current_image = $_POST['current_image'];
-
-        // Call the edit product function
-        $productController->editProduct($productId, $name, $description, $price, $image, $current_image);
+    // Handle product approval
+    if (isset($_POST['approve_product']) && !empty($_POST['product_id'])) {
+        $productController->updateProductStatus($_POST['product_id'], 'approved');
         header("Location: product-management.php");
         exit();
     }
@@ -53,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="../../public/style/admin.css">
-  <link rel="stylesheet" href="../../public/style/sidebar.css">
+  <link rel="stylesheet" href="../../public/style/admin-sidebar.css">
   <style>
     .table-container {
       position: relative;
@@ -89,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
   <div class="container-fluid">
     <div class="row">
       <!-- Sidebar -->
-      <?php include '../../views/global/sidebar.php'; ?>
+      <?php include '../../views/global/admin-sidebar.php'; ?>
 
       <!-- Main Content -->
       <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
@@ -121,101 +110,78 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
           </div>
         </div>
 
-        <!-- Product Table -->
-        <div class="table-container">
-          <table class="table table-bordered text-center">
-            <thead class="table-header">
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Price</th>
-                <th>Image</th>
-                <th>Farmer</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="productTableBody">
-              <?php foreach ($products as $product): ?>
-                <tr>
-                  <td><?= htmlspecialchars($product['product_id']) ?></td>
-                  <td><?= htmlspecialchars($product['name']) ?></td>
-                  <td><?= htmlspecialchars($product['description']) ?></td>
-                  <td>₱<?= number_format($product['price'], 2) ?></td>
-                  <td>
-                    <img src="uploads/<?= $product['image'] ?: 'placeholder.jpg' ?>" alt="Product Image" class="img-thumbnail" style="width: 50px; height: 50px;">
-                  </td>
-                  <td><?= htmlspecialchars($product['farmer_name']) ?></td>
-                  <td>
-                    <!-- Edit Button -->
-                    <button class="btn btn-warning btn-sm" data-toggle="modal" data-target="#editProductModal<?= $product['product_id'] ?>">
-                      <i class="bi bi-pencil"></i> Edit
-                    </button>
-                    <!-- Delete Form -->
-                    <form method="POST" style="display:inline;">
-                      <input type="hidden" name="product_id" value="<?= $product['product_id'] ?>">
-                      <button type="submit" name="delete_product" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this product?');">
-                        <i class="bi bi-trash"></i> Delete
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        </div>
+<!-- Product Table -->
+<div class="table-container mt-5">
+  <table class="table table-bordered text-center">
+    <thead class="table-header">
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Price</th>
+        <th>Image</th>
+        <th>Farmer</th>
+        <th>Actions</th>
+        <th>Status</th> <!-- Moved Status to the last column -->
+      </tr>
+    </thead>
+    <tbody id="productTableBody">
+      <?php foreach ($products as $product): ?>
+        <tr>
+          <td><?= htmlspecialchars($product['product_id']) ?></td>
+          <td><?= htmlspecialchars($product['name']) ?></td>
+          <td><?= htmlspecialchars($product['description']) ?></td>
+          <td>₱<?= number_format($product['price'], 2) ?></td>
+          <td>
+          <?php if (!empty($product['image'])): ?>
+              <img src="<?= '../../public/' . htmlspecialchars($product['image']) ?>" alt="Product Image" class="img-thumbnail" style="width: 80px; height: 80px;">
+          <?php else: ?>
+              <img src="../../public/assets/placeholder.png" alt="No Image" class="img-thumbnail" style="width: 80px; height: 80px;">
+          <?php endif; ?>
+      </td>
+          <td><?= htmlspecialchars($product['farmer_name']) ?></td>
+          <td>
+            <!-- Approve Button -->
+            <?php if ($product['status'] !== 'approved'): ?>
+              <form method="POST" style="display:inline;">
+                <input type="hidden" name="product_id" value="<?= $product['product_id'] ?>">
+                <button type="submit" name="approve_product" class="btn btn-success btn-sm mb-2">
+                  <i class="bi bi-check2-circle"></i> Approve
+                </button>
+              </form>
+            <?php endif; ?>
 
-        <!-- Edit Product Modal -->
-        <?php foreach ($products as $product): ?>
-          <div class="modal fade" id="editProductModal<?= $product['product_id'] ?>" tabindex="-1" role="dialog" aria-labelledby="editProductModalLabel<?= $product['product_id'] ?>" aria-hidden="true">
-            <div class="modal-dialog" role="document">
-              <div class="modal-content">
-                <form method="POST" enctype="multipart/form-data">
-                  <div class="modal-header">
-                    <h5 class="modal-title" id="editProductModalLabel<?= $product['product_id'] ?>">Edit Product</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                      <span aria-hidden="true">&times;</span>
-                    </button>
-                  </div>
-                  <div class="modal-body">
-                    <!-- Hidden input for product_id -->
-                    <input type="hidden" name="product_id" value="<?= $product['product_id'] ?>">
-                    <div class="form-group">
-                      <label for="editProductName">Product Name</label>
-                      <input type="text" class="form-control" id="editProductName" name="name" value="<?= htmlspecialchars($product['name']) ?>" required>
-                    </div>
-                    <div class="form-group">
-                      <label for="editProductDescription">Description</label>
-                      <textarea class="form-control" id="editProductDescription" name="description" required><?= htmlspecialchars($product['description']) ?></textarea>
-                    </div>
-                    <div class="form-group">
-                      <label for="editProductPrice">Price</label>
-                      <input type="number" class="form-control" id="editProductPrice" name="price" value="<?= htmlspecialchars($product['price']) ?>" required>
-                    </div>
-                    <div class="form-group">
-                      <label for="editProductFarmer">Farmer</label>
-                      <select class="form-control" id="editProductFarmer" name="farmer_id" required>
-                        <?php foreach ($farmers as $farmer): ?>
-                          <option value="<?= $farmer['user_id'] ?>" <?= $product['farmer_id'] == $farmer['user_id'] ? 'selected' : '' ?>><?= htmlspecialchars($farmer['username']) ?></option>
-                        <?php endforeach; ?>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label for="editProductImage">Product Image</label>
-                      <input type="file" class="form-control-file" id="editProductImage" name="image">
-                      <input type="hidden" name="current_image" value="<?= htmlspecialchars($product['image']) ?>"> <!-- Keep current image -->
-                    </div>
-                  </div>
-                  <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                    <button type="submit" name="edit_product" class="btn btn-primary">Save Changes</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        <?php endforeach; ?>
-
+            <!-- Reject Button -->
+            <?php if ($product['status'] !== 'rejected'): ?>
+              <form method="POST" style="display:inline;">
+                <input type="hidden" name="product_id" value="<?= $product['product_id'] ?>">
+                <button type="submit" name="reject_product" class="btn btn-danger btn-sm">
+                  <i class="bi bi-x-circle"></i> Reject
+                </button>
+              </form>
+            <?php endif; ?>
+          </td>
+          <td>
+            <!-- Approved Status Indicator -->
+            <?php if ($product['status'] === 'approved'): ?>
+              <span class="badge badge-success">
+                <i class="bi bi-check2-circle"></i> Approved
+              </span>
+            <?php elseif ($product['status'] === 'rejected'): ?>
+              <span class="badge badge-danger">
+                <i class="bi bi-x-circle"></i> Rejected
+              </span>
+            <?php else: ?>
+              <span class="badge badge-warning">
+                <i class="bi bi-hourglass-split"></i> Pending
+              </span>
+            <?php endif; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
       </main>
     </div>
   </div>
