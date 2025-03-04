@@ -2,9 +2,9 @@
 // Start session to check if user is logged in
 session_start();
 
-// Check if the user is logged in as an Admin, if not redirect to the login page
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true || $_SESSION['role'] !== 'Admin') {
-    header("Location: admin-login.php");
+// Check if the user is logged in as a Manager, if not redirect to the login page
+if (!isset($_SESSION['manager_logged_in']) || $_SESSION['manager_logged_in'] !== true || $_SESSION['role'] !== 'Manager') {
+    header("Location: manager-login.php");
     exit();
 }
 
@@ -18,10 +18,10 @@ $conn = $database->connect();
 // Log instance
 $log = new Log();  // Instantiate the Log class
 
-// Get Admin User ID from Session - Crucial for logging
-$admin_user_id = $_SESSION['admin_user_id'] ?? null; // Assuming you store the admin's user_id in the session
-if (!$admin_user_id) {
-    error_log("Admin user ID not found in session. Logging will be incomplete.");
+// Get Manager User ID from Session - Crucial for logging
+$manager_user_id = $_SESSION['manager_user_id'] ?? null; // Assuming you store the manager's user_id in the session
+if (!$manager_user_id) {
+    error_log("Manager user ID not found in session. Logging will be incomplete.");
     // Handle the error appropriately - maybe redirect to login or display an error message
 }
 
@@ -78,8 +78,8 @@ if (isset($_POST['manage_pickup_details'])) {
         $_SESSION['message_type'] = 'success';
 
         // Log the activity
-        if ($admin_user_id) {
-            $log->logActivity($admin_user_id, $action_description);
+        if ($manager_user_id) {
+            $log->logActivity($manager_user_id, $action_description);
         }
 
     } else {
@@ -87,13 +87,13 @@ if (isset($_POST['manage_pickup_details'])) {
         $_SESSION['message_type'] = 'danger';
 
         // Log the activity (even on error)
-        if ($admin_user_id) {
-            $log->logActivity($admin_user_id, "Failed to save pickup details for order ID: $order_id. Error: " . print_r($stmt->errorInfo(), true));
+        if ($manager_user_id) {
+            $log->logActivity($manager_user_id, "Failed to save pickup details for order ID: $order_id. Error: " . print_r($stmt->errorInfo(), true));
             error_log("PDO Error: " . print_r($stmt->errorInfo(), true));  // Log PDO errors
         }
     }
 
-    header("Location: order-oversight.php"); // Redirect to refresh the page
+    header("Location: manager-order-oversight.php"); // Redirect to refresh the page
     exit();
 }
 
@@ -160,21 +160,21 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Handle logout
 if (isset($_POST['logout'])) {
     // Log the activity
-    if ($admin_user_id) {
-        $log->logActivity($admin_user_id, "Admin logged out.");
+    if ($manager_user_id) {
+        $log->logActivity($manager_user_id, "Manager logged out.");
     }
 
     session_unset();
     session_destroy();
-    header("Location: admin-login.php");
+    header("Location: manager-login.php");
     exit();
 }
 
 // Log Search Activity
 if (!empty($search)) {
     // Log the activity
-    if ($admin_user_id) {
-        $log->logActivity($admin_user_id, "Admin searched orders with term: '$search'. Results: $totalOrders");
+    if ($manager_user_id) {
+        $log->logActivity($manager_user_id, "Manager searched orders with term: '$search'. Results: $totalOrders");
     }
 }
 ?>
@@ -184,10 +184,9 @@ if (!empty($search)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Oversight - Admin Dashboard</title>
+    <title>Order Oversight - Manager Dashboard</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../../public/style/admin.css">
     <link rel="stylesheet" href="../../public/style/admin-sidebar.css">
     <style>
@@ -225,14 +224,13 @@ if (!empty($search)) {
     <div class="container-fluid">
         <div class="row">
             <!-- Include Sidebar -->
-            <?php include '../../views/global/admin-sidebar.php'; ?>
+            <?php include '../../views/global/manager-sidebar.php'; ?>
 
             <!-- Main Content -->
             <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4 py-1">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2 text-success">Order Oversight</h1>
                     <form method="POST" class="ml-3">
-                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                         <button type="submit" name="logout" class="btn btn-danger">
                             <i class="bi bi-box-arrow-right"></i> Logout
                         </button>
@@ -302,7 +300,7 @@ if (!empty($search)) {
 
                 <!-- Pagination -->
                 <nav>
-                    <ul class="pagination justify-content-center mt-5">
+                    <ul class="pagination justify-content-center mt-3">
                         <?php if ($page > 1): ?>
                             <li class="page-item">
                                 <a class="page-link" href="?page=1&search=<?= urlencode($search) ?>">First</a>
@@ -344,7 +342,6 @@ if (!empty($search)) {
                                 <form method="POST" action="">
                                     <input type="hidden" name="order_id" id="order_id">
                                     <input type="hidden" name="pickup_id" id="pickup_id">
-                                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
 
                                     <div class="form-group">
                                         <label for="pickup_date">Pickup Date</label>
@@ -380,7 +377,6 @@ if (!empty($search)) {
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-
     <script>
         $(document).ready(function () {
             $('.manage-pickup-btn').click(function () {

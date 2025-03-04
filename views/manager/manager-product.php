@@ -1,46 +1,32 @@
 <?php
+// Start session to check if user is logged in
 session_start();
-require_once '../../controllers/ProductController.php';
-require_once '../../models/Log.php'; // Include the Log class
 
+// Check if the user is logged in as a Manager, if not redirect to the login page
+if (!isset($_SESSION['manager_logged_in']) || $_SESSION['manager_logged_in'] !== true || $_SESSION['role'] !== 'Manager') {
+    header("Location: manager-login.php");
+    exit();
+}
+
+// Include necessary files
+require_once '../../controllers/ProductController.php';  // For product-related functions
+require_once '../../models/Log.php'; //For activity logs
+
+// Create instances of required classes
 $productController = new ProductController();
-$logClass = new Log(); // Create an instance of the Log class
+$logClass = new Log();
 
-// Fetch products
-$products = $productController->getAllProducts();
+// Fetch products (Modify this to fetch ONLY products the Manager is responsible for)
+$products = $productController->getAllProducts(); //Important to limit this for Managers
 
-// Handle POST requests for approving and rejecting products
+// Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Handle product rejection
-    if (isset($_POST['reject_product']) && !empty($_POST['product_id'])) {
-        $productController->updateProductStatus($_POST['product_id'], 'rejected');
-        
-        // Log the action
-        $logClass->logActivity($_SESSION['user_id'], 'Rejected product with ID: ' . $_POST['product_id']);
-        
-        header("Location: product-management.php");
-        exit();
-    }
-
-    // Handle product approval
-    if (isset($_POST['approve_product']) && !empty($_POST['product_id'])) {
-        $productController->updateProductStatus($_POST['product_id'], 'approved');
-        
-        // Log the action
-        $logClass->logActivity($_SESSION['user_id'], 'Approved product with ID: ' . $_POST['product_id']);
-        
-        header("Location: product-management.php");
-        exit();
-    }
 
     // Handle logout
     if (isset($_POST['logout'])) {
-        // Log the logout action
-        $logClass->logActivity($_SESSION['user_id'], 'Admin logged out');
-        
         session_unset();
         session_destroy();
-        header("Location: admin-login.php");
+        header("Location: manager-login.php");
         exit();
     }
 }
@@ -51,10 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Product Management - Admin Dashboard</title>
+  <title>Product Management - Manager Dashboard</title>
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../../public/style/admin.css">
   <link rel="stylesheet" href="../../public/style/admin-sidebar.css">
   <style>
@@ -92,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
   <div class="container-fluid">
     <div class="row">
       <!-- Sidebar -->
-      <?php include '../../views/global/admin-sidebar.php'; ?>
+      <?php include '../../views/global/manager-sidebar.php'; ?>
 
       <!-- Main Content -->
       <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
@@ -124,78 +109,56 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
           </div>
         </div>
 
-        <!-- Product Table -->
-        <div class="table-container mt-5">
-          <table class="table table-bordered text-center">
-            <thead class="table-header">
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Price</th>
-                <th>Image</th>
-                <th>Farmer</th>
-                <th>Actions</th>
-                <th>Status</th> <!-- Moved Status to the last column -->
-              </tr>
-            </thead>
-            <tbody id="productTableBody">
-              <?php foreach ($products as $product): ?>
-                <tr>
-                  <td><?= htmlspecialchars($product['product_id']) ?></td>
-                  <td><?= htmlspecialchars($product['name']) ?></td>
-                  <td><?= htmlspecialchars($product['description']) ?></td>
-                  <td>₱<?= number_format($product['price'], 2) ?></td>
-                  <td>
-                    <?php if (!empty($product['image'])): ?>
-                      <img src="<?= '../../public/' . htmlspecialchars($product['image']) ?>" alt="Product Image" class="img-thumbnail" style="width: 80px; height: 80px;">
-                    <?php else: ?>
-                      <img src="../../public/assets/placeholder.png" alt="No Image" class="img-thumbnail" style="width: 80px; height: 80px;">
-                    <?php endif; ?>
-                  </td>
-                  <td><?= htmlspecialchars($product['farmer_name']) ?></td>
-                  <td>
-                    <!-- Approve Button -->
-                    <?php if ($product['status'] !== 'approved'): ?>
-                      <form method="POST" style="display:inline;">
-                        <input type="hidden" name="product_id" value="<?= $product['product_id'] ?>">
-                        <button type="submit" name="approve_product" class="btn btn-success btn-sm mb-2">
-                          <i class="bi bi-check2-circle"></i> Approve
-                        </button>
-                      </form>
-                    <?php endif; ?>
-
-                    <!-- Reject Button -->
-                    <?php if ($product['status'] !== 'rejected'): ?>
-                      <form method="POST" style="display:inline;">
-                        <input type="hidden" name="product_id" value="<?= $product['product_id'] ?>">
-                        <button type="submit" name="reject_product" class="btn btn-danger btn-sm">
-                          <i class="bi bi-x-circle"></i> Reject
-                        </button>
-                      </form>
-                    <?php endif; ?>
-                  </td>
-                  <td>
-                    <!-- Approved Status Indicator -->
-                    <?php if ($product['status'] === 'approved'): ?>
-                      <span class="badge badge-success">
-                        <i class="bi bi-check2-circle"></i> Approved
-                      </span>
-                    <?php elseif ($product['status'] === 'rejected'): ?>
-                      <span class="badge badge-danger">
-                        <i class="bi bi-x-circle"></i> Rejected
-                      </span>
-                    <?php else: ?>
-                      <span class="badge badge-warning">
-                        <i class="bi bi-hourglass-split"></i> Pending
-                      </span>
-                    <?php endif; ?>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        </div>
+<!-- Product Table -->
+<div class="table-container mt-5">
+  <table class="table table-bordered text-center">
+    <thead class="table-header">
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Price</th>
+        <th>Image</th>
+        <th>Farmer</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="productTableBody">
+      <?php foreach ($products as $product): ?>
+        <tr>
+          <td><?= htmlspecialchars($product['product_id']) ?></td>
+          <td><?= htmlspecialchars($product['name']) ?></td>
+          <td><?= htmlspecialchars($product['description']) ?></td>
+          <td>₱<?= number_format($product['price'], 2) ?></td>
+          <td>
+          <?php if (!empty($product['image'])): ?>
+              <img src="<?= '../../public/' . htmlspecialchars($product['image']) ?>" alt="Product Image" class="img-thumbnail" style="width: 80px; height: 80px;">
+          <?php else: ?>
+              <img src="../../public/assets/placeholder.png" alt="No Image" class="img-thumbnail" style="width: 80px; height: 80px;">
+          <?php endif; ?>
+      </td>
+          <td><?= htmlspecialchars($product['farmer_name']) ?></td>
+          <td>
+            <!-- Approved Status Indicator -->
+            <?php if ($product['status'] === 'approved'): ?>
+              <span class="badge badge-success">
+                <i class="bi bi-check2-circle"></i> Approved
+              </span>
+            <?php elseif ($product['status'] === 'rejected'): ?>
+              <span class="badge badge-danger">
+                <i class="bi bi-x-circle"></i> Rejected
+              </span>
+            <?php else: ?>
+              <span class="badge badge-warning">
+                <i class="bi bi-hourglass-split"></i> Pending
+              </span>
+            <?php endif; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
       </main>
     </div>
   </div>

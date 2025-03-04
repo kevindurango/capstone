@@ -2,12 +2,16 @@
 // Start the session to track login status
 session_start();
 
-// Include the database connection file
-require_once '../../models/Database.php';  // Ensure the path to Database.php is correct
+// Include necessary files
+require_once '../../models/Database.php';
+require_once '../../models/Log.php';  // Include the Log class
 
 // Create a new Database instance and get the PDO connection
 $db = new Database();
 $pdo = $db->connect();  // Get the database connection
+
+// Create an instance of the Log class
+$log = new Log();
 
 // If the login form is submitted
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -37,6 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_SESSION['user_id'] = $user['user_id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['role'] = $user['role_name'];  // Store the user's role in session
+
+            // Log the login activity to the activitylogs table
+            $log->logActivity($user['user_id'], 'Admin logged in');  // Make sure the activity is logged
 
             // Redirect to the admin dashboard
             header("Location: admin-dashboard.php");
