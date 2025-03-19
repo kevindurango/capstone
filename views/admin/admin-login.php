@@ -41,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_SESSION['user_id'] = $user['user_id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['role'] = $user['role_name'];  // Store the user's role in session
+            $_SESSION['admin_name'] = $user['username']; // Add this line to store admin name
 
             // Log the login activity to the activitylogs table
             $log->logActivity($user['user_id'], 'Admin logged in');  // Make sure the activity is logged
@@ -71,9 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <style>
         body {
             font-family: 'Poppins', sans-serif;
-            background-image: url('../../public/assets/admin-background.svg'); /* Set background image */
-            background-size: cover; /* Cover the entire screen */
-            background-position: center; /* Center the background image */
+            background-image: url('../../public/assets/admin-background.svg');
+            background-size: cover;
+            background-position: center;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -81,24 +82,76 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             margin: 0;
         }
         .login-card {
-            background-color: rgba(255, 255, 255, 0.8); /* White background with transparency */
-            border-radius: 10px;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
             padding: 40px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
             width: 400px;
+            transition: transform 0.3s ease;
+        }
+        .login-card:hover {
+            transform: translateY(-5px);
         }
         .login-card h3 {
             text-align: center;
             margin-bottom: 30px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        .logo-container {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .logo {
+            width: 80px;
+            height: auto;
+        }
+        .form-group {
+            margin-bottom: 25px;
+            position: relative;
+        }
+        .form-group label {
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 8px;
+            display: block;
         }
         .form-control {
-            margin-bottom: 15px;
+            border-radius: 8px;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            transition: all 0.3s ease;
         }
-        .btn {
-            width: 100%;
+        .form-control:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        }
+        .btn-primary {
+            background-color: #3498db;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        .btn-primary:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
         }
         .alert {
-            margin-bottom: 20px;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-left: 4px solid #e74c3c;
+        }
+        .input-icon {
+            position: absolute;
+            right: 15px;
+            top: 43px;
+            color: #777;
         }
     </style>
 </head>
@@ -106,35 +159,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <!-- Login Form -->
 <div class="login-card">
-    <h3>Admin Login</h3>
-
-    <!-- Display error message if login failed -->
+    <div class="logo-container">
+        <img src="../../public/assets/admin-logo.png" alt="Admin Logo" class="logo">
+    </div>
+    
+    <!-- Display error message if any -->
     <?php if (isset($error)): ?>
-        <div class="alert alert-danger">
-            <?= htmlspecialchars($error) ?> <!-- Use htmlspecialchars to prevent XSS attacks -->
+        <div class="alert alert-danger" role="alert">
+            <?php echo htmlspecialchars($error); ?>
         </div>
     <?php endif; ?>
 
-    <form method="POST" action="admin-login.php">
-        <!-- Username Field -->
+    <!-- Login Form -->
+    <form method="POST" action="">
+        <h3>Admin Login</h3>
         <div class="form-group">
             <label for="username">Username</label>
             <input type="text" class="form-control" id="username" name="username" required>
+            <i class="bi bi-person input-icon"></i>
         </div>
-
-        <!-- Password Field -->
         <div class="form-group">
             <label for="password">Password</label>
             <input type="password" class="form-control" id="password" name="password" required>
+            <i class="bi bi-lock input-icon"></i>
         </div>
-
-        <!-- Submit Button -->
-        <button type="submit" class="btn btn-primary">Login</button>
+        <button type="submit" class="btn btn-primary btn-block">Login</button>
     </form>
 </div>
 
-<!-- Scripts -->
-<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>

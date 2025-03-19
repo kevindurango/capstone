@@ -1,0 +1,345 @@
+:root {
+  --primary-color: #28a745; /* Changed to match other pages */
+  --primary-light: #e8f5e9; /* Added to match other pages */
+  --secondary-color: #2ecc71;
+  --danger-color: #e74c3c;
+  --warning-color: #f39c12;
+  --dark-color: #2c3e50;
+  --light-color: #ecf0f1;
+  --border-radius: 10px; /* Changed to match other pages */
+  --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --transition: all 0.3s ease;
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --radius: 8px;
+}
+
+/* Card styling */
+.card.custom-card {
+  border: none;
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius);
+  transition: var(--transition);
+  background: linear-gradient(145deg, #ffffff, #f8f9fa);
+}
+
+.card.custom-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-3px);
+}
+
+/* Action buttons */
+.btn-action {
+  width: 35px;
+  height: 35px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-right: 5px;
+  transition: var(--transition);
+}
+
+.btn-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Table styling */
+.table-responsive {
+  max-height: 70vh;
+  overflow-y: auto;
+  border-radius: var(--radius);
+  position: relative;
+}
+
+.table {
+  margin-bottom: 0;
+  position: relative;
+}
+
+table thead {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+table thead th {
+  background: #28a745;
+  border-bottom: 2px solid #219a3a;
+  color: white;
+  font-weight: 600;
+  padding: 12px 15px;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+  /* Add these properties to prevent header overlap */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* Remove the green line to match other pages */
+table thead::after {
+  content: none;
+}
+
+table tbody tr {
+  transition: var(--transition);
+}
+
+table tbody tr:hover {
+  background-color: rgba(52, 152, 219, 0.1);
+}
+
+/* Improved table styling for better visibility */
+.table-responsive {
+  max-height: 70vh;
+  overflow-y: auto;
+  border-radius: var(--radius);
+}
+
+.table th,
+.table td {
+  vertical-align: middle;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.table-bordered th {
+  border-color: #b9c3ce;
+}
+
+.table-bordered td {
+  border-color: #dee2e6;
+}
+
+/* Breadcrumb styling - updated to match other pages */
+.breadcrumb {
+  background-color: transparent;
+  padding: 0.75rem 0;
+  margin-bottom: 1.5rem;
+  padding-top: 1rem; /* Add this to match other pages */
+}
+
+.breadcrumb-item a {
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.breadcrumb-item a:hover {
+  color: #2980b9;
+  text-decoration: underline;
+}
+
+/* Card title styling */
+.card-title {
+  color: var(--dark-color);
+  font-weight: 600;
+  position: relative;
+  padding-bottom: 8px;
+}
+
+.card-title:after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 40px;
+  background-color: var(--primary-color);
+  border-radius: 2px;
+}
+
+/* Modal styling */
+.modal-content {
+  border-radius: var(--radius);
+  border: none;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+  background: linear-gradient(145deg, #f8f9fa, #e9ecef);
+  border-bottom: 1px solid #dee2e6;
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+}
+
+.modal-title {
+  color: var(--dark-color);
+  font-weight: 600;
+}
+
+/* Button styling */
+.btn {
+  border-radius: var(--radius);
+  font-weight: 500;
+  padding: 8px 16px;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(145deg, #3498db, #2980b9);
+  border: none;
+}
+
+.btn-success {
+  background: linear-gradient(145deg, #2ecc71, #27ae60);
+  border: none;
+}
+
+.btn-warning {
+  background: linear-gradient(145deg, #f39c12, #e67e22);
+  border: none;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Search and filter controls - Enhanced visibility */
+#searchUser,
+#roleFilter {
+  border-radius: var(--radius);
+  border: 1px solid #ced4da;
+  padding: 10px 15px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.075);
+  transition: var(--transition);
+  color: #000000; /* Darker text color for better visibility */
+  background-color: white;
+  height: auto; /* Ensure proper height */
+  min-height: 42px; /* Minimum height to avoid sizing issues */
+  width: 100%; /* Full width within container */
+  font-size: 14px; /* Explicit font size */
+  -webkit-appearance: none; /* Fix for Safari issues */
+  -moz-appearance: none; /* Fix for Firefox issues */
+  appearance: none; /* Standardized appearance */
+}
+
+#searchUser:focus,
+#roleFilter:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25); /* Match primary color */
+  outline: none; /* Remove default outline */
+}
+
+/* Dropdown option text visibility fix */
+#roleFilter option {
+  color: #000000; /* Darker text for options */
+  background-color: white;
+  padding: 10px 15px; /* Match input padding */
+  font-size: 14px; /* Match font size */
+  min-height: 30px; /* Ensure options are tall enough */
+  line-height: 1.5; /* Add line height for better readability */
+}
+
+/* Placeholder text styling */
+#searchUser::placeholder {
+  color: #6c757d;
+  opacity: 0.8;
+}
+
+/* Filter dropdown arrow styling */
+#roleFilter {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 16px 12px;
+  padding-right: 2.5rem; /* Make room for the arrow */
+}
+
+/* Fix for Firefox styling */
+@-moz-document url-prefix() {
+  #roleFilter {
+    text-indent: 0.01px;
+    text-overflow: "";
+  }
+}
+
+/* Page header - fix margin and spacing */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  position: relative;
+  padding: 1rem;
+  margin-bottom: 2rem;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.page-header:after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, #28a745, transparent);
+}
+
+.page-header h1 {
+  background: linear-gradient(45deg, var(--dark-color), #28a745);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  font-size: 1.75rem;
+  margin-bottom: 5px;
+}
+
+.page-header .d-flex form {
+  margin-left: 0.5rem !important; /* Update this to be consistent */
+}
+
+/* Action row - removed as it's now part of page-header */
+.action-row {
+  display: none;
+}
+
+/* Manager header styling */
+.manager-header {
+  background: linear-gradient(135deg, #1a8754 0%, #34c38f 100%);
+  color: white;
+  padding: 10px 0;
+}
+
+.manager-badge {
+  background-color: #157347;
+  color: white;
+  font-size: 0.8rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-left: 10px;
+}
+
+/* Role badges */
+.role-badge {
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.role-badge.Farmer {
+  background-color: #e1f5fe;
+  color: #0288d1;
+}
+
+.role-badge.Vendor {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.role-badge.Customer {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}

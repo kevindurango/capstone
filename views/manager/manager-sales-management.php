@@ -1,92 +1,34 @@
 <?php
-// Start the session to track login status
 session_start();
 
-// Check if the user is logged in as a Manager, if not redirect to the login page
+// Check manager authentication
 if (!isset($_SESSION['manager_logged_in']) || $_SESSION['manager_logged_in'] !== true || $_SESSION['role'] !== 'Manager') {
     header("Location: manager-login.php");
     exit();
 }
 
-// Include necessary models
-require_once '../../models/Order.php'; // Assuming you have an Order model
-require_once '../../models/Log.php'; // Assuming you have a Log model
+require_once '../../models/Sales.php';
+require_once '../../models/Log.php';
 
-// Instantiate necessary classes
-$orderClass = new Order();
+$salesClass = new Sales();
 $logClass = new Log();
 
-// Get Manager User ID from Session - Crucial for logging
-$manager_user_id = $_SESSION['manager_user_id'] ?? null; // Assuming you store the manager's user_id in the session
-if (!$manager_user_id) {
-    error_log("Manager user ID not found in session. Logging will be incomplete.");
-}
+// Fetch sales metrics
+$dailySales = $salesClass->getDailySales();
+$weeklySales = $salesClass->getWeeklySales();
+$monthlySales = $salesClass->getMonthlySales();
+$totalRevenue = $salesClass->getTotalRevenue();
+$averageOrderValue = $salesClass->getAverageOrderValue();
+$salesByCategory = $salesClass->getSalesByCategory();
+$topProducts = $salesClass->getTopProducts(5); // Get top 5 products
+$revenueData = $salesClass->getRevenueData(); // For chart
 
-// Log the Manager Login activity
-if ($_SESSION['manager_logged_in'] === true && $_SESSION['role'] === 'Manager' && isset($manager_user_id)) {
-    $logClass->logActivity($manager_user_id, "Manager logged in.");
-}
-
-// Fetch orders using the existing method in your Order model
-$orders = $orderClass->getOrdersWithPickupDetails(); // Fetch orders with pickup details
-
-// Handle logout functionality
-if (isset($_POST['logout'])) {
-    // Log the activity
-    if ($manager_user_id) {
-        $logClass->logActivity($manager_user_id, "Manager logged out.");
-    }
-
-    // Destroy session and log out the user
-    session_unset();
+// Handle POST actions
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['logout'])) {
+    $logClass->logActivity($_SESSION['user_id'], "Manager logged out");
     session_destroy();
     header("Location: manager-login.php");
     exit();
-}
-
-// Generate a CSRF token
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
-// Handle form submissions with CSRF validation
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
-    // Example: If you want to update an order status
-    if (isset($_POST['update_order_status'])) {
-        $order_id = $_POST['order_id'];
-        $new_status = $_POST['order_status'];
-
-        // Allowed statuses for updating
-        $allowed_statuses = ['pending', 'completed', 'canceled'];
-
-        if (!in_array($new_status, $allowed_statuses)) {
-            $_SESSION['message'] = "Invalid status update request!";
-            $_SESSION['message_type'] = 'danger';
-            header("Location: manager-sales-management.php");
-            exit();
-        }
-
-        // Log the activity of changing the status
-        if ($manager_user_id) {
-            $logClass->logActivity($manager_user_id, "Attempted to update order ID $order_id to status: $new_status");
-        }
-
-        // Update order status if valid
-        if ($orderClass->updateOrderStatus($order_id, $new_status)) {
-            // Log the successful status update activity
-            if ($manager_user_id) {
-                $logClass->logActivity($manager_user_id, "Updated order status for order ID: $order_id to $new_status.");
-            }
-            $_SESSION['message'] = "Order status updated successfully.";
-            $_SESSION['message_type'] = 'success';
-        } else {
-            $_SESSION['message'] = "Failed to update order status.";
-            $_SESSION['message_type'] = 'danger';
-        }
-
-        header("Location: manager-sales-management.php"); // Redirect to reload the page with the new status
-        exit();
-    }
 }
 ?>
 
@@ -98,40 +40,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && hash_equals($_SESSION['csrf_token'],
     <title>Sales Management - Manager Dashboard</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../../public/style/admin.css">
     <link rel="stylesheet" href="../../public/style/admin-sidebar.css">
-    <style>
-        .table-container {
-            position: relative;
-            overflow-x: auto;
-            max-height: 450px;
-        }
-        .table-container thead th {
-            position: sticky;
-            top: 0;
-            z-index: 1;
-        }
-        .table-container tbody td {
-            vertical-align: middle;
-        }
-        .btn-primary, .btn-success, .btn-warning, .btn-danger {
-            font-weight: bold;
-        }
-        .modal-header {
-            background-color: #f7f7f7;
-        }
-        .modal-footer button {
-            width: 120px;
-        }
-        .modal-title {
-            font-weight: bold;
-        }
-        .table-bordered td, .table-bordered th {
-            border: 1px solid #dee2e6;
-        }
-    </style>
+    <link rel="stylesheet" href="../../public/style/admin-dashboard.css">
+    <link rel="stylesheet" href="../../public/style/manager-sales.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+    <!-- Add Manager Header -->
+    <div class="manager-header text-center">
+        <h2><i class="bi bi-graph-up"></i> SALES MANAGEMENT SYSTEM <span class="manager-badge">Manager Access</span></h2>
+    </div>
+
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
@@ -139,161 +60,245 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && hash_equals($_SESSION['csrf_token'],
 
             <!-- Main Content -->
             <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
-                <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2 text-success">Sales Management</h1>
-                    <div class="d-flex">
-                        <form method="POST" class="ml-3">
-                            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                            <button type="submit" name="logout" class="btn btn-danger">
+                <!-- Breadcrumb -->
+                <nav aria-label="breadcrumb" class="mt-3">
+                    <ol class="breadcrumb bg-white">
+                        <li class="breadcrumb-item"><a href="manager-dashboard.php">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Sales Management</li>
+                    </ol>
+                </nav>
+
+                <!-- Enhanced Page Header -->
+                <div class="page-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h2 gradient-text">
+                            <i class="bi bi-graph-up-arrow"></i> Sales Overview
+                        </h1>
+                        <p class="text-muted mb-0">Track and analyze your sales performance</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success mr-2" onclick="exportSalesReport()">
+                            <i class="bi bi-file-earmark-excel"></i> Export Report
+                        </button>
+                        <form method="POST" class="mb-0">
+                            <button type="submit" name="logout" class="btn btn-danger logout-btn">
                                 <i class="bi bi-box-arrow-right"></i> Logout
                             </button>
                         </form>
                     </div>
                 </div>
 
-                <!-- Display Message -->
-                <?php if (isset($_SESSION['message'])): ?>
-                    <div class="alert alert-<?= $_SESSION['message_type'] ?> alert-dismissible fade show" role="alert">
-                        <?php echo $_SESSION['message']; ?>
-                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <?php unset($_SESSION['message']); // Clear message after display ?>
-                <?php endif; ?>
-
-                <!-- Order Listing -->
-                <div class="card custom-card table-container">
-                    <div class="card-body">
-                        <h5 class="card-title">Order List</h5>
-                        <div class="table-responsive">
-                            <table class="table table-hover table-striped table-bordered mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Order ID</th>
-                                        <th>Consumer Name</th>
-                                        <th>Order Status</th>
-                                        <th>Order Date</th>
-                                        <th>Pickup Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($orders as $order): ?>
-                                        <tr>
-                                            <td><?= htmlspecialchars($order['order_id']) ?></td>
-                                            <td><?= htmlspecialchars($order['consumer_name']) ?></td>
-                                            <td><?= htmlspecialchars($order['order_status']) ?></td>
-                                            <td><?= htmlspecialchars($order['order_date']) ?></td>
-                                            <td><?= htmlspecialchars($order['pickup_status']) ?></td>
-                                            <td>
-                                                <!-- View Details -->
-                                                <button class="btn btn-info btn-sm view-order-btn"
-                                                        data-order-id="<?= htmlspecialchars($order['order_id']) ?>"
-                                                        data-toggle="modal" data-target="#orderDetailsModal">
-                                                    <i class="bi bi-eye"></i>
-                                                </button>
-
-                                                <!-- Update Order Status -->
-                                                <button class="btn btn-warning btn-sm update-order-status-btn"
-                                                        data-order-id="<?= htmlspecialchars($order['order_id']) ?>"
-                                                        data-order-status="<?= htmlspecialchars($order['order_status']) ?>"
-                                                        data-toggle="modal" data-target="#updateOrderStatusModal">
-                                                    <i class="bi bi-arrow-clockwise"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                <!-- Date Filter Section -->
+                <form id="dateFilterForm" class="date-filter-container">
+                    <div class="row align-items-end">
+                        <div class="col-md-4">
+                            <div class="date-input-group">
+                                <label for="startDate"><i class="bi bi-calendar3"></i> Start Date:</label>
+                                <input type="date" id="startDate" name="startDate" class="form-control" required>
+                            </div>
                         </div>
-                    </div>
-                </div>
-
-            </main>
-        </div>
-    </div>
-
-    <!-- Update Order Status Modal -->
-    <div class="modal fade" id="updateOrderStatusModal" tabindex="-1" role="dialog" aria-labelledby="updateOrderStatusModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <form method="POST">
-                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                    <input type="hidden" name="order_id" id="update_order_id">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="updateOrderStatusModalLabel">Update Order Status</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label for="order_status">New Status</label>
-                            <select class="form-control" id="order_status" name="order_status">
-                                <option value="pending">Pending</option>
-                                <option value="completed">Completed</option>
-                                <option value="canceled">Canceled</option>
-                            </select>
+                        <div class="col-md-4">
+                            <div class="date-input-group">
+                                <label for="endDate"><i class="bi bi-calendar3"></i> End Date:</label>
+                                <input type="date" id="endDate" name="endDate" class="form-control" required>
+                            </div>
                         </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                        <button type="submit" name="update_order_status" class="btn btn-primary">Save changes</button>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-funnel"></i> Apply Filter
+                            </button>
+                        </div>
                     </div>
                 </form>
-            </div>
-        </div>
-    </div>
 
-    <!-- Order Details Modal -->
-    <div class="modal fade" id="orderDetailsModal" tabindex="-1" role="dialog" aria-labelledby="orderDetailsModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="orderDetailsModalLabel">Order Details</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                <!-- Sales Overview Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="sales-dashboard-card">
+                            <div class="sales-card-icon text-primary">
+                                <i class="bi bi-calendar-day"></i>
+                            </div>
+                            <div class="sales-card-title">Today's Sales</div>
+                            <div class="sales-card-value">₱<?= number_format($dailySales, 2) ?></div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="sales-dashboard-card">
+                            <div class="sales-card-icon text-success">
+                                <i class="bi bi-calendar-week"></i>
+                            </div>
+                            <div class="sales-card-title">Weekly Sales</div>
+                            <div class="sales-card-value">₱<?= number_format($weeklySales, 2) ?></div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="sales-dashboard-card">
+                            <div class="sales-card-icon text-info">
+                                <i class="bi bi-calendar-month"></i>
+                            </div>
+                            <div class="sales-card-title">Monthly Sales</div>
+                            <div class="sales-card-value">₱<?= number_format($monthlySales, 2) ?></div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="sales-dashboard-card">
+                            <div class="sales-card-icon text-warning">
+                                <i class="bi bi-cash-stack"></i>
+                            </div>
+                            <div class="sales-card-title">Average Order</div>
+                            <div class="sales-card-value">₱<?= number_format($averageOrderValue, 2) ?></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="modal-body" id="orderDetailsContent">
-                    <!-- Order details will be loaded here via AJAX -->
+
+                <!-- Sales Charts -->
+                <div class="row mb-4">
+                    <div class="col-md-8">
+                        <div class="chart-panel">
+                            <h3 class="chart-panel-title"><i class="bi bi-graph-up"></i> Revenue Trend</h3>
+                            <div class="chart-container">
+                                <canvas id="revenueTrendChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="chart-panel">
+                            <h3 class="chart-panel-title"><i class="bi bi-pie-chart"></i> Sales by Category</h3>
+                            <div class="chart-container">
+                                <canvas id="categoryChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+
+                <!-- Top Products Table -->
+                <div class="products-table-container">
+                    <div class="products-table-header">
+                        <h5><i class="bi bi-trophy"></i> Top Performing Products</h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table products-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Category</th>
+                                    <th>Units Sold</th>
+                                    <th>Revenue</th>
+                                    <th>Trend</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($topProducts as $product): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($product['name']) ?></td>
+                                    <td><?= htmlspecialchars($product['category']) ?></td>
+                                    <td><?= number_format($product['units_sold']) ?></td>
+                                    <td>₱<?= number_format($product['revenue'], 2) ?></td>
+                                    <td>
+                                        <?php if ($product['trend'] > 0): ?>
+                                            <i class="bi bi-arrow-up-circle-fill trend-up"></i>
+                                        <?php else: ?>
+                                            <i class="bi bi-arrow-down-circle-fill trend-down"></i>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+            </main>
         </div>
     </div>
 
     <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
     <script>
-        // JavaScript to populate modal with order ID and current status
-        $(document).ready(function() {
-            $('.update-order-status-btn').click(function() {
-                var orderId = $(this).data('order-id');
-                var orderStatus = $(this).data('order-status');
-                $('#update_order_id').val(orderId);
-                $('#order_status').val(orderStatus);
-            });
-
-            // JavaScript for View Details button
-            $('.view-order-btn').click(function() {
-                var orderId = $(this).data('order-id');
-                // Load order details using AJAX
-                $.ajax({
-                    url: 'order-details.php?order_id=' + orderId,
-                    type: 'GET',
-                    success: function(data) {
-                        $('#orderDetailsContent').html(data); // Load the response into the modal body
-                    },
-                    error: function() {
-                        $('#orderDetailsContent').html('<p>Error loading order details.</p>');
+        // Revenue Trend Chart
+        const revenueTrendCtx = document.getElementById('revenueTrendChart').getContext('2d');
+        new Chart(revenueTrendCtx, {
+            type: 'line',
+            data: {
+                labels: <?= json_encode(array_column($revenueData, 'date')) ?>,
+                datasets: [{
+                    label: 'Revenue',
+                    data: <?= json_encode(array_column($revenueData, 'amount')) ?>,
+                    borderColor: '#28a745',
+                    tension: 0.4,
+                    fill: true,
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
                     }
-                });
-            });
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₱' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Category Chart
+        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+        new Chart(categoryCtx, {
+            type: 'doughnut',
+            data: {
+                labels: <?= json_encode(array_column($salesByCategory, 'category')) ?>,
+                datasets: [{
+                    data: <?= json_encode(array_column($salesByCategory, 'total')) ?>,
+                    backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#dc3545', '#6f42c1']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Export functionality
+        function exportSalesReport() {
+            const startDate = document.getElementById('startDate')?.value || '';
+            const endDate = document.getElementById('endDate')?.value || '';
+            
+            // Redirect to export endpoint with date parameters
+            window.location.href = `export-sales.php?start=${startDate}&end=${endDate}`;
+        }
+
+        // Handle date filter form submission
+        document.getElementById('dateFilterForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            if (new Date(startDate) > new Date(endDate)) {
+                alert('Start date cannot be after end date');
+                return;
+            }
+            
+            // Here you would implement date filtering logic
+            // For now just show an alert
+            alert(`Filtering data from ${startDate} to ${endDate}`);
+            
+            // In a real implementation, you would make an AJAX request to refresh the data
+            // window.location.href = `?start=${startDate}&end=${endDate}`;
         });
     </script>
 </body>

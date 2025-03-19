@@ -1,27 +1,45 @@
-/* Sidebar Styles */
-#sidebar {
-  background-color: #1f2937; /* Dark gray/navy */
-  height: 100vh; /* Full viewport height */
-  padding: 10px; /* Reduced padding */
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start; /* Align items to the start */
-  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease-in-out;
+:root {
+  --primary-color: #28a745;
+  --primary-light: #e8f5e9;
+  --sidebar-bg: #1f2937;
+  --sidebar-hover: #16a34a;
+  --sidebar-active: #22c55e;
+  --sidebar-text: #d1d5db;
+  --sidebar-icon: #22c55e;
+  --transition: all 0.3s ease;
+  --radius: 10px;
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
+/* Base Sidebar Structure */
+#sidebar {
+  background-color: var(--sidebar-bg);
+  height: 100vh;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-md);
+  transition: var(--transition);
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+}
+
+/* Logo Container */
 #sidebar .logo-container {
   display: flex;
   justify-content: center;
-  margin-bottom: 20px; /* Reduced margin */
+  margin-bottom: 20px;
 }
 
 #sidebar .logo-container img {
-  width: 100px; /* Adjusted size */
-  height: 100px; /* Adjusted size */
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: var(--transition);
 }
 
 #sidebar .logo-container img:hover {
@@ -29,77 +47,138 @@
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
 }
 
+/* Section Headings */
 #sidebar .sidebar-heading {
-  font-size: 18px;
-  color: #22c55e; /* Modern green */
+  font-size: 0.9rem;
+  color: var(--sidebar-icon);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
   text-align: center;
-  margin-bottom: 15px; /* Reduced margin */
+  margin-bottom: 15px;
+  padding: 0.5rem 0;
 }
 
-/* Sidebar Navigation Links */
+/* Navigation Container */
 #sidebar ul {
   list-style: none;
   padding: 0;
   margin: 0;
-  flex-grow: 1; /* Allow the list to grow and take available space */
+  flex-grow: 1;
+  overflow-y: hidden;
 }
 
+/* Navigation Links */
 #sidebar .nav-link {
-  color: #d1d5db; /* Neutral light gray */
+  color: var(--sidebar-text);
   font-weight: 500;
-  padding: 10px 15px; /* Reduced padding */
-  margin-bottom: 8px; /* Reduced margin */
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
   display: flex;
   align-items: center;
-  border-radius: 8px;
-  transition: background-color 0.3s ease, transform 0.3s ease, color 0.3s ease;
+  border-radius: var(--radius);
+  transition: var(--transition);
   text-decoration: none;
+  border-left: 4px solid transparent;
+}
+
+/* Add explicit active/pressed state styling */
+#sidebar .nav-link:active {
+  color: #ffffff !important; /* Force white text when pressed */
+  background-color: var(--sidebar-active);
+}
+
+#sidebar .nav-link:active i {
+  color: #ffffff !important; /* Force white icon when pressed */
 }
 
 #sidebar .nav-link i {
-  margin-right: 10px;
-  font-size: 18px;
-  color: #22c55e; /* Green icon */
-  transition: color 0.3s ease;
+  margin-right: 0.75rem;
+  font-size: 1.125rem;
+  color: var(--sidebar-icon);
+  transition: var(--transition);
 }
 
 /* Hover State */
 #sidebar .nav-link:hover {
-  background-color: #16a34a; /* Darker green */
-  color: #ffffff; /* White text */
+  background-color: var(--sidebar-hover);
+  color: #ffffff;
   transform: translateX(5px);
 }
 
 #sidebar .nav-link:hover i {
-  color: #ffffff; /* White icon */
+  color: #ffffff;
 }
 
 /* Active State */
-#sidebar .nav-item.active .nav-link {
-  background-color: #22c55e; /* Medium green */
-  color: #ffffff;
-  font-weight: bold;
+#sidebar .nav-item.active .nav-link,
+#sidebar .nav-link.active {
+  background-color: var(--sidebar-active);
+  color: #ffffff !important; /* Force white text for active state */
+  font-weight: 600;
   box-shadow: 0 4px 8px rgba(34, 197, 94, 0.4);
-  border-left: 5px solid #ffffff; /* Left border for active state */
-  transform: none; /* Prevent hover conflict */
+  border-left: 4px solid #ffffff;
+  transform: none;
 }
 
-#sidebar .nav-item.active .nav-link i {
-  color: #ffffff;
+#sidebar .nav-item.active .nav-link i,
+#sidebar .nav-link.active i {
+  color: #ffffff !important; /* Force white icon for active state */
 }
 
-/* Responsive Sidebar */
+/* Add explicit active/pressed state styling with increased specificity */
+#sidebar .nav-link:active,
+#sidebar .nav-item .nav-link:active {
+  color: #ffffff !important; /* Force white text when pressed */
+  background-color: var(--sidebar-active);
+}
+
+#sidebar .nav-link:active i,
+#sidebar .nav-item .nav-link:active i {
+  color: #ffffff !important; /* Force white icon when pressed */
+}
+
+/* Focus state - also add styling for keyboard navigation */
+#sidebar .nav-link:focus {
+  color: #ffffff !important;
+  background-color: var(--sidebar-hover);
+  outline: none;
+}
+
+#sidebar .nav-link:focus i {
+  color: #ffffff !important;
+}
+
+/* Brand/App Name */
+.sidebar-brand {
+  padding: 1rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.sidebar-brand img {
+  width: 35px;
+  margin-right: 10px;
+}
+
+/* Sidebar Sticky Container */
+.sidebar-sticky {
+  position: relative;
+  height: calc(100vh - 60px);
+  padding-top: 0.5rem;
+  overflow-y: hidden;
+  overflow-x: hidden;
+}
+
+/* Responsive Design */
 @media (max-width: 992px) {
   #sidebar {
-    position: fixed;
-    left: -100%;
-    top: 0;
     width: 250px;
-    z-index: 1000;
-    height: 100%;
+    left: -100%;
     transition: left 0.3s ease-in-out;
   }
 
@@ -108,19 +187,23 @@
   }
 
   #sidebar .logo-container img {
-    width: 80px; /* Adjusted size for smaller screens */
-    height: 80px; /* Adjusted size for smaller screens */
+    width: 80px;
+    height: 80px;
   }
 }
 
 @media (max-width: 576px) {
+  #sidebar {
+    width: 220px;
+  }
+
   #sidebar .nav-link {
     font-size: 14px;
-    padding: 8px 12px; /* Reduced padding for smaller screens */
+    padding: 8px 12px;
   }
 
   #sidebar .logo-container img {
-    width: 60px; /* Adjusted size for smaller screens */
-    height: 60px; /* Adjusted size for smaller screens */
+    width: 60px;
+    height: 60px;
   }
 }

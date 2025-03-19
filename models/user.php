@@ -131,6 +131,79 @@ class User
         }
     }
 
+    // User login method
+    public function login($username, $password, $role)
+    {
+        try {
+            $query = "SELECT * FROM users WHERE username = :username AND role_id = (SELECT role_id FROM roles WHERE role_name = :role) LIMIT 1";
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':username', $username);
+            $stmt->bindParam(':role', $role);
+            $stmt->execute();
+
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($user && password_verify($password, $user['password'])) {
+                return $user;
+            } else {
+                return false;
+            }
+        } catch (PDOException $e) {
+            echo "Error logging in: " . $e->getMessage();
+            return false;
+        }
+    }
+
+    public function getUsersByRoles($roles) {
+        try {
+            $placeholders = str_repeat('?,', count($roles) - 1) . '?';
+            $query = "SELECT u.*, r.role_name 
+                     FROM users u 
+                     JOIN roles r ON u.role_id = r.role_id 
+                     WHERE r.role_name IN ($placeholders)
+                     ORDER BY u.user_id DESC";
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute($roles);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error fetching users by roles: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getRolesByType($roleTypes) {
+        try {
+            $placeholders = str_repeat('?,', count($roleTypes) - 1) . '?';
+            $query = "SELECT * FROM roles WHERE role_name IN ($placeholders)";
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute($roleTypes);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error fetching roles by type: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function countUsersByRole($roleName) {
+        try {
+            $query = "SELECT COUNT(*) as count 
+                     FROM users u 
+                     JOIN roles r ON u.role_id = r.role_id 
+                     WHERE r.role_name = :role_name";
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':role_name', $roleName);
+            $stmt->execute();
+            
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result['count'];
+        } catch (PDOException $e) {
+            error_log("Error counting users by role: " . $e->getMessage());
+            return 0;
+        }
+    }
+
     // Close the database connection (optional)
     public function close()
     {

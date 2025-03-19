@@ -1,0 +1,371 @@
+:root {
+  --primary-color: #28a745; /* Changed to match pickup-management green */
+  --primary-light: #e8f5e9;
+  --secondary-color: #2ecc71;
+  --secondary-light: #eafaf1;
+  --warning-color: #f39c12;
+  --warning-light: #fef5e7;
+  --danger-color: #e74c3c;
+  --danger-light: #fdedec;
+  --info-color: #3498db;
+  --info-light: #ebf5fb;
+  --dark-color: #2c3e50;
+  --light-gray: #f8f9fa;
+  --border-radius: 8px;
+  --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --transition: all 0.3s ease;
+}
+
+/* Page container */
+main.order-oversight-page {
+  padding-top: 1.5rem !important;
+}
+
+/* Breadcrumb styling */
+.breadcrumb {
+  background-color: transparent;
+  padding: 0.75rem 0;
+  margin-bottom: 1.5rem;
+}
+
+.breadcrumb-item a {
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.breadcrumb-item a:hover {
+  color: #2980b9;
+  text-decoration: underline;
+}
+
+/* Action row with gradient - updated to match pickup-management style */
+.action-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  position: relative;
+}
+
+.action-row:after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    #28a745,
+    transparent
+  ); /* Changed to primary-color */
+}
+
+.action-row h1 {
+  background: linear-gradient(
+    45deg,
+    var(--dark-color),
+    #28a745
+  ); /* Changed to primary-color */
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+/* Card styling */
+.card.custom-card {
+  border: none;
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  background: linear-gradient(145deg, #ffffff, var(--light-gray));
+  transition: var(--transition);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.card.custom-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.card-title {
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #eee;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Search and filter controls */
+.filters-container {
+  background: var(--light-gray);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--box-shadow);
+}
+
+.search-control {
+  border-radius: var(--border-radius);
+  padding: 0.75rem 1rem;
+  border: 1px solid #dee2e6;
+  transition: var(--transition);
+}
+
+.search-control:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+}
+
+/* Fix search bar input group styling */
+.input-group {
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+.input-group-text {
+  border: 1px solid #dee2e6;
+  border-right: none;
+  background-color: white;
+  padding: 0.75rem 1rem;
+}
+
+.input-group .form-control {
+  border-left: none;
+  padding: 0.75rem 1rem;
+  height: auto;
+}
+
+.input-group .form-control:focus {
+  box-shadow: none;
+  border-color: #dee2e6;
+}
+
+.input-group .btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding: 0.75rem 1.5rem;
+}
+
+.input-group-prepend .input-group-text {
+  color: #6c757d;
+}
+
+.input-group:focus-within {
+  box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+}
+
+.input-group:focus-within .input-group-text,
+.input-group:focus-within .form-control {
+  border-color: var(--primary-color);
+}
+
+/* Override default search control styles for the input group */
+.search-control {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.search-control:focus {
+  box-shadow: none !important;
+}
+
+/* Table styling */
+.table-container {
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  overflow: hidden;
+}
+
+.table thead th {
+  background: #28a745; /* Changed to match pickup-management green */
+  border-bottom: 2px solid #219a3a; /* Changed to darker green similar to pickup-management */
+  color: white;
+  font-weight: 600;
+  padding: 12px 15px;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* Status badges */
+.status-badge {
+  padding: 0.4rem 0.8rem;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.badge-warning {
+  background-color: var(--warning-light);
+  color: var(--warning-color);
+}
+
+.badge-success {
+  background-color: var(--secondary-light);
+  color: var(--secondary-color);
+}
+
+.badge-danger {
+  background-color: var(--danger-light);
+  color: var(--danger-color);
+}
+
+/* Action buttons */
+.btn-sm {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.875rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: var(--transition);
+}
+
+.btn-sm:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Improved Modal Styling */
+.modal-content {
+  border: none;
+  border-radius: var(--border-radius);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+  background: linear-gradient(
+    145deg,
+    #28a745,
+    #219a3a
+  ); /* Changed to match pickup-management */
+  color: white;
+  border-bottom: none;
+  padding: 1.5rem;
+}
+
+.modal-title {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.modal-body {
+  padding: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: var(--dark-color);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-control {
+  border-radius: var(--border-radius);
+  padding: 0.75rem 1rem;
+  border: 2px solid #e9ecef;
+  transition: var(--transition);
+}
+
+.form-control:focus {
+  border-color: #28a745; /* Changed to match pickup-management */
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25); /* Changed to match pickup-management */
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e9ecef;
+}
+
+/* Order details styling */
+.order-details-container {
+  padding: 1rem;
+}
+
+.order-header {
+  margin-bottom: 2rem;
+}
+
+.order-items table {
+  margin-top: 1rem;
+}
+
+.pickup-details .card {
+  background: var(--light-gray);
+  border: none;
+}
+
+/* Status filter buttons */
+.status-filter .btn {
+  padding: 0.5rem 1rem;
+  border-radius: 50px;
+  font-weight: 500;
+  transition: var(--transition);
+}
+
+.status-filter .btn.active {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Order date styling */
+.order-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+/* Empty state styling */
+.no-orders-message {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: #6c757d;
+}
+
+.no-orders-message i {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+/* Print styles */
+@media print {
+  .breadcrumb,
+  .filters-container,
+  .btn-print {
+    display: none !important;
+  }
+
+  .card {
+    box-shadow: none !important;
+  }
+
+  .table th {
+    background-color: #f8f9fa !important;
+    color: #000 !important;
+  }
+}

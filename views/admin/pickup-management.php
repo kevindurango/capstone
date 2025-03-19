@@ -2,6 +2,11 @@
 // Start the session to track login status
 session_start();
 
+// Generate CSRF token if not exists
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Redirect to login page if not logged in
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header("Location: admin-login.php");
@@ -33,6 +38,10 @@ $offset = ($page - 1) * $limit;
 // Search Setup
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
+// Filter Setup
+$statusFilter = isset($_GET['status']) ? $_GET['status'] : '';
+$dateFilter = isset($_GET['date']) ? $_GET['date'] : '';
+
 // Update Pickup Logic
 if (isset($_POST['update_pickup'])) {
     $pickup_id = $_POST['pickup_id'];
@@ -41,6 +50,13 @@ if (isset($_POST['update_pickup'])) {
     $pickup_location = $_POST['pickup_location'];
     $assigned_to = $_POST['assigned_to'];
     $pickup_notes = $_POST['pickup_notes'];
+
+    // Get the old pickup data for logging purposes
+    $oldDataQuery = "SELECT * FROM pickups WHERE pickup_id = :pickup_id";
+    $oldDataStmt = $conn->prepare($oldDataQuery);
+    $oldDataStmt->bindParam(':pickup_id', $pickup_id, PDO::PARAM_INT);
+    $oldDataStmt->execute();
+    $oldData = $oldDataStmt->fetch(PDO::FETCH_ASSOC);
 
     // Prepare Update Query
     $updateQuery = "UPDATE pickups
@@ -69,6 +85,8 @@ if (isset($_POST['update_pickup'])) {
                 $admin_user_id,
                 "Pickup ID: $pickup_id updated successfully. New status: $pickup_status",
                 [
+                    'previous_status' => $oldData['pickup_status'],
+                    'new_status' => $pickup_status,
                     'pickup_date' => $pickup_date,
                     'pickup_location' => $pickup_location,
                     'assigned_to' => $assigned_to,
@@ -86,7 +104,7 @@ if (isset($_POST['update_pickup'])) {
         }
     }
 
-    header("Location: pickup-management.php?page=$page&search=" . urlencode($search)); // Redirect to refresh the page
+    header("Location: pickup-management.php?page=$page&search=" . urlencode($search) . "&status=" . urlencode($statusFilter) . "&date=" . urlencode($dateFilter)); // Redirect to refresh the page
     exit();
 }
 
@@ -117,6 +135,18 @@ if (!empty($search)) {
     $queryParams[':search'] = "%$search%";
 }
 
+// Add status filter
+if (!empty($statusFilter)) {
+    $whereClauses[] = "p.pickup_status = :status";
+    $queryParams[':status'] = $statusFilter;
+}
+
+// Add date filter
+if (!empty($dateFilter)) {
+    $whereClauses[] = "DATE(p.pickup_date) = :date";
+    $queryParams[':date'] = $dateFilter;
+}
+
 // Add WHERE clauses to the query
 if (!empty($whereClauses)) {
     $query .= " WHERE " . implode(" AND ", $whereClauses);
@@ -125,7 +155,7 @@ if (!empty($whereClauses)) {
 $query .= " ORDER BY p.pickup_date DESC LIMIT :limit OFFSET :offset";
 
 // Count Query (for pagination)
-$countQuery = "SELECT COUNT(*) AS total FROM pickups AS p JOIN orders AS o ON p.order_id = o.order_id  JOIN users AS u ON o.consumer_id = u.user_id";
+$countQuery = "SELECT COUNT(*) AS total FROM pickups AS p JOIN orders AS o ON p.order_id = o.order_id JOIN users AS u ON o.consumer_id = u.user_id";
 
 if (!empty($whereClauses)) {
     $countQuery .= " WHERE " . implode(" AND ", $whereClauses);
@@ -155,6 +185,12 @@ if (!empty($queryParams)) {
 }
 $stmt->execute();
 $pickups = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch all distinct statuses for the filter dropdown
+$statusQuery = "SELECT DISTINCT pickup_status FROM pickups ORDER BY pickup_status";
+$statusStmt = $conn->prepare($statusQuery);
+$statusStmt->execute();
+$statuses = $statusStmt->fetchAll(PDO::FETCH_COLUMN);
 
 // Handle logout
 if (isset($_POST['logout'])) {
@@ -194,27 +230,73 @@ if ($admin_user_id) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="../../public/style/admin.css">
     <link rel="stylesheet" href="../../public/style/admin-sidebar.css">
+    <link rel="stylesheet" href="../../public/style/pickup-management.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        /* Datepicker Styling */
-        .datepicker {
-            z-index: 1100 !important; /* Make sure datepicker appears above other elements */
+        /* Add admin header styling */
+        .admin-header {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            padding: 10px 0;
         }
+        .admin-badge {
+            background-color: #6a11cb;
+            color: white;
+            font-size: 0.8rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+    
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding: 0.5rem 0;
+        }
+        /* Card styling */
+        .pickup-card {
+            transition: transform 0.2s;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .pickup-card:hover {
+            transform: translateY(-5px);
+        }
+
     </style>
 </head>
 <body>
+    <!-- Add Admin Header -->
+    <div class="admin-header text-center">
+        <h2><i class="bi bi-shield-lock"></i> ADMIN CONTROL PANEL <span class="admin-badge">Restricted Access</span></h2>
+    </div>
+
     <div class="container-fluid">
         <div class="row">
             <!-- Include Sidebar -->
             <?php include '../../views/global/admin-sidebar.php'; ?>
 
             <!-- Main Content -->
-            <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4 py-1">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2 text-success">Pickup Management</h1>
-                    <!-- Logout Button -->
-                    <form method="POST" class="ml-3">
+            <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4 py-4 pickup-management-page">
+                <!-- Update breadcrumb styling -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="admin-dashboard.php">Dashboard</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">Pickup Management</li>
+                    </ol>
+                </nav>
+
+                <!-- Update header section with page-header class -->
+                <div class="page-header">
+                    <div>
+                        <h1 class="h2"><i class="bi bi-truck"></i> Pickup Management</h1>
+                        <p class="text-muted">Manage and track all product pickups in one place</p>
+                    </div>
+                    <form method="POST" onsubmit="return confirm('Are you sure you want to logout?');">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                         <button type="submit" name="logout" class="btn btn-danger">
                             <i class="bi bi-box-arrow-right"></i> Logout
                         </button>
@@ -232,91 +314,182 @@ if ($admin_user_id) {
                     <?php unset($_SESSION['message']); // Clear message after display ?>
                 <?php endif; ?>
 
-                <!-- Search Bar -->
-                <form method="GET" action="" class="form-inline mb-3">
-                    <input type="text" name="search" class="form-control mr-2" placeholder="Search pickups..." value="<?= htmlspecialchars($search) ?>">
-                    <button type="submit" class="btn btn-outline-success">Search</button>
-                </form>
-
-                <!-- Pickups Table -->
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th>Pickup ID</th>
-                                <th>Order ID</th>
-                                <th>Consumer</th>
-                                <th>Status</th>
-                                <th>Pickup Date</th>
-                                <th>Pickup Location</th>
-                                <th>Assigned To</th>
-                                <th>Notes</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (count($pickups) > 0): ?>
-                                <?php foreach ($pickups as $pickup): ?>
-                                    <tr>
-                                        <td><?= htmlspecialchars($pickup['pickup_id']) ?></td>
-                                        <td><?= htmlspecialchars($pickup['order_id']) ?></td>
-                                        <td><?= htmlspecialchars($pickup['consumer_name']) ?></td>
-                                        <td><?= htmlspecialchars($pickup['pickup_status']) ?></td>
-                                        <td><?= htmlspecialchars(date("F j, Y, g:i A", strtotime($pickup['pickup_date']))) ?></td>
-                                        <td><?= htmlspecialchars($pickup['pickup_location']) ?></td>
-                                        <td><?= htmlspecialchars($pickup['assigned_to']) ?></td>
-                                        <td><?= htmlspecialchars($pickup['pickup_notes']) ?></td>
-                                        <td>
-                                            <!-- Edit Button (launches Modal) -->
-                                            <button type="button" class="btn btn-sm btn-primary edit-pickup-btn"
-                                                    data-toggle="modal" data-target="#editPickupModal"
-                                                    data-pickup-id="<?= htmlspecialchars($pickup['pickup_id']) ?>"
-                                                    data-pickup-status="<?= htmlspecialchars($pickup['pickup_status']) ?>"
-                                                    data-pickup-date="<?= htmlspecialchars($pickup['pickup_date']) ?>"
-                                                    data-pickup-location="<?= htmlspecialchars($pickup['pickup_location']) ?>"
-                                                    data-assigned-to="<?= htmlspecialchars($pickup['assigned_to']) ?>"
-                                                    data-pickup-notes="<?= htmlspecialchars($pickup['pickup_notes']) ?>">
-                                                <i class="bi bi-pencil"></i> Edit
-                                            </button>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="9" class="text-center">No pickups found.</td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+                <!-- Search and Filter Bar -->
+                <div class="search-container">
+                    <form method="GET" action="" class="row">
+                        <div class="col-md-4 mb-2">
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                </div>
+                                <input type="text" name="search" class="form-control" placeholder="Search pickups..." value="<?= htmlspecialchars($search) ?>">
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="bi bi-filter"></i></span>
+                                </div>
+                                <select name="status" class="form-control">
+                                    <option value="">All Statuses</option>
+                                    <?php foreach ($statuses as $status): ?>
+                                        <option value="<?= htmlspecialchars($status) ?>" <?= $statusFilter === $status ? 'selected' : '' ?>>
+                                            <?= ucfirst(htmlspecialchars($status)) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="bi bi-calendar"></i></span>
+                                </div>
+                                <input type="date" name="date" class="form-control" value="<?= htmlspecialchars($dateFilter) ?>">
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-2">
+                            <button type="submit" class="btn btn-success btn-block">
+                                <i class="bi bi-funnel"></i> Apply
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
+                <!-- Pickups Content -->
+                <?php if (count($pickups) > 0): ?>
+                    <!-- Card View for Pickups -->
+                    <div class="row">
+                        <?php foreach ($pickups as $pickup): ?>
+                            <div class="col-md-6 col-lg-4">
+                                <div class="card pickup-card mb-4">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <span class="font-weight-bold"><i class="bi bi-box"></i> Pickup #<?= htmlspecialchars($pickup['pickup_id']) ?></span>
+                                        <span class="status-label status-<?= strtolower(str_replace(' ', '-', $pickup['pickup_status'])) ?>">
+                                            <?= ucfirst(htmlspecialchars($pickup['pickup_status'])) ?>
+                                        </span>
+                                    </div>
+                                    <div class="card-body">
+                                        <p><strong><i class="bi bi-receipt"></i> Order ID:</strong> <?= htmlspecialchars($pickup['order_id']) ?></p>
+                                        <p><strong><i class="bi bi-person"></i> Consumer:</strong> <?= htmlspecialchars($pickup['consumer_name']) ?></p>
+                                        <p><strong><i class="bi bi-calendar-event"></i> Date:</strong> <?= htmlspecialchars(date("F j, Y, g:i A", strtotime($pickup['pickup_date']))) ?></p>
+                                        <p><strong><i class="bi bi-geo-alt"></i> Location:</strong> <?= htmlspecialchars($pickup['pickup_location']) ?></p>
+                                        <p><strong><i class="bi bi-person-badge"></i> Assigned To:</strong> <?= htmlspecialchars($pickup['assigned_to']) ?></p>
+                                        <div class="pickup-notes">
+                                            <strong><i class="bi bi-card-text"></i> Notes:</strong> <?= htmlspecialchars($pickup['pickup_notes'] ?: 'No notes available') ?>
+                                        </div>
+                                    </div>
+                                    <div class="card-footer">
+                                        <button type="button" class="btn btn-primary btn-block edit-pickup-btn"
+                                                data-toggle="modal" data-target="#editPickupModal"
+                                                data-pickup-id="<?= htmlspecialchars($pickup['pickup_id']) ?>"
+                                                data-pickup-status="<?= htmlspecialchars($pickup['pickup_status']) ?>"
+                                                data-pickup-date="<?= htmlspecialchars($pickup['pickup_date']) ?>"
+                                                data-pickup-location="<?= htmlspecialchars($pickup['pickup_location']) ?>"
+                                                data-assigned-to="<?= htmlspecialchars($pickup['assigned_to']) ?>"
+                                                data-pickup-notes="<?= htmlspecialchars($pickup['pickup_notes']) ?>">
+                                            <i class="bi bi-pencil"></i> Edit Details
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <!-- Empty State -->
+                    <div class="empty-state">
+                        <i class="bi bi-box-seam"></i>
+                        <h4>No Pickups Found</h4>
+                        <p>There are no pickups matching your search criteria.</p>
+                        <a href="pickup-management.php" class="btn btn-outline-success">Clear Filters</a>
+                    </div>
+                <?php endif; ?>
+
                 <!-- Pagination -->
-                <nav>
-                    <ul class="pagination justify-content-center mt-5">
-                        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                            <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
-                                <a class="page-link" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>"><?= $i ?></a>
-                            </li>
-                        <?php endfor; ?>
-                    </ul>
-                </nav>
+                <?php if ($totalPages > 1): ?>
+                    <div class="pagination-container">
+                        <nav>
+                            <ul class="pagination justify-content-center">
+                                <?php if ($page > 1): ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=1&search=<?= urlencode($search) ?>&status=<?= urlencode($statusFilter) ?>&date=<?= urlencode($dateFilter) ?>">
+                                            <i class="bi bi-chevron-double-left"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<?= ($page - 1) ?>&search=<?= urlencode($search) ?>&status=<?= urlencode($statusFilter) ?>&date=<?= urlencode($dateFilter) ?>">
+                                            <i class="bi bi-chevron-left"></i>
+                                        </a>
+                                    </li>
+                                <?php endif; ?>
+                                
+                                <?php 
+                                // Calculate range of page numbers to display
+                                $startPage = max(1, $page - 2);
+                                $endPage = min($totalPages, $page + 2);
+                                
+                                // Always show first page
+                                if ($startPage > 1): ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=1&search=<?= urlencode($search) ?>&status=<?= urlencode($statusFilter) ?>&date=<?= urlencode($dateFilter) ?>">1</a>
+                                    </li>
+                                    <?php if ($startPage > 2): ?>
+                                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                                
+                                <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
+                                    <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
+                                        <a class="page-link" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&status=<?= urlencode($statusFilter) ?>&date=<?= urlencode($dateFilter) ?>"><?= $i ?></a>
+                                    </li>
+                                <?php endfor; ?>
+                                
+                                <?php 
+                                // Always show last page
+                                if ($endPage < $totalPages): 
+                                    if ($endPage < $totalPages - 1): ?>
+                                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                                    <?php endif; ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<?= $totalPages ?>&search=<?= urlencode($search) ?>&status=<?= urlencode($statusFilter) ?>&date=<?= urlencode($dateFilter) ?>"><?= $totalPages ?></a>
+                                    </li>
+                                <?php endif; ?>
+                                
+                                <?php if ($page < $totalPages): ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<?= ($page + 1) ?>&search=<?= urlencode($search) ?>&status=<?= urlencode($statusFilter) ?>&date=<?= urlencode($dateFilter) ?>">
+                                            <i class="bi bi-chevron-right"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<?= $totalPages ?>&search=<?= urlencode($search) ?>&status=<?= urlencode($statusFilter) ?>&date=<?= urlencode($dateFilter) ?>">
+                                            <i class="bi bi-chevron-double-right"></i>
+                                        </a>
+                                    </li>
+                                <?php endif; ?>
+                            </ul>
+                            <p class="text-center text-muted">Page <?= $page ?> of <?= $totalPages ?></p>
+                        </nav>
+                    </div>
+                <?php endif; ?>
 
                 <!-- Edit Pickup Modal -->
                 <div class="modal fade" id="editPickupModal" tabindex="-1" role="dialog" aria-labelledby="editPickupModalLabel" aria-hidden="true">
                     <div class="modal-dialog" role="document">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title" id="editPickupModalLabel">Edit Pickup Details</h5>
+                                <h5 class="modal-title" id="editPickupModalLabel"><i class="bi bi-truck"></i> Edit Pickup Details</h5>
                                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                     <span aria-hidden="true">&times;</span>
                                 </button>
                             </div>
                             <div class="modal-body">
-                                <form method="POST" action="">
+                                <form method="POST" action="" class="pickup-form">
                                     <input type="hidden" name="pickup_id" id="pickup_id">
+                                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
 
                                     <div class="form-group">
-                                        <label for="pickup_status">Pickup Status</label>
+                                        <label for="pickup_status"><i class="bi bi-tag"></i> Pickup Status</label>
                                         <select class="form-control" id="pickup_status" name="pickup_status">
                                             <option value="pending">Pending</option>
                                             <option value="scheduled">Scheduled</option>
@@ -328,26 +501,31 @@ if ($admin_user_id) {
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="pickup_date">Pickup Date</label>
+                                        <label for="pickup_date"><i class="bi bi-calendar"></i> Pickup Date</label>
                                         <input type="datetime-local" class="form-control" id="pickup_date" name="pickup_date">
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="pickup_location">Pickup Location</label>
+                                        <label for="pickup_location"><i class="bi bi-geo-alt"></i> Pickup Location</label>
                                         <input type="text" class="form-control" id="pickup_location" name="pickup_location">
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="assigned_to">Assigned To</label>
+                                        <label for="assigned_to"><i class="bi bi-person"></i> Assigned To</label>
                                         <input type="text" class="form-control" id="assigned_to" name="assigned_to">
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="pickup_notes">Pickup Notes</label>
+                                        <label for="pickup_notes"><i class="bi bi-card-text"></i> Pickup Notes</label>
                                         <textarea class="form-control" id="pickup_notes" name="pickup_notes" rows="3"></textarea>
                                     </div>
 
-                                    <button type="submit" class="btn btn-primary" name="update_pickup">Update Pickup</button>
+                                    <div class="pickup-actions">
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                                        <button type="submit" class="btn btn-success" name="update_pickup">
+                                            <i class="bi bi-check-circle"></i> Update Pickup
+                                        </button>
+                                    </div>
                                 </form>
                             </div>
                         </div>
@@ -357,7 +535,7 @@ if ($admin_user_id) {
         </div>
     </div>
 
-    <!-- Bootstrap JS and Datepicker -->
+    <!-- Bootstrap JS and Dependencies -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
@@ -365,6 +543,13 @@ if ($admin_user_id) {
 
     <script>
         $(document).ready(function () {
+            // Format the date for datetime-local input
+            function formatDateForInput(dateString) {
+                const date = new Date(dateString);
+                return date.toISOString().slice(0, 16);
+            }
+            
+            // Handle edit pickup button click
             $('.edit-pickup-btn').click(function () {
                 // Get data from button attributes
                 var pickupId = $(this).data('pickup-id');
@@ -377,18 +562,19 @@ if ($admin_user_id) {
                 // Populate the modal form
                 $('#pickup_id').val(pickupId);
                 $('#pickup_status').val(pickupStatus);
-                $('#pickup_date').val(pickupDate);
+                $('#pickup_date').val(formatDateForInput(pickupDate));
                 $('#pickup_location').val(pickupLocation);
                 $('#assigned_to').val(assignedTo);
                 $('#pickup_notes').val(pickupNotes);
+                
+                // Update modal title with pickup ID
+                $('#editPickupModalLabel').html('<i class="bi bi-truck"></i> Edit Pickup #' + pickupId);
             });
 
-            // Initialize Datepicker
-            $('#pickup_date').datepicker({
-                format: 'yyyy-mm-dd',
-                autoclose: true,
-                todayHighlight: true
-            });
+            // Auto-dismiss alerts after 5 seconds
+            setTimeout(function() {
+                $('.alert').alert('close');
+            }, 5000);
         });
     </script>
 </body>
