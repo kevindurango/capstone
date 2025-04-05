@@ -19,18 +19,18 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= ($currentPage == 'organization-head-product.php') ? 'active' : '' ?>" href="organization-head-product.php">
-                    <i class="bi bi-box-fill"></i> Product Management
-                </a>
-            </li>
-            <li class="nav-item">
                 <a class="nav-link <?= ($currentPage == 'organization-head-order-management.php') ? 'active' : '' ?>" href="organization-head-order-management.php">
                     <i class="bi bi-list-check"></i> Order Management
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= ($currentPage == 'organization-head-sales.php') ? 'active' : '' ?>" href="organization-head-sales.php">
-                    <i class="bi bi-cash-coin"></i> Sales
+                <a class="nav-link <?= ($currentPage == 'organization-head-sales-report.php') ? 'active' : '' ?>" href="organization-head-sales-report.php">
+                    <i class="bi bi-graph-up"></i> Sales Reports
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?= ($currentPage == 'organization-head-farmers.php') ? 'active' : '' ?>" href="organization-head-farmers.php">
+                    <i class="bi bi-people-fill"></i> Farmers Management
                 </a>
             </li>
             <li class="nav-item">

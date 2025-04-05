@@ -1,35 +1,65 @@
 <?php
 session_start();
 
-// Include necessary models
+// Redirect if already logged in
+if (isset($_SESSION['organization_head_logged_in']) && $_SESSION['organization_head_logged_in'] === true) {
+    header("Location: organization-head-dashboard.php");
+    exit();
+}
+
 require_once '../../models/Database.php';
-require_once '../../models/User.php'; // Assuming you have a User model for authentication
+require_once '../../models/User.php';
+require_once '../../models/Log.php';
 
-// Instantiate necessary classes
 $database = new Database();
-$db = $database->connect();
-$userClass = new User($db);
+$conn = $database->connect();
+$userModel = new User($conn);
+$logClass = new Log();
 
-// Initialize variables
 $error = '';
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $username = $_POST['username'];
-    $password = $_POST['password'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = $_POST['email'] ?? '';
+    $password = $_POST['password'] ?? '';
 
-    // Validate credentials
-    $user = $userClass->login($username, $password, 'Organization Head');
-    if ($user) {
-        // Set session variables
-        $_SESSION['organization_head_logged_in'] = true;
-        $_SESSION['organization_head_user_id'] = $user['user_id'];
-        $_SESSION['role'] = 'Organization Head';
-
-        // Redirect to the dashboard
-        header("Location: organization-head-dashboard.php");
-        exit();
+    // Basic validation
+    if (empty($email) || empty($password)) {
+        $error = 'Please fill in all fields.';
     } else {
-        $error = 'Invalid username or password.';
+        try {
+            // Query to check user credentials and get all necessary information
+            $query = "SELECT u.*, CONCAT(u.first_name, ' ', u.last_name) as full_name 
+                     FROM users u 
+                     WHERE u.email = :email AND u.role_id = 5"; // role_id 5 for Organization Head
+            $stmt = $conn->prepare($query);
+            $stmt->execute(['email' => $email]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($user && password_verify($password, $user['password'])) {
+                // Store user information in session
+                $_SESSION['organization_head_logged_in'] = true;
+                $_SESSION['organization_head_user_id'] = $user['user_id'];
+                $_SESSION['role'] = 'Organization Head';
+                $_SESSION['first_name'] = $user['first_name'];
+                $_SESSION['last_name'] = $user['last_name'];
+                $_SESSION['full_name'] = $user['full_name'];
+                $_SESSION['email'] = $user['email'];
+
+                // Log the successful login
+                $logClass->logActivity($user['user_id'], "Organization Head logged in successfully");
+
+                // Redirect to dashboard
+                header("Location: organization-head-dashboard.php");
+                exit();
+            } else {
+                $error = 'Invalid email or password.';
+                // Log failed login attempt
+                $logClass->logActivity(null, "Failed login attempt for Organization Head account: $email");
+            }
+        } catch (PDOException $e) {
+            $error = 'An error occurred. Please try again later.';
+            error_log("Login error: " . $e->getMessage());
+        }
     }
 }
 ?>
@@ -93,10 +123,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <?php endif; ?>
 
     <form method="POST" action="organization-head-login.php">
-        <!-- Username Field -->
+        <!-- Email Field -->
         <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" class="form-control" id="username" name="username" required>
+            <label for="email">Email</label>
+            <input type="email" class="form-control" id="email" name="email" required>
         </div>
 
         <!-- Password Field -->

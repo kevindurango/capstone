@@ -1,30 +1,13 @@
 import { Tabs } from "expo-router";
-import React from "react";
-import { Platform } from "react-native";
-
-import { HapticTab } from "@/components/HapticTab";
-import { IconSymbol } from "@/components/ui/IconSymbol";
-import TabBarBackground from "@/components/ui/TabBarBackground";
-import { Colors } from "@/constants/Colors";
-import { useColorScheme } from "@/hooks/useColorScheme";
+import { Ionicons } from "@expo/vector-icons";
+import { COLORS } from "@/constants/Colors";
 
 export default function TabsLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: "absolute",
-          },
-          default: {},
-        }),
+        tabBarActiveTintColor: COLORS.accent,
+        headerShown: false, // Disable header for tab routes
       }}
     >
       <Tabs.Screen
@@ -32,16 +15,41 @@ export default function TabsLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="house.fill" color={color} />
+            <Ionicons name="home" size={24} color={color} />
           ),
         }}
       />
+
+      {/* Fix for the login and register routes */}
       <Tabs.Screen
-        name="explore"
+        name="login"
         options={{
-          title: "Explore",
+          title: "Login",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="paperplane.fill" color={color} />
+            <Ionicons name="log-in-outline" size={24} color={color} />
+          ),
+          // Use href to redirect to the auth folder
+          href: "/(auth)/login",
+        }}
+      />
+
+      <Tabs.Screen
+        name="register"
+        options={{
+          title: "Register",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="person-add-outline" size={24} color={color} />
+          ),
+          href: "/(auth)/register",
+        }}
+      />
+
+      <Tabs.Screen
+        name="main"
+        options={{
+          title: "Market",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="basket-outline" size={24} color={color} />
           ),
         }}
       />

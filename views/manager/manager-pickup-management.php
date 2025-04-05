@@ -1219,15 +1219,30 @@ if (isset($_POST['logout'])) {
                 $('#edit_assigned_driver').val(assignedTo);
                 $('#pickup_notes').val(pickupNotes);
 
-                // Update modal title
-                $('#editPickupModalLabel').text(`Edit Pickup #${pickupId}`);
-                
-                // Show/hide assigned driver field based on status
+                // Enable or disable the dropdown based on status
                 if (pickupStatus === 'completed' || pickupStatus === 'cancelled') {
                     $('#edit_assigned_driver').prop('disabled', true);
                 } else {
                     $('#edit_assigned_driver').prop('disabled', false);
                 }
+
+                // Dynamically populate the dropdown with available drivers
+                $.ajax({
+                    url: '../../controllers/get-available-drivers.php', // Endpoint to fetch available drivers
+                    method: 'GET',
+                    success: function (response) {
+                        const drivers = JSON.parse(response);
+                        const driverDropdown = $('#edit_assigned_driver');
+                        driverDropdown.empty(); // Clear existing options
+                        driverDropdown.append('<option value="">Select Driver</option>');
+                        drivers.forEach(driver => {
+                            driverDropdown.append(`<option value="${driver.user_id}">${driver.first_name} ${driver.last_name} (${driver.rating}★)</option>`);
+                        });
+                    },
+                    error: function () {
+                        alert('Failed to load available drivers. Please try again.');
+                    }
+                });
             });
 
             // Handle view order button click

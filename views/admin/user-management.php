@@ -25,6 +25,18 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+// Near the top of the file, add this to show messages
+if (isset($_SESSION['message'])) {
+    echo '<div class="alert alert-' . $_SESSION['message_type'] . ' alert-dismissible fade show" role="alert">
+        ' . $_SESSION['message'] . '
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>';
+    unset($_SESSION['message']);
+    unset($_SESSION['message_type']);
+}
+
 // Handle POST actions
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
 
@@ -114,10 +126,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && hash_equals($_SESSION['csrf_token'],
         exit();
     }
 
-    // Delete User
-    if (isset($_POST['delete_user'])) {
-        $userClass->deleteUser($_POST['user_id']);
-        $logClass->logActivity($_SESSION['user_id'], 'Deleted user with ID: ' . $_POST['user_id']);
+    // Fix the Delete User handler
+    if (isset($_POST['delete_user']) && isset($_POST['user_id'])) {
+        try {
+            $userId = $_POST['user_id'];
+            
+            // Check if user is a driver first
+            $userRole = $userClass->getUserRole($userId);
+            if ($userRole == 6) { // Only delete driver details if user is actually a driver
+                try {
+                    $driverModel->deleteDriverDetails($userId);
+                } catch (Exception $e) {
+                    error_log("Error deleting driver details: " . $e->getMessage());
+                    // Continue with user deletion even if driver details deletion fails
+                }
+            }
+            
+            // Use admin_user_id from the session for logging
+            $adminUserId = $_SESSION['admin_user_id'] ?? $_SESSION['user_id'] ?? null;
+            
+            // Then delete the user
+            if ($userClass->deleteUser($userId)) {
+                if ($adminUserId) {
+                    $logClass->logActivity($adminUserId, 'Deleted user ID: ' . $userId);
+                }
+                $_SESSION['message'] = "User deleted successfully.";
+                $_SESSION['message_type'] = "success";
+            } else {
+                $_SESSION['message'] = "Failed to delete user.";
+                $_SESSION['message_type'] = "danger";
+            }
+        } catch (Exception $e) {
+            error_log("Error deleting user: " . $e->getMessage());
+            $_SESSION['message'] = "Error deleting user: " . $e->getMessage();
+            $_SESSION['message_type'] = "danger";
+        }
+        
         header("Location: user-management.php");
         exit();
     }
@@ -285,14 +329,11 @@ foreach ($users as $user) {
                               <?php endif; ?>>
                         <i class="bi bi-pencil"></i>
                       </button>
-                      <form method="POST" style="display:inline;">
-                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                        <input type="hidden" name="user_id" value="<?= $user['user_id'] ?>">
-                        <button type="submit" name="delete_user" class="btn btn-danger btn-sm btn-action" 
-                                onclick="return confirm('Are you sure you want to delete this user?');">
-                          <i class="bi bi-trash"></i>
-                        </button>
-                      </form>
+                      <button type="button" class="btn btn-danger btn-sm btn-action delete-btn" 
+                              data-user-id="<?= $user['user_id'] ?>"
+                              data-username="<?= htmlspecialchars($user['username']) ?>">
+                        <i class="bi bi-trash"></i>
+                      </button>
                     </td>
                   </tr>
                   <?php endforeach; ?>
@@ -554,6 +595,26 @@ foreach ($users as $user) {
       if (document.getElementById('edit_role_id')) {
           toggleDriverFields(document.getElementById('edit_role_id').value, 'edit_');
       }
+
+      // Delete user confirmation
+      $('.delete-btn').click(function() {
+          const userId = $(this).data('user-id');
+          const username = $(this).data('username');
+          
+          if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
+              // Create and submit a form dynamically
+              const form = document.createElement('form');
+              form.method = 'POST';
+              form.action = 'user-management.php'; // Explicitly set the action
+              form.innerHTML = `
+                  <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                  <input type="hidden" name="user_id" value="${userId}">
+                  <input type="hidden" name="delete_user" value="1">
+              `;
+              document.body.appendChild(form);
+              form.submit();
+          }
+      });
     });
   </script>
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>

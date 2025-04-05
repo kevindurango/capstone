@@ -15,6 +15,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
 require_once '../../models/Database.php';
 require_once '../../models/Log.php'; 
+require_once '../../models/Order.php'; // Add Order model include
 
 // Database Connection
 $database = new Database();
@@ -22,6 +23,7 @@ $conn = $database->connect();
 
 // Log instance
 $log = new Log();  // Instantiate the Log class
+$orderClass = new Order(); // Initialize Order class
 
 // Get Admin User ID from Session - Crucial for logging
 $admin_user_id = $_SESSION['admin_user_id'] ?? null; // Assuming you store the admin's user_id in the session
@@ -184,6 +186,51 @@ if (!empty($search)) {
         $log->logActivity($admin_user_id, "Admin searched orders with term: '$search'. Results: $totalOrders");
     }
 }
+
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Get order statistics
+$pendingOrders = $orderClass->getOrdersByStatus('pending');
+$completedOrders = $orderClass->getOrdersByStatus('completed');
+$allOrders = $orderClass->getOrdersByStatus('all');
+
+// Calculate statistics
+$totalOrders = count($allOrders);
+$pendingCount = count($pendingOrders);
+$totalRevenue = array_reduce($completedOrders, function($carry, $order) {
+    return $carry + ($order['total_amount'] ?? 0);
+}, 0);
+
+$todayOrders = array_filter($allOrders, function($order) {
+    return date('Y-m-d', strtotime($order['order_date'])) === date('Y-m-d');
+});
+$todayCount = count($todayOrders);
+
+// Update the status filter options
+echo "
+<select id='statusFilter' class='form-control'>
+    <option value=''>All Statuses</option>
+    <option value='pending'>Pending</option>
+    <option value='completed'>Completed</option>
+    <option value='canceled'>Canceled</option>
+</select>";
+
+// Display orders table
+if (!empty($allOrders)) {
+    foreach ($allOrders as $order) {
+        // Format the data correctly
+        $orderDate = date('M d, Y H:i', strtotime($order['order_date']));
+        $totalAmount = number_format($order['total_amount'] ?? 0, 2);
+        $itemCount = $order['item_count'] ?? 0;
+        
+        echo "<tr data-status='" . htmlspecialchars($order['order_status']) . "'>";
+        // ... rest of the table row code ...
+    }
+} else {
+    echo "<tr><td colspan='7' class='text-center'>No orders found</td></tr>";
+}
 ?>
 
 <!DOCTYPE html>
@@ -222,6 +269,131 @@ if (!empty($search)) {
             padding: 0.5rem 0;
         }
 
+        #driverDetails {
+            background-color: #f8f9fa;
+            border-color: #dee2e6 !important;
+        }
+        
+        #assigned_to option[data-status="available"] {
+            background-color: #d4edda;
+        }
+        
+        #assigned_to option[data-status="busy"] {
+            background-color: #fff3cd;
+        }
+        
+        #assigned_to option[data-status="offline"] {
+            background-color: #f8f9fa;
+        }
+        
+        .driver-status {
+            font-weight: 500;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        /* Improve select element styling */
+        #assigned_to {
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        /* Update driver status styling in select */
+        #assigned_to option {
+            padding: 8px;
+            font-weight: normal;
+        }
+
+        #assigned_to option[data-status="available"] {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        #assigned_to option[data-status="busy"] {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        #assigned_to option[data-status="offline"] {
+            background-color: #f8f9fa;
+            color: #6c757d;
+        }
+
+        /* Driver details container styling */
+        #driverDetails {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin-top: 10px;
+        }
+
+        #driverDetails small {
+            color: #495057;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        #driverStatus.text-success {
+            color: #28a745 !important;
+            font-weight: 600;
+        }
+
+        #driverStatus.text-warning {
+            color: #ffc107 !important;
+            font-weight: 600;
+        }
+
+        #driverStatus.text-secondary {
+            color: #6c757d !important;
+            font-weight: 600;
+        }
+
+        /* Enhanced Modal Select Styling */
+        .modal select.form-control {
+            height: auto !important;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .modal select.form-control option {
+            padding: 10px 15px;
+            margin: 2px 0;
+            line-height: 1.5;
+            min-height: 40px;
+            display: block;
+            white-space: normal;
+            border-bottom: 1px solid #eee;
+        }
+
+        #assigned_to option[data-status="available"] {
+            background-color: #d4edda;
+            color: #155724;
+            font-weight: 500;
+        }
+        
+        #assigned_to option[data-status="busy"] {
+            background-color: #fff3cd;
+            color: #856404;
+            font-weight: 500;
+        }
+        
+        #assigned_to option[data-status="offline"] {
+            background-color: #f8f9fa;
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        /* Modal Select Container */
+        .modal .form-group select {
+            width: 100%;
+            font-size: 14px;
+        }
+
+        /* Ensure text doesn't get cut off */
+        .modal select option {
+            word-wrap: break-word;
+            white-space: normal !important;
+        }
     </style>
 </head>
 <body>
@@ -465,7 +637,7 @@ if (!empty($search)) {
                         <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
 
                         <div class="form-group">
-                            <label for="pickup_date">
+                            <label for="pickup_date"> 
                                 <i class="bi bi-calendar-event"></i> Pickup Date
                             </label>
                             <input type="datetime-local" class="form-control" id="pickup_date" name="pickup_date" required>
@@ -480,9 +652,48 @@ if (!empty($search)) {
 
                         <div class="form-group">
                             <label for="assigned_to">
-                                <i class="bi bi-person"></i> Assigned To
+                                <i class="bi bi-person-badge"></i> Assign Driver
                             </label>
-                            <input type="text" class="form-control" id="assigned_to" name="assigned_to" placeholder="Enter staff name">
+                            <select class="form-control" id="assigned_to" name="assigned_to">
+                                <option value="">Select Driver</option>
+                                <?php
+                                try {
+                                    $driverQuery = "SELECT u.user_id, u.first_name, u.last_name, u.username,
+                                                         d.availability_status, d.current_location, d.vehicle_type,
+                                                         (SELECT COUNT(*) FROM pickups WHERE assigned_to = u.user_id 
+                                                          AND pickup_status = 'pending') as active_pickups
+                                                  FROM users u 
+                                                  JOIN driver_details d ON u.user_id = d.user_id
+                                                  WHERE u.role_id = 6";
+                                    $driverStmt = $conn->query($driverQuery);
+                                    while ($driver = $driverStmt->fetch(PDO::FETCH_ASSOC)) {
+                                        $statusClass = match($driver['availability_status']) {
+                                            'available' => 'text-success',
+                                            'busy' => 'text-warning',
+                                            default => 'text-secondary'
+                                        };
+                                        $assignmentInfo = $driver['active_pickups'] > 0 ? 
+                                            " (" . $driver['active_pickups'] . " active)" : '';
+                                        
+                                        echo '<option value="' . $driver['user_id'] . '" ' .
+                                             'data-status="' . $driver['availability_status'] . '" ' .
+                                             'data-location="' . $driver['current_location'] . '" ' .
+                                             'data-vehicle="' . $driver['vehicle_type'] . '">' .
+                                             htmlspecialchars($driver['first_name'] . ' ' . $driver['last_name']) .
+                                             ' - ' . ucfirst($driver['availability_status']) . $assignmentInfo .
+                                             '</option>';
+                                    }
+                                } catch (PDOException $e) {
+                                    error_log("Error fetching drivers: " . $e->getMessage());
+                                }
+                                ?>
+                            </select>
+                            <small class="form-text text-muted">Available drivers are shown in green, busy drivers in yellow</small>
+                            <div id="driverDetails" class="mt-2 p-2 border rounded d-none">
+                                <small class="d-block"><strong>Status:</strong> <span id="driverStatus"></span></small>
+                                <small class="d-block"><strong>Location:</strong> <span id="driverLocation"></span></small>
+                                <small class="d-block"><strong>Vehicle:</strong> <span id="driverVehicle"></span></small>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -540,7 +751,6 @@ if (!empty($search)) {
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-
     <script>
         $(document).ready(function () {
             // Manage Pickup Modal Functionality
@@ -560,17 +770,17 @@ if (!empty($search)) {
                 $('#pickup_location').val(pickupLocation);
                 $('#assigned_to').val(assignedTo);
                 $('#pickup_notes').val(pickupNotes);
-                
+
                 // Update modal title with order ID
                 $('#managePickupModalLabel').html('<i class="bi bi-truck"></i> Manage Pickup Details - Order #' + orderId);
             });
-            
+
             // Order Details Modal Functionality
             $('.view-details-btn').click(function() {
                 const orderId = $(this).data('order-id');
                 $('#viewOrderModalLabel').html('<i class="bi bi-bag-check"></i> Order Details - #' + orderId);
                 $('#viewOrderModal').modal('show');
-                
+
                 // Show loading spinner
                 $('#orderDetailsContent').html(`
                     <div class="text-center py-5">
@@ -596,17 +806,17 @@ if (!empty($search)) {
                             `);
                             return;
                         }
-                        
+
                         // Format the order date
                         const orderDate = new Date(response.order.order_date);
                         const formattedDate = orderDate.toLocaleDateString('en-US', {
-                            year: 'numeric', 
-                            month: 'long', 
+                            year: 'numeric',
+                            month: 'long',
                             day: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit'
                         });
-                        
+
                         // Get status badge based on order status
                         let statusBadge = '';
                         if (response.order.order_status === 'pending') {
@@ -616,7 +826,7 @@ if (!empty($search)) {
                         } else {
                             statusBadge = '<span class="badge badge-danger">Canceled</span>';
                         }
-                        
+
                         // Build the order items HTML
                         let itemsHtml = '';
                         response.items.forEach(item => {
@@ -625,25 +835,18 @@ if (!empty($search)) {
                                     <td>${item.product_name}</td>
                                     <td>₱${parseFloat(item.item_price).toFixed(2)}</td>
                                     <td>${item.quantity}</td>
-                        }
+                                    <td>₱${parseFloat(item.total_price).toFixed(2)}</td>
+                                </tr>
+                            `;
+                        });
                         
-                        // Build the complete order details HTML
-                        const orderDetailsHtml = `
-                            <div class="order-details-container">
-                                <div class="order-header">
-                                    <div class="row mb-4">
-                                    <td>₱${parseFloat(item.total_price).toFixed(2)}</td>               <div class="col-md-6">
-                                </tr>                    <h6 class="text-muted">ORDER INFORMATION</h6>
-                            `;</strong> ${response.order.order_id}</p>
-                        });rong>Date:</strong> ${formattedDate}</p>
-                        trong> ${statusBadge}</p>
                         // Format pickup date if available
-                        let pickupDateFormatted = 'Not scheduled';-6">
-                        if (response.pickup && response.pickup.pickup_date) {ted">CUSTOMER INFORMATION</h6>
-                            const pickupDate = new Date(response.pickup.pickup_date);rst_name} ${response.order.last_name}</p>
+                        let pickupDateFormatted = 'Not scheduled';
+                        if (response.pickup && response.pickup.pickup_date) {
+                            const pickupDate = new Date(response.pickup.pickup_date);
                             pickupDateFormatted = pickupDate.toLocaleDateString('en-US', {
-                                year: 'numeric', ail}</p>
-                                month: 'long', ntact_number || 'Not provided'}</p>
+                                year: 'numeric',
+                                month: 'long',
                                 day: 'numeric',
                                 hour: '2-digit',
                                 minute: '2-digit'
@@ -651,38 +854,37 @@ if (!empty($search)) {
                         }
                         
                         // Build the complete order details HTML
-                        const orderDetailsHtml = ` class="thead-light">
-                            <div class="order-details-container">  <tr>
-                                <div class="order-header">          <th>Product</th>
-                                    <div class="row mb-4">                <th>Price</th>
-                                        <div class="col-md-6">th>
+                        const orderDetailsHtml = `
+                            <div class="order-details-container">
+                                <div class="order-header">
+                                    <div class="row mb-4">
+                                        <div class="col-md-6">
                                             <h6 class="text-muted">ORDER INFORMATION</h6>
                                             <p><strong>Order ID:</strong> ${response.order.order_id}</p>
                                             <p><strong>Date:</strong> ${formattedDate}</p>
                                             <p><strong>Status:</strong> ${statusBadge}</p>
                                         </div>
                                         <div class="col-md-6">
-                                            <h6 class="text-muted">CUSTOMER INFORMATION</h6>lass="text-right"><strong>Subtotal:</strong></td>
-                                            <p><strong>Name:</strong> ${response.order.first_name} ${response.order.last_name}</p>oat(response.subtotal).toFixed(2)}</td>
+                                            <h6 class="text-muted">CUSTOMER INFORMATION</h6>
+                                            <p><strong>Name:</strong> ${response.order.first_name} ${response.order.last_name}</p>
                                             <p><strong>Username:</strong> ${response.order.username}</p>
                                             <p><strong>Email:</strong> ${response.order.email}</p>
                                             <p><strong>Phone:</strong> ${response.order.contact_number || 'Not provided'}</p>
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <div class="order-items mt-4">';
+                                <div class="order-items mt-4">
                                     <h6 class="text-muted mb-3">ORDER ITEMS</h6>
-                                    <table class="table table-bordered">l = `
-                                        <thead class="thead-light">lass="pickup-details mt-4">
-                                            <tr>          <h6 class="text-muted mb-3">PICKUP DETAILS</h6>
-                                                <th>Product</th>            <div class="card">
+                                    <table class="table table-bordered">
+                                        <thead class="thead-light">
+                                            <tr>
+                                                <th>Product</th>
                                                 <th>Price</th>
-                                                <th>Quantity</th>ong>Pickup Location:</strong> ${response.pickup.pickup_location || 'Not specified'}</p>
-                                                <th>Total</th>><strong>Pickup Date:</strong> ${pickupDateFormatted}</p>
-                                            </tr>trong>Assigned To:</strong> ${response.pickup.assigned_to || 'Not assigned'}</p>
-                                        </thead>trong> ${response.pickup.pickup_status || 'Pending'}</p>
-                                        <tbody>ickup.pickup_notes || 'No notes'}</p>
+                                                <th>Quantity</th>
+                                                <th>Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
                                             ${itemsHtml}
                                             <tr>
                                                 <td colspan="3" class="text-right"><strong>Subtotal:</strong></td>
@@ -690,88 +892,92 @@ if (!empty($search)) {
                                             </tr>
                                         </tbody>
                                     </table>
-                                </div>"text-muted mb-3">PICKUP DETAILS</h6>
-                        `;lass="alert alert-info">
-                          <i class="bi bi-info-circle"></i> No pickup details have been assigned yet.
-                        // Add pickup details section if available      </div>
-                        let pickupDetailsHtml = '';</div>
+                                </div>
+                        `;
+                        
+                        // Add pickup details section if available
+                        let pickupDetailsHtml = '';
                         if (response.pickup) {
                             pickupDetailsHtml = `
                                 <div class="pickup-details mt-4">
                                     <h6 class="text-muted mb-3">PICKUP DETAILS</h6>
                                     <div class="card">
                                         <div class="card-body">
-                                            <p><strong>Pickup Location:</strong> ${response.pickup.pickup_location || 'Not specified'}</p>r, status, error) {
-                                            <p><strong>Pickup Date:</strong> ${pickupDateFormatted}</p>e.error('Error fetching order details:', error);
-                                            <p><strong>Assigned To:</strong> ${response.pickup.assigned_to || 'Not assigned'}</p>('#orderDetailsContent').html(`
-                                            <p><strong>Status:</strong> ${response.pickup.pickup_status || 'Pending'}</p>    <div class="alert alert-danger">
-                                            <p><strong>Notes:</strong> ${response.pickup.pickup_notes || 'No notes'}</p>lamation-triangle"></i> Failed to load order details. Please try again.
+                                            <p><strong>Pickup Location:</strong> ${response.pickup.pickup_location || 'Not specified'}</p>
+                                            <p><strong>Pickup Date:</strong> ${pickupDateFormatted}</p>
+                                            <p><strong>Assigned To:</strong> ${response.pickup.assigned_to || 'Not assigned'}</p>
+                                            <p><strong>Status:</strong> ${response.pickup.pickup_status || 'Pending'}</p>
+                                            <p><strong>Notes:</strong> ${response.pickup.pickup_notes || 'No notes'}</p>
                                         </div>
-                                    </div>  `);
+                                    </div>
                                 </div>
                             `;
                         } else {
                             pickupDetailsHtml = `
                                 <div class="pickup-details mt-4">
-                                    <h6 class="text-muted mb-3">PICKUP DETAILS</h6>).click(function() {
-                                    <div class="alert alert-info">Contents = document.getElementById('orderDetailsContent').innerHTML;
-                                        <i class="bi bi-info-circle"></i> No pickup details have been assigned yet. originalContents = document.body.innerHTML;
+                                    <h6 class="text-muted mb-3">PICKUP DETAILS</h6>
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i> No pickup details have been assigned yet.
                                     </div>
-                                </div> document.body.innerHTML = `
-                            `;        <div style="padding: 30px;">
-                        }"text-align: center; margin-bottom: 20px;">Order Details</h1>
+                                </div>
+                            `;
+                        }
                         
                         // Update the modal content
                         $('#orderDetailsContent').html(orderDetailsHtml + pickupDetailsHtml + '</div>');
                     },
                     error: function(xhr, status, error) {
-                        console.error('Error fetching order details:', error);alContents;
+                        console.error('Error fetching order details:', error);
                         $('#orderDetailsContent').html(`
                             <div class="alert alert-danger">
                                 <i class="bi bi-exclamation-triangle"></i> Failed to load order details. Please try again.
-                            </div>tus Filter Functionality
-                        `);filter-btn').click(function() {
-                    }$(this).data('status');
+                            </div>
+                        `);
+                    }
                 });
-            });utton
-             $('.filter-btn').removeClass('active');
-            // Print functionality    $(this).addClass('active');
+            });
+            
+            // Print functionality
             $('#printOrderDetails').click(function() {
                 const printContents = document.getElementById('orderDetailsContent').innerHTML;
                 const originalContents = document.body.innerHTML;
-                    $('#orders-table tr').show();
                 document.body.innerHTML = `
                     <div style="padding: 30px;">
-                        <h1 style="text-align: center; margin-bottom: 20px;">Order Details</h1>a-status="' + status + '"]').show();
-                        ${printContents}}
+                        <h1 style="text-align: center; margin-bottom: 20px;">Order Details</h1>
+                        ${printContents}
                     </div>
-                `;age if needed
-                .length === 0) {
-                window.print();orders-table').append(`
+                `;
+                window.print();
                 document.body.innerHTML = originalContents;
-                location.reload();e">
-            });               <i class="bi bi-cart-x"></i>
-                            No ${status} orders found.
+                location.reload();
+            });
+
             // Status Filter Functionality
             $('.filter-btn').click(function() {
                 const status = $(this).data('status');
-                
                 // Update active button
                 $('.filter-btn').removeClass('active');
                 $(this).addClass('active');
-                
-                // Filter rowsn
-                if (status === 'all') {orm').submit(function() {
-                    $('#orders-table tr').show();#pickup_date').val() || !$('#pickup_location').val()) {
-                } else {n are required.');
-                    $('#orders-table tr').hide();   return false;
-                    $('#orders-table tr[data-status="' + status + '"]').show(); }
-                }    return true;
-                
+
+                // Filter rows
+                if (status === 'all') {
+                    $('#orders-table tr').show();
+                } else {
+                    $('#orders-table tr').hide();
+                    $('#orders-table tr[data-status="' + status + '"]').show();
+                }
+
                 // Show no results message if needed
                 if ($('#orders-table tr:visible').length === 0) {
                     $('#orders-table').append(`
-                        <tr id="no-results-row">                            <td colspan="5" class="text-center no-orders-message">                                <i class="bi bi-cart-x"></i>                                No ${status} orders found.                            </td>                        </tr>                    `);                } else {
+                        <tr id="no-results-row">
+                            <td colspan="5" class="text-center no-orders-message">
+                                <i class="bi bi-cart-x"></i>
+                                No ${status} orders found.
+                            </td>
+                        </tr>
+                    `);
+                } else {
                     $('#no-results-row').remove();
                 }
             });
@@ -783,6 +989,25 @@ if (!empty($search)) {
                     return false;
                 }
                 return true;
+            });
+
+            // Handle driver selection change
+            $('#assigned_to').change(function() {
+                const selectedOption = $(this).find('option:selected');
+                const driverDetails = $('#driverDetails');
+                if (selectedOption.val()) {
+                    const status = selectedOption.data('status');
+                    const location = selectedOption.data('location');
+                    const vehicle = selectedOption.data('vehicle');
+                    $('#driverStatus').text(status)
+                        .removeClass()
+                        .addClass(status === 'available' ? 'text-success' : status === 'busy' ? 'text-warning' : 'text-secondary');
+                    $('#driverLocation').text(location || 'Not specified');
+                    $('#driverVehicle').text(vehicle || 'Not specified');
+                    driverDetails.removeClass('d-none');
+                } else {
+                    driverDetails.addClass('d-none');
+                }
             });
         });
     </script>

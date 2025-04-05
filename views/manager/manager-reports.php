@@ -252,7 +252,7 @@ if (isset($_POST['logout'])) {
                     <!-- Product Summary -->
                     <div class="col-md-4 mb-4">
                         <div class="card h-100">
-                            <div class->card-body>
+                            <div class="card-body"> <!-- Fix: Changed from 'card->body' to 'card-body' -->
                                 <h5 class="card-title d-flex align-items-center">
                                     <i class="bi bi-box-seam-fill me-2 text-warning"></i> Product Summary
                                 </h5>

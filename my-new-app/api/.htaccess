@@ -1,0 +1,30 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Handle CORS preflight requests
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
+    
+    # Force all requested URLs to an exact matching file
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ not-found.php [L]
+</IfModule>
+
+# Prevent viewing of .htaccess and other hidden files
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Set proper PHP error handling
+php_flag display_errors off
+php_value error_reporting E_ALL
+php_flag log_errors on
+
+# Ensure all responses are treated as JSON
+<FilesMatch "\.(php)$">
+    <IfModule mod_headers.c>
+        Header set Content-Type "application/json; charset=UTF-8"
+    </IfModule>
+</FilesMatch>

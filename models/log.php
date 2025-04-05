@@ -99,12 +99,12 @@ class Log
     /**
      * Logs an activity to the activitylogs table.
      *
-     * @param int $userId The ID of the user performing the action.
+     * @param int|null $userId The ID of the user performing the action or null for system actions.
      * @param string $action The description of the action performed.
-     * @param array $context Optional array of contextual information to include in the log (e.g., old status, new status).
+     * @param array $context Optional array of contextual information to include in the log.
      * @return bool True on success, false on failure.
      */
-    public function logActivity(int $userId, string $action, array $context = []): bool {
+    public function logActivity($userId, string $action, array $context = []): bool {
         try {
             // Check if the PDO connection is valid
             if (!$this->pdo) {
@@ -117,19 +117,32 @@ class Log
 
             // Add contextual information to the log message
             if (!empty($context)) {
-                $logMessage .= " Context: " . json_encode($context); // Convert context array to JSON string
+                // Ensure we have safe JSON encoding with error handling
+                $contextJson = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+                if ($contextJson === false) {
+                    $contextJson = json_encode(['error' => 'Failed to encode context']);
+                }
+                $logMessage .= " Context: " . $contextJson;
             }
 
             // Insert the activity log with the current timestamp (NOW()).
-            $sql = "INSERT INTO activitylogs (user_id, action, action_date)
-                    VALUES (:user_id, :action, NOW())"; // NOW() will insert the current timestamp
-
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->bindParam(':user_id', $userId, PDO::PARAM_INT);
-            $stmt->bindParam(':action', $logMessage, PDO::PARAM_STR); // Save the combined log message
+            if ($userId === null) {
+                // For system or unidentified user actions
+                $sql = "INSERT INTO activitylogs (user_id, action, action_date)
+                        VALUES (NULL, :action, NOW())";
+                
+                $stmt = $this->pdo->prepare($sql);
+                $stmt->bindParam(':action', $logMessage, PDO::PARAM_STR);
+            } else {
+                $sql = "INSERT INTO activitylogs (user_id, action, action_date)
+                        VALUES (:user_id, :action, NOW())";
+                
+                $stmt = $this->pdo->prepare($sql);
+                $stmt->bindParam(':user_id', $userId, PDO::PARAM_INT);
+                $stmt->bindParam(':action', $logMessage, PDO::PARAM_STR);
+            }
 
             $stmt->execute();
-
             return true; // Successfully added log
         } catch (PDOException $e) {
             error_log("Error logging activity: " . $e->getMessage());

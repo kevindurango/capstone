@@ -1,0 +1,697 @@
+/* Organization Header Styling - Black to green gradient */
+.organization-header {
+  background: linear-gradient(
+    135deg,
+    #212529 0%,
+    #1a8754 100%
+  ); /* Changed to black-to-green gradient */
+  color: white;
+  padding: 15px 0;
+  margin-bottom: 25px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.organization-badge {
+  background-color: #157347; /* Restored green color */
+  color: white;
+  font-size: 0.8rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-left: 10px;
+}
+
+/* Dashboard Cards - Updated to green */
+.dashboard-card {
+  background: white;
+  border-radius: 12px; /* Adjusted for consistency */
+  padding: 25px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  border-top: 4px solid #1a8754; /* Restored green color */
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+.card-icon {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+  color: #1a8754;
+}
+
+.card-title {
+  color: #fafbfc;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.card-text {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #1e4b8d;
+}
+
+/* Statistics Cards */
+.dashboard-stat-card {
+  background: white;
+  border-radius: 15px;
+  padding: 25px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-top: 4px solid #1a8754;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.dashboard-stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+  color: #1a8754;
+}
+
+.stat-title {
+  color: #6c757d;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #1a8754;
+}
+
+/* Chart Cards - Restored colors */
+.stat-card,
+.chart-card {
+  background: white;
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #1a8754; /* Restored green color */
+}
+
+.chart-title {
+  color: #1a8754; /* Restored green color */
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(26, 135, 84, 0.1);
+}
+
+.chart-container {
+  height: 300px;
+  position: relative;
+}
+
+/* Driver Cards */
+.driver-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 12px;
+  border: none;
+  margin-bottom: 15px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.driver-card:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.driver-card.available {
+  border-left: 4px solid #1a8754; /* Restored green color */
+}
+.driver-card.busy {
+  border-left: 4px solid #ffc107;
+}
+.driver-card.offline {
+  border-left: 4px solid #6c757d;
+}
+
+/* Pickup Timeline */
+.pickup-timeline {
+  position: relative;
+  padding-left: 30px;
+}
+
+.pickup-timeline::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(
+    to bottom,
+    #1a8754,
+    #34c38f
+  ); /* Restored green colors */
+}
+
+.pickup-item {
+  position: relative;
+  padding: 15px;
+  background: white;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.pickup-item::before {
+  content: "";
+  position: absolute;
+  left: -34px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #1a8754; /* Restored green color */
+  transform: translateY(-50%);
+  border: 3px solid white;
+  box-shadow: 0 0 0 3px rgba(26, 135, 84, 0.2);
+}
+
+/* Status Badges */
+.badge-custom {
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-weight: 500;
+  font-size: 0.8rem;
+  letter-spacing: 0.3px;
+}
+
+/* Table Styling - Updated colors back to green */
+.table-container {
+  border-radius: 15px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+/* Table Styling - Solid green header */
+.table-container .table thead th {
+  background: #1a8754; /* Solid green color instead of gradient */
+  color: white;
+  font-weight: 600;
+  border-bottom: none;
+  padding: 12px 15px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+/* Additional style to ensure the table head color overrides bootstrap */
+.table thead {
+  border-color: #1a8754;
+}
+
+/* Fix for first table cell border radius */
+.table-container .table thead th:first-child {
+  border-top-left-radius: 8px;
+}
+
+/* Fix for last table cell border radius */
+.table-container .table thead th:last-child {
+  border-top-right-radius: 8px;
+}
+
+/* Add hover effect to table rows for better UX */
+.table tbody tr:hover {
+  background-color: rgba(26, 135, 84, 0.05);
+}
+
+/* Page Header - Fix logout button positioning */
+.page-header {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid rgba(26, 135, 84, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-header h1 {
+  background: linear-gradient(
+    45deg,
+    #1a8754,
+    #34c38f
+  ); /* Restored green colors */
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+/* Modals - Updated header colors back to green */
+.modal-header {
+  background: linear-gradient(
+    135deg,
+    #1a8754 0%,
+    #34c38f 100%
+  ); /* Restored green colors */
+  color: white;
+  border-radius: 15px 15px 0 0;
+}
+
+.modal-content {
+  border-radius: 15px;
+  border: none;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Buttons */
+.btn-action {
+  border-radius: 20px;
+  padding: 8px 15px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  transition: all 0.3s ease;
+}
+
+/* Welcome Section */
+.welcome-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 25px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border-left: 4px solid #1a8754; /* Restored green color */
+}
+
+.greeting-text {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: #1a8754; /* Restored green color */
+}
+
+.date-text {
+  color: #6c757d;
+  margin-bottom: 0;
+}
+
+/* Quick Actions */
+.quick-actions {
+  margin-bottom: 30px;
+}
+
+.action-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+/* Action Cards - Updated colors for better visibility */
+.action-card {
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 12px;
+  padding: 15px 20px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+  flex: 1 1 300px;
+  min-width: 300px;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  color: #212529; /* Ensure text is dark for visibility on white background */
+  border-left: 4px solid #1a8754;
+}
+
+.action-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
+  color: #1a8754; /* Darken text color on hover for better visibility */
+  text-decoration: none;
+}
+
+.action-card-icon {
+  font-size: 2rem;
+  margin-right: 15px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(26, 135, 84, 0.1); /* Restored green color */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a8754; /* Restored green color */
+}
+
+.action-card-content {
+  flex: 1;
+}
+
+.action-card-content h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: #212529; /* Explicitly set dark color for headings */
+}
+
+.action-card-content p {
+  font-size: 0.85rem;
+  color: #6c757d; /* Medium gray for paragraph text */
+  margin-bottom: 0;
+}
+
+.action-card-arrow {
+  font-size: 1.2rem;
+  transition: transform 0.3s ease;
+}
+
+.action-card:hover .action-card-arrow {
+  transform: translateX(5px);
+}
+
+/* Activity Cards */
+.activity-card {
+  height: 100%;
+  border: none;
+  border-radius: 15px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.activity-card .card-header {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-bottom: 2px solid rgba(26, 135, 84, 0.1); /* Restored green color */
+  padding: 15px 20px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #6c757d;
+}
+
+.empty-state i {
+  font-size: 3rem;
+  margin-bottom: 15px;
+  color: #dee2e6;
+}
+
+/* Action Buttons */
+.btn-action {
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 5px;
+  transition: all 0.2s ease;
+}
+
+.btn-action:hover {
+  transform: scale(1.1);
+}
+
+/* Pickup Timeline Enhancements */
+.pickup-item {
+  padding: 15px;
+  background: white;
+  border-radius: 10px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.pickup-time {
+  font-size: 0.8rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+/* Ensure table responsive works well */
+.table-container .table {
+  margin-bottom: 0;
+}
+
+.table-container .card-body {
+  padding: 0;
+}
+
+/* Chart Enhancements */
+.chart-container {
+  position: relative;
+  height: 300px;
+  margin: 20px 0;
+  width: 100%; /* Ensure full width */
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.chart-container canvas {
+  max-width: 100%;
+  height: auto !important; /* Override inline height sometimes set by Chart.js */
+}
+
+.stat-card {
+  background: white;
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #1a8754;
+  height: 100%;
+}
+
+.stat-card .chart-title {
+  color: #1a8754;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(26, 135, 84, 0.1);
+}
+
+/* Status Badge Colors - Adjusted for consistency */
+.badge-pending {
+  background-color: #ffc107;
+  color: #212529;
+}
+.badge-scheduled {
+  background-color: #17a2b8; /* Restored color */
+  color: #fff;
+}
+.badge-in-transit {
+  background-color: #007bff; /* Restored color */
+  color: #fff;
+}
+.badge-completed {
+  background-color: #28a745;
+  color: #fff;
+}
+.badge-canceled {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 767.98px) {
+  .dashboard-card,
+  .stat-card {
+    margin-bottom: 15px !important;
+  }
+
+  .action-card {
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
+
+  .welcome-section {
+    flex-direction: column;
+  }
+
+  .welcome-actions {
+    margin-top: 15px;
+  }
+
+  .pickup-timeline {
+    padding-left: 20px;
+  }
+
+  .pickup-item::before {
+    left: -24px;
+  }
+
+  .btn-action {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* Fix for chart containers to ensure proper rendering */
+.chart-container canvas {
+  max-width: 100%;
+}
+
+/* Improve table readability on small screens */
+@media (max-width: 575.98px) {
+  .table-responsive {
+    font-size: 0.85rem;
+  }
+
+  .card-header h5 {
+    font-size: 1rem;
+  }
+}
+
+/* Enhanced tooltips for charts */
+.chartjs-tooltip {
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border-radius: 4px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-family: "Poppins", sans-serif;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  z-index: 1050;
+}
+
+/* Focus states */
+.action-card:focus,
+.btn-action:focus,
+button:focus {
+  outline: 2px solid #1a8754; /* Restored green color */
+  outline-offset: 2px;
+}
+
+/* Print styles for dashboard */
+@media print {
+  .dashboard-card,
+  .stat-card,
+  .activity-card {
+    box-shadow: none !important;
+    border: 1px solid #ddd;
+  }
+
+  .organization-header,
+  .sidebar,
+  .breadcrumb,
+  .welcome-actions,
+  .page-header form,
+  .btn-action,
+  .action-card-arrow,
+  .modal {
+    display: none !important;
+  }
+
+  .chart-container {
+    page-break-inside: avoid;
+    height: 250px;
+  }
+
+  .table-container {
+    page-break-inside: avoid;
+  }
+
+  main {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+/* Fix for IE11 flexbox issues */
+@media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
+  .action-container {
+    display: block;
+  }
+
+  .action-card {
+    display: block;
+    width: 100%;
+    float: left;
+    margin-bottom: 15px;
+  }
+
+  .driver-card,
+  .pickup-item {
+    width: 100%;
+  }
+}
+
+/* Chart Containers - Fix for stretching issues */
+.chart-container {
+  position: relative;
+  height: 300px; /* Fixed height */
+  max-height: 350px; /* Maximum height to prevent stretching */
+  margin: 20px 0;
+  width: 100%;
+  overflow: hidden; /* Prevent overflow content */
+}
+
+.chart-container canvas {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  width: auto !important; /* Let Chart.js handle the width */
+  height: auto !important; /* Let Chart.js handle the height */
+}
+
+/* Add manager-specific visualization elements */
+.manager-section-divider {
+  height: 2px;
+  background: linear-gradient(to right, #1a8754, transparent); /* Using green */
+  margin: 30px 0;
+}
+
+/* Add manager-style navigation indicators */
+.nav-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #1a8754;
+  margin-right: 5px;
+}
+
+.nav-indicator.active {
+  background-color: #34c38f;
+  box-shadow: 0 0 0 2px rgba(26, 135, 84, 0.2);
+}
+
+/* Table Styling - Enhanced green gradient */
+.table-container .table thead th {
+  background-color: #1a8754; /* Fallback color if gradient doesn't work */
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  color: white !important;
+  font-weight: 600;
+  border-bottom: none;
+  padding: 12px 15px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1); /* Add subtle text shadow for depth */
+}
+
+/* Additional style to ensure the table head color overrides bootstrap */
+.table thead {
+  border-color: #1a8754;
+}
+
+/* Fix for first table cell border radius */
+.table-container .table thead th:first-child {
+  border-top-left-radius: 8px;
+}
+
+/* Fix for last table cell border radius */
+.table-container .table thead th:last-child {
+  border-top-right-radius: 8px;
+}

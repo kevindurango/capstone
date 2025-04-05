@@ -70,7 +70,7 @@ export default function IntroScreen() {
   });
 
   const handleNext = () => {
-    router.push("/(tabs)/auth");
+    router.push("/(auth)/auth-selection");
   };
 
   return (
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   title: {
-    fontSize: 28,
+    fontSize: 25,
     fontWeight: "bold",
     color: COLORS.light,
     marginTop: 15,

@@ -106,13 +106,61 @@ class User
     public function deleteUser($user_id)
     {
         try {
+            // Begin transaction to ensure all operations succeed or fail together
+            $this->conn->beginTransaction();
+            
+            // Try to delete any related entries in other tables first
+            try {
+                // Delete from activity_logs - fix the table name to match your database
+                $query = "DELETE FROM activitylogs WHERE user_id = :user_id";
+                $stmt = $this->conn->prepare($query);
+                $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+                $stmt->execute();
+                
+                // Delete from order_items where the order belongs to this user
+                $query = "DELETE oi FROM order_items oi 
+                          JOIN orders o ON oi.order_id = o.order_id 
+                          WHERE o.consumer_id = :user_id";
+                $stmt = $this->conn->prepare($query);
+                $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+                $stmt->execute();
+                
+                // Delete orders associated with this user
+                $query = "DELETE FROM orders WHERE consumer_id = :user_id";
+                $stmt = $this->conn->prepare($query);
+                $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+                $stmt->execute();
+                
+                // Delete pickups assigned to this user (if the user is a driver)
+                $query = "UPDATE pickups SET assigned_to = NULL WHERE assigned_to = :user_id";
+                $stmt = $this->conn->prepare($query);
+                $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+                $stmt->execute();
+            } catch (PDOException $e) {
+                // Log the error but continue - some tables might not exist or have different structures
+                error_log("Error deleting related records: " . $e->getMessage());
+            }
+            
+            // Finally delete the user
             $query = "DELETE FROM users WHERE user_id = :user_id";
             $stmt = $this->conn->prepare($query);
-            $stmt->bindParam(':user_id', $user_id);
-            return $stmt->execute();
+            $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+            $result = $stmt->execute();
+            
+            if ($result) {
+                $this->conn->commit();
+                return true;
+            } else {
+                $this->conn->rollBack();
+                error_log("Failed to delete user ID: $user_id");
+                return false;
+            }
         } catch (PDOException $e) {
-            echo "Error deleting user: " . $e->getMessage();
-            return false;
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            error_log("Error deleting user: " . $e->getMessage());
+            throw new Exception("Error deleting user: " . $e->getMessage());
         }
     }
 
@@ -201,6 +249,20 @@ class User
         } catch (PDOException $e) {
             error_log("Error counting users by role: " . $e->getMessage());
             return 0;
+        }
+    }
+
+    public function getUserRole($userId) {
+        try {
+            $query = "SELECT role_id FROM users WHERE user_id = :user_id";
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':user_id', $userId, PDO::PARAM_INT);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result ? $result['role_id'] : null;
+        } catch (PDOException $e) {
+            error_log("Error getting user role: " . $e->getMessage());
+            return null;
         }
     }
 

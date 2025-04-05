@@ -1,50 +1,69 @@
-# Welcome to your Expo app 👋
+# Farmers Market App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is a mobile application for connecting farmers with consumers for direct product sales.
 
-## Get started
+## Server Setup
 
-1. Install dependencies
+The app requires a backend server running on PHP with a MySQL database.
 
-   ```bash
+### Prerequisites
+
+- XAMPP (or similar) with PHP 8.0+ and MySQL
+- Node.js and npm or yarn
+
+### Backend Setup
+
+1. Ensure XAMPP is installed and Apache + MySQL services are running
+2. Import the database schema from `farmersmarketdb.sql` into MySQL
+3. The backend files should be in `c:\xampp\htdocs\capstone\my-new-app\api`
+
+### Frontend Development
+
+1. Install dependencies:
+
+   ```
    npm install
    ```
 
-2. Start the app
+   or
 
-   ```bash
-    npx expo start
+   ```
+   yarn
    ```
 
-In the output, you'll find options to open the app in a
+2. Start the development server:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   ```
+   npm start
+   ```
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+   or
 
-## Get a fresh project
+   ```
+   yarn start
+   ```
 
-When you're ready, run:
+3. Configure the server connection:
+   - By default, the app will try to auto-discover the server
+   - Use the "Server Settings" tab to configure the server IP manually
 
-```bash
-npm run reset-project
-```
+## Server Connection
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+The app uses a smart server discovery mechanism:
 
-## Learn more
+- It will try recently used server addresses first
+- Then common development IP addresses
+- You can manually set the server IP in the server configuration screen
 
-To learn more about developing your project with Expo, look at the following resources:
+### Common development server addresses:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- `localhost` - For local development on iOS
+- `10.0.2.2` - For Android emulators pointing to the host machine
+- `192.168.x.x` - For devices on the same network as the server
 
-## Join the community
+## Files Structure
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `/api` - Backend PHP files
+- `/app` - React Native frontend screens
+- `/components` - Reusable React components
+- `/services` - JavaScript services for API communication and business logic

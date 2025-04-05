@@ -112,15 +112,22 @@ if (isset($_POST['update_pickup'])) {
 $query = "SELECT
             p.pickup_id,
             o.order_id,
-            u.username AS consumer_name,
+            c.username AS consumer_name,
             p.pickup_status,
             p.pickup_date,
             p.pickup_location,
             p.assigned_to,
+            CONCAT(d.first_name, ' ', d.last_name) AS driver_name,
+            dd.vehicle_type,
+            dd.vehicle_plate,
+            dd.availability_status,
+            dd.max_load_capacity,
             p.pickup_notes
           FROM pickups AS p
           JOIN orders AS o ON p.order_id = o.order_id
-          JOIN users AS u ON o.consumer_id = u.user_id";
+          JOIN users AS c ON o.consumer_id = c.user_id
+          LEFT JOIN users AS d ON p.assigned_to = d.user_id
+          LEFT JOIN driver_details AS dd ON d.user_id = dd.user_id";
 
 $whereClauses = [];
 $queryParams = [];
@@ -129,7 +136,7 @@ if (!empty($search)) {
     $whereClauses[] = "(p.pickup_status LIKE :search
                         OR p.pickup_location LIKE :search
                         OR p.assigned_to LIKE :search
-                        OR u.username LIKE :search
+                        OR c.username LIKE :search
                         OR o.order_id LIKE :search)"; // Add search by order_id as well.
 
     $queryParams[':search'] = "%$search%";
@@ -374,14 +381,31 @@ if ($admin_user_id) {
                                         <p><strong><i class="bi bi-person"></i> Consumer:</strong> <?= htmlspecialchars($pickup['consumer_name']) ?></p>
                                         <p><strong><i class="bi bi-calendar-event"></i> Date:</strong> <?= htmlspecialchars(date("F j, Y, g:i A", strtotime($pickup['pickup_date']))) ?></p>
                                         <p><strong><i class="bi bi-geo-alt"></i> Location:</strong> <?= htmlspecialchars($pickup['pickup_location']) ?></p>
-                                        <p><strong><i class="bi bi-person-badge"></i> Assigned To:</strong> <?= htmlspecialchars($pickup['assigned_to']) ?></p>
+                                        <p>
+                                            <strong><i class="bi bi-person-badge"></i> Assigned To:</strong> 
+                                            <?php if (!empty($pickup['driver_name'])): ?>
+                                                <?= htmlspecialchars($pickup['driver_name']) ?>
+                                                <?php if (!empty($pickup['vehicle_type'])): ?>
+                                                    <span class="badge badge-info">
+                                                        <?= htmlspecialchars($pickup['vehicle_type']) ?> - <?= htmlspecialchars($pickup['vehicle_plate']) ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                                <span class="badge badge-<?= $pickup['availability_status'] === 'available' ? 'success' : 
+                                                                        ($pickup['availability_status'] === 'busy' ? 'warning' : 'danger') ?>">
+                                                    <?= ucfirst(htmlspecialchars($pickup['availability_status'])) ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="text-muted">No driver assigned</span>
+                                            <?php endif; ?>
+                                        </p>
                                         <div class="pickup-notes">
                                             <strong><i class="bi bi-card-text"></i> Notes:</strong> <?= htmlspecialchars($pickup['pickup_notes'] ?: 'No notes available') ?>
                                         </div>
                                     </div>
                                     <div class="card-footer">
                                         <button type="button" class="btn btn-primary btn-block edit-pickup-btn"
-                                                data-toggle="modal" data-target="#editPickupModal"
+                                                data-toggle="modal" 
+                                                data-target="#editPickupModal"
                                                 data-pickup-id="<?= htmlspecialchars($pickup['pickup_id']) ?>"
                                                 data-pickup-status="<?= htmlspecialchars($pickup['pickup_status']) ?>"
                                                 data-pickup-date="<?= htmlspecialchars($pickup['pickup_date']) ?>"
@@ -511,8 +535,33 @@ if ($admin_user_id) {
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="assigned_to"><i class="bi bi-person"></i> Assigned To</label>
-                                        <input type="text" class="form-control" id="assigned_to" name="assigned_to">
+                                        <label for="assigned_to"><i class="bi bi-person"></i> Assign Driver</label>
+                                        <select class="form-control" id="assigned_to" name="assigned_to">
+                                            <option value="">-- Select Driver --</option>
+                                            <?php
+                                            // Fetch available drivers
+                                            $driversQuery = "SELECT u.user_id, CONCAT(u.first_name, ' ', u.last_name) as driver_name, 
+                                                            dd.vehicle_type, dd.vehicle_plate, dd.availability_status
+                                                            FROM users u 
+                                                            JOIN driver_details dd ON u.user_id = dd.user_id 
+                                                            WHERE u.role_id = 6 
+                                                            ORDER BY dd.availability_status = 'available' DESC, u.last_name";
+                                            $driversStmt = $conn->prepare($driversQuery);
+                                            $driversStmt->execute();
+                                            while ($driver = $driversStmt->fetch(PDO::FETCH_ASSOC)) {
+                                                $status_class = $driver['availability_status'] == 'available' ? 'text-success' : 
+                                                              ($driver['availability_status'] == 'busy' ? 'text-warning' : 'text-danger');
+                                                echo "<option value='" . $driver['user_id'] . "' " . 
+                                                     "data-vehicle='" . htmlspecialchars($driver['vehicle_type']) . " - " . 
+                                                     htmlspecialchars($driver['vehicle_plate']) . "' " .
+                                                     "class='" . $status_class . "'>" .
+                                                     htmlspecialchars($driver['driver_name']) . 
+                                                     " (" . ucfirst($driver['availability_status']) . ")" .
+                                                     "</option>";
+                                            }
+                                            ?>
+                                        </select>
+                                        <small class="form-text text-muted vehicle-info"></small>
                                     </div>
 
                                     <div class="form-group">
@@ -551,13 +600,15 @@ if ($admin_user_id) {
             
             // Handle edit pickup button click
             $('.edit-pickup-btn').click(function () {
-                // Get data from button attributes
-                var pickupId = $(this).data('pickup-id');
-                var pickupStatus = $(this).data('pickup-status');
-                var pickupDate = $(this).data('pickup-date');
-                var pickupLocation = $(this).data('pickup-location');
-                var assignedTo = $(this).data('assigned-to');
-                var pickupNotes = $(this).data('pickup-notes');
+                // Get data from button attributes using the correct data attribute names
+                const pickupId = $(this).data('pickupId');
+                const pickupStatus = $(this).data('pickupStatus');
+                const pickupDate = $(this).data('pickupDate');
+                const pickupLocation = $(this).data('pickupLocation');
+                const assignedTo = $(this).data('assignedTo');
+                const pickupNotes = $(this).data('pickupNotes');
+
+                console.log('Debug - Pickup Status:', pickupStatus); // Debug line
 
                 // Populate the modal form
                 $('#pickup_id').val(pickupId);
@@ -569,7 +620,21 @@ if ($admin_user_id) {
                 
                 // Update modal title with pickup ID
                 $('#editPickupModalLabel').html('<i class="bi bi-truck"></i> Edit Pickup #' + pickupId);
+
+                // Update vehicle info if a driver is selected
+                updateVehicleInfo();
             });
+
+            // Handle driver selection change
+            $('#assigned_to').change(function() {
+                updateVehicleInfo();
+            });
+
+            function updateVehicleInfo() {
+                const selectedOption = $('#assigned_to option:selected');
+                const vehicleInfo = selectedOption.data('vehicle');
+                $('.vehicle-info').text(vehicleInfo ? 'Vehicle: ' + vehicleInfo : '');
+            }
 
             // Auto-dismiss alerts after 5 seconds
             setTimeout(function() {

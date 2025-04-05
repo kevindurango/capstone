@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   Dimensions,
   Platform,
+  Alert,
 } from "react-native";
 import { ThemedText } from "./ThemedText";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { authService } from "@/services/authService";
 
 const { width } = Dimensions.get("window");
 
@@ -29,28 +31,32 @@ interface SidebarProps {
     primary: string;
     light: string;
     text: string;
+    cardBg?: string;
   };
+  onLogout?: () => Promise<boolean>;
 }
-
-const menuItems: MenuItem[] = [
-  { icon: "home", label: "Home", route: "/(tabs)/main" },
-  { icon: "list", label: "Services", route: "/(tabs)/services" },
-  { icon: "star", label: "Programs", route: "/(tabs)/programs" },
-  { icon: "basket", label: "Market", route: "/(tabs)/market" },
-  { icon: "newspaper", label: "News", route: "/(tabs)/news" },
-  { icon: "person", label: "Profile", route: "/(tabs)/profile" },
-  { icon: "settings", label: "Settings", route: "/(tabs)/settings" },
-];
 
 export default function Sidebar({
   isVisible,
   onClose,
   router,
   colors,
+  onLogout,
 }: SidebarProps) {
   const translateX = React.useRef(new Animated.Value(-width)).current;
   const defaultRouter = useRouter();
   const navigationRouter = router || defaultRouter;
+
+  // Menu items with updated routes matching the app structure
+  const menuItems: MenuItem[] = [
+    { icon: "home", label: "Home", route: "/(tabs)/main" },
+    { icon: "information-circle", label: "About", route: "/(tabs)/about" },
+    { icon: "list", label: "Services", route: "/(tabs)/services" },
+    { icon: "star", label: "Programs", route: "/(tabs)/programs" },
+    { icon: "basket", label: "Market", route: "/(tabs)/market" },
+    { icon: "newspaper", label: "News", route: "/(tabs)/news" },
+    { icon: "person", label: "Profile", route: "/(tabs)/profile" },
+  ];
 
   React.useEffect(() => {
     if (isVisible) {
@@ -91,10 +97,43 @@ export default function Sidebar({
     });
   };
 
-  const handleLogout = () => {
-    // Handle logout logic here
-    console.log("User logged out");
-    onClose();
+  // Handle logout with proper cleanup and navigation
+  const handleLogout = async () => {
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Logout",
+        onPress: async () => {
+          try {
+            console.log("[Sidebar] User confirmed logout");
+            onClose(); // Close sidebar first
+
+            // Try to use the provided onLogout first
+            if (typeof onLogout === "function") {
+              await onLogout();
+            } else {
+              // Fallback to direct authService logout
+              await authService.logout();
+            }
+
+            console.log("[SSidebar] Logout completed successfully");
+
+            // Force immediate navigation to login
+            console.log("[Sidebar] Navigating to login screen");
+            setTimeout(() => {
+              navigationRouter.replace("/(tabs)/login");
+            }, 100);
+          } catch (error) {
+            console.error("[Sidebar] Logout error:", error);
+            // If logout fails, still try to navigate to login
+            navigationRouter.replace("/(tabs)/login");
+          }
+        },
+      },
+    ]);
   };
 
   if (!isVisible) return null;

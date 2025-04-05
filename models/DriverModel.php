@@ -452,4 +452,22 @@ class DriverModel {
             return false;
         }
     }
+
+    public function deleteDriverDetails($userId) {
+        try {
+            $query = "DELETE FROM driver_details WHERE user_id = :user_id";
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':user_id', $userId, PDO::PARAM_INT);
+            $success = $stmt->execute();
+            
+            if (!$success) {
+                error_log("Failed to delete driver details for user ID: $userId");
+            }
+            
+            return $success;
+        } catch (PDOException $e) {
+            error_log("Error deleting driver details: " . $e->getMessage());
+            throw new Exception("Failed to delete driver details: " . $e->getMessage());
+        }
+    }
 }

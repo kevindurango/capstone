@@ -13,8 +13,8 @@ require_once '../../models/Log.php';
 $orderController = new OrderController();
 $logClass = new Log();
 
-// Get organization_id from session
-$organization_id = $_SESSION['organization_id'] ?? null;
+// Get organization_head_user_id from session
+$organization_head_user_id = $_SESSION['organization_head_user_id'] ?? null;
 
 // Pagination Setup
 $limit = 10;
@@ -25,10 +25,64 @@ $offset = ($page - 1) * $limit;
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $status_filter = isset($_GET['status']) ? trim($_GET['status']) : '';
 
-// Fetch orders with pagination and search
-$orders = $organization_id ? $orderController->getOrdersByOrganizationPaginated($organization_id, $search, $status_filter, $limit, $offset) : [];
-$totalOrders = $organization_id ? $orderController->getTotalOrders($organization_id, $search, $status_filter) : 0;
-$totalPages = ceil($totalOrders / $limit);
+// Get all consumer orders
+try {
+    // Check if the method exists to avoid fatal errors
+    if (method_exists($orderController, 'getOrders')) {
+        $orders = $orderController->getOrders();
+        
+        // Ensure status field is properly mapped from order_status
+        foreach ($orders as &$order) {
+            // Make sure we're using the correct status field name
+            if (!isset($order['status']) && isset($order['order_status'])) {
+                $order['status'] = $order['order_status'];
+            }
+        }
+    } else {
+        // Fallback if method doesn't exist
+        $orders = [];
+        error_log("OrderController::getOrders() method does not exist");
+        $_SESSION['message'] = "Error: Order functionality is not fully implemented. Please contact the administrator.";
+        $_SESSION['message_type'] = 'danger';
+    }
+    
+    // Apply search filter if provided
+    if (!empty($search) && !empty($orders)) {
+        $filteredOrders = [];
+        foreach ($orders as $order) {
+            // Search by order ID, customer name, or other relevant fields
+            if (
+                stripos($order['order_id'], $search) !== false || 
+                stripos($order['customer_name'], $search) !== false ||
+                stripos($order['status'] ?? '', $search) !== false
+            ) {
+                $filteredOrders[] = $order;
+            }
+        }
+        $orders = $filteredOrders;
+    }
+    
+    // Apply status filter if provided
+    if (!empty($status_filter) && !empty($orders)) {
+        $filteredOrders = [];
+        foreach ($orders as $order) {
+            if (strtolower($order['status'] ?? '') === strtolower($status_filter)) {
+                $filteredOrders[] = $order;
+            }
+        }
+        $orders = $filteredOrders;
+    }
+} catch (Exception $e) {
+    error_log("Error fetching orders: " . $e->getMessage());
+    $_SESSION['message'] = "Error retrieving orders. Please try again later.";
+    $_SESSION['message_type'] = 'danger';
+    $orders = [];
+}
+
+// Pagination
+$totalOrders = count($orders);
+$totalPages = ceil($totalOrders / $limit) ?: 1; // Ensure at least 1 page
+$orders = array_slice($orders, $offset, $limit);
 
 // Generate CSRF token if not set
 if (empty($_SESSION['csrf_token'])) {
@@ -41,12 +95,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
         $order_id = $_POST['order_id'];
         $new_status = $_POST['new_status'];
         
-        if ($orderController->updateOrderStatus($order_id, $new_status)) {
-            $logClass->logActivity($_SESSION['user_id'], "Updated order #$order_id status to $new_status");
-            $_SESSION['message'] = "Order status updated successfully!";
-            $_SESSION['message_type'] = 'success';
-        } else {
-            $_SESSION['message'] = "Failed to update order status.";
+        try {
+            if ($orderController->updateOrderStatus($order_id, $new_status)) {
+                $logClass->logActivity($organization_head_user_id, "Updated order #$order_id status to $new_status");
+                $_SESSION['message'] = "Order status updated successfully!";
+                $_SESSION['message_type'] = 'success';
+                
+                // Force page refresh to show updated status
+                header("Location: organization-head-order-management.php");
+                exit();
+            } else {
+                $_SESSION['message'] = "Failed to update order status. Please check database logs.";
+                $_SESSION['message_type'] = 'danger';
+            }
+        } catch (Exception $e) {
+            error_log("Error updating order status: " . $e->getMessage());
+            $_SESSION['message'] = "An error occurred while updating the order status: " . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
         }
         
@@ -56,8 +120,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
 
     // Handle logout
     if (isset($_POST['logout'])) {
-        if ($admin_user_id) {
-            $logClass->logActivity($_SESSION['user_id'], "Organization Head logged out.");
+        // Use organization_head_user_id
+        if (isset($_SESSION['organization_head_user_id'])) {
+            $logClass->logActivity($_SESSION['organization_head_user_id'], "Organization Head logged out.");
         }
         session_unset();
         session_destroy();
@@ -78,6 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../../public/style/admin.css">
     <link rel="stylesheet" href="../../public/style/admin-sidebar.css">
+    <link rel="stylesheet" href="../../public/style/organization-head-dashboard.css">
     <style>
         body { font-family: 'Poppins', sans-serif; }
         .table-container {
@@ -103,10 +169,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
             font-size: 0.875rem;
             font-weight: 500;
         }
-        .status-pending { background-color: #fff3cd; color: #856404; }
-        .status-processing { background-color: #cce5ff; color: #004085; }
-        .status-completed { background-color: #d4edda; color: #155724; }
-        .status-cancelled { background-color: #f8d7da; color: #721c24; }
+        .status-pending { background-color: #ffc107; color: #212529; }
+        .status-processing { background-color: #007bff; color: #fff; }
+        .status-completed { background-color: #28a745; color: #fff; }
+        .status-cancelled { background-color: #dc3545; color: #fff; }
         .btn-action {
             padding: 0.375rem 0.75rem;
             font-size: 0.875rem;
@@ -118,9 +184,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
             border-radius: 8px;
             margin-bottom: 1.5rem;
         }
+        .order-card {
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            border-left: 4px solid #1a8754;
+            transition: transform 0.3s ease;
+        }
+        
+        .order-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
     </style>
 </head>
 <body class="bg-light">
+    <!-- Organization Header -->
+    <div class="organization-header text-center">
+        <h2><i class="bi bi-building"></i> ORGANIZATION ORDER MANAGEMENT
+            <span class="organization-badge">Organization Head Access</span>
+        </h2>
+    </div>
+
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
@@ -197,14 +282,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($orders as $order): ?>
+                                    <?php 
+                                        // Standardize status 
+                                        $status = isset($order['status']) ? $order['status'] : 
+                                                 (isset($order['order_status']) ? $order['order_status'] : 'pending');
+                                        
+                                        // Determine style class based on status
+                                        $statusClass = '';
+                                        switch(strtolower($status)) {
+                                            case 'pending':
+                                                $statusClass = 'pending';
+                                                break;
+                                            case 'completed':
+                                                $statusClass = 'completed';
+                                                break;
+                                            case 'canceled': // Handle DB enum value
+                                                $statusClass = 'cancelled'; // Use UI class
+                                                $status = 'Canceled'; // Use consistent display text
+                                                break;
+                                            default:
+                                                $statusClass = 'pending';
+                                        }
+                                    ?>
                                     <tr>
                                         <td>#<?= htmlspecialchars($order['order_id']) ?></td>
                                         <td><?= htmlspecialchars($order['customer_name']) ?></td>
                                         <td><?= date('M d, Y H:i', strtotime($order['order_date'])) ?></td>
                                         <td>₱<?= number_format($order['total_amount'], 2) ?></td>
                                         <td>
-                                            <span class="status-badge status-<?= strtolower($order['status']) ?>">
-                                                <?= ucfirst(htmlspecialchars($order['status'])) ?>
+                                            <span class="status-badge status-<?= $statusClass ?>">
+                                                <?= ucfirst(htmlspecialchars($status)) ?>
                                             </span>
                                         </td>
                                         <td>
@@ -298,10 +405,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
                             <label for="new_status">New Status</label>
                             <select name="new_status" id="new_status" class="form-control" required>
                                 <option value="pending">Pending</option>
-                                <option value="processing">Processing</option>
                                 <option value="completed">Completed</option>
-                                <option value="cancelled">Cancelled</option>
+                                <option value="canceled">Canceled</option>
                             </select>
+                        </div>
+                        <div class="alert alert-info">
+                            <small><i class="bi bi-info-circle"></i> Note: Only these status values are supported by the database.</small>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -330,7 +439,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
             // Update Status
             $('.update-status').click(function() {
                 const orderId = $(this).data('order-id');
-                const currentStatus = $(this).data('current-status');
+                let currentStatus = $(this).data('current-status');
+                
+                // Make sure we map cancelled to canceled for the form
+                if (currentStatus === 'cancelled') {
+                    currentStatus = 'canceled';
+                }
+                
                 $('#updateOrderId').val(orderId);
                 $('#new_status').val(currentStatus);
             });

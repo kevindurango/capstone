@@ -228,9 +228,13 @@ class Order {
      * @return int The total number of orders.
      */
     public function getTotalOrderCount(): int {
-        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM orders");
-        $stmt->execute();
-        return (int) $stmt->fetchColumn();
+        try {
+            $query = "SELECT COUNT(*) FROM orders";
+            return $this->pdo->query($query)->fetchColumn();
+        } catch (PDOException $e) {
+            error_log("Error getting total order count: " . $e->getMessage());
+            return 0;
+        }
     }
 
     /**
@@ -264,37 +268,45 @@ class Order {
 
     public function getOrdersByStatus($status) {
         try {
-            $query = "SELECT 
-                        o.order_id,
-                        o.order_status as status,
-                        o.order_date,
-                        u.first_name,
-                        u.last_name,
-                        u.email,
-                        CONCAT(u.first_name, ' ', u.last_name) as customer_name,
-                        COUNT(oi.order_item_id) as item_count,
-                        COALESCE(SUM(oi.price * oi.quantity), 0) as total_amount
-                    FROM orders o
-                    LEFT JOIN users u ON o.consumer_id = u.user_id
-                    LEFT JOIN orderitems oi ON o.order_id = oi.order_id
-                    WHERE o.order_status = :status
-                    GROUP BY o.order_id, o.order_status, o.order_date, u.first_name, u.last_name, u.email
-                    ORDER BY o.order_date DESC";
+            error_log("Fetching orders with status: " . $status);
             
+            $query = "SELECT o.*, 
+                      u.username as customer_name, 
+                      u.email,
+                      u.first_name,
+                      u.last_name,
+                      (SELECT COUNT(*) FROM orderitems oi WHERE oi.order_id = o.order_id) as item_count,
+                      (SELECT SUM(oi.quantity * oi.price) FROM orderitems oi WHERE oi.order_id = o.order_id) as total_amount
+                      FROM orders o
+                      LEFT JOIN users u ON o.consumer_id = u.user_id";
+
+            $params = [];
+            if ($status !== 'all') {
+                $query .= " WHERE o.order_status = :status";
+                $params[':status'] = $status;
+            }
+
+            $query .= " ORDER BY o.order_date DESC";
+
             $stmt = $this->pdo->prepare($query);
-            $stmt->bindParam(':status', $status, PDO::PARAM_STR);
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
             $stmt->execute();
             
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            error_log("Found " . count($results) . " orders");
+            return $results;
         } catch (PDOException $e) {
-            error_log("Error getting orders by status: " . $e->getMessage());
+            error_log("Error fetching orders: " . $e->getMessage());
             return [];
         }
     }
 
     public function getTodayOrderCount() {
         try {
-            $query = "SELECT COUNT(*) FROM orders WHERE DATE(order_date) = CURDATE()";
+            $query = "SELECT COUNT(*) FROM orders 
+                     WHERE DATE(order_date) = CURDATE()";
             $stmt = $this->pdo->query($query);
             return $stmt->fetchColumn();
         } catch (PDOException $e) {
@@ -305,10 +317,8 @@ class Order {
 
     public function getTotalRevenue() {
         try {
-            $query = "SELECT COALESCE(SUM(oi.price * oi.quantity), 0) as total
-                      FROM orderitems oi
-                      JOIN orders o ON oi.order_id = o.order_id
-                      WHERE o.order_status = 'completed'";
+            $query = "SELECT COALESCE(SUM(total_amount), 0) FROM orders 
+                     WHERE order_status = 'completed'";
             $stmt = $this->pdo->query($query);
             return $stmt->fetchColumn();
         } catch (PDOException $e) {

@@ -7,17 +7,37 @@ if (!isset($_SESSION['manager_logged_in']) || $_SESSION['manager_logged_in'] !==
     exit();
 }
 
+require_once '../../models/Database.php';
 require_once '../../models/Order.php';
 require_once '../../models/Log.php';
 
 $orderClass = new Order();
 $logClass = new Log();
 
-// Get order statistics
-$pendingOrders = $orderClass->getOrdersByStatus('pending');
+// Add debug logging
+error_log("Starting order fetching process...");
+
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Get order statistics with debug info
+$pendingOrders = $orderClass->getOrdersByStatus('pending'); // Note: case matters - use 'pending' not 'PENDING'
+error_log("Pending orders count: " . count($pendingOrders));
+
 $totalOrders = $orderClass->getTotalOrderCount();
+error_log("Total orders: " . $totalOrders);
+
 $todayOrders = $orderClass->getTodayOrderCount();
+error_log("Today's orders: " . $todayOrders);
+
 $totalRevenue = $orderClass->getTotalRevenue();
+error_log("Total revenue: " . $totalRevenue);
+
+// Add error checking for empty results
+if (empty($pendingOrders)) {
+    error_log("No pending orders found - verify database connection and data");
+}
 
 // Handle status updates
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -156,9 +176,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <select id="statusFilter" class="form-control">
                                     <option value="">All Statuses</option>
                                     <option value="pending">Pending</option>
-                                    <option value="processing">Processing</option>
                                     <option value="completed">Completed</option>
-                                    <option value="cancelled">Cancelled</option>
+                                    <option value="canceled">Canceled</option>
                                 </select>
                             </div>
                         </div>
@@ -198,46 +217,60 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($pendingOrders as $order): ?>
-                                <tr>
-                                    <td>#<?= $order['order_id'] ?></td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <i class="bi bi-person-circle mr-2"></i>
-                                            <div>
-                                                <div class="font-weight-bold">
-                                                    <?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?>
-                                                </div>
-                                                <small class="text-muted">
-                                                    <?= htmlspecialchars($order['email'] ?? 'No email') ?>
-                                                </small>
+                                <?php if (empty($pendingOrders)): ?>
+                                    <tr>
+                                        <td colspan="7" class="text-center">
+                                            <div class="alert alert-info">
+                                                <i class="bi bi-info-circle"></i> No orders found.
+                                                <?php if (isset($_SESSION['debug'])): ?>
+                                                    <br>
+                                                    <small>Debug: Check database connection and orders table.</small>
+                                                <?php endif; ?>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td><?= intval($order['item_count']) ?> items</td>
-                                    <td>₱<?= number_format(floatval($order['total_amount']), 2) ?></td>
-                                    <td><?= date('M d, Y H:i', strtotime($order['order_date'])) ?></td>
-                                    <td>
-                                        <span class="badge badge-<?= getStatusBadgeClass($order['status'] ?? 'pending') ?>">
-                                            <?= ucfirst(htmlspecialchars($order['status'] ?? 'pending')) ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group">
-                                            <button class="btn btn-sm btn-info view-order" 
-                                                    data-id="<?= $order['order_id'] ?>"
-                                                    title="View Order Details">
-                                                <i class="bi bi-eye"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-success update-status" 
-                                                    data-id="<?= $order['order_id'] ?>"
-                                                    title="Update Status">
-                                                <i class="bi bi-arrow-up-circle"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
+                                        </td>
+                                    </tr>
+                                <?php else: ?>
+                                    <?php foreach ($pendingOrders as $order): ?>
+                                    <tr>
+                                        <td>#<?= $order['order_id'] ?></td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-person-circle mr-2"></i>
+                                                <div>
+                                                    <div class="font-weight-bold">
+                                                        <?= htmlspecialchars($order['customer_name'] ?? 'N/A') ?>
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        <?= htmlspecialchars($order['email'] ?? 'No email') ?>
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><?= intval($order['item_count']) ?> items</td>
+                                        <td>₱<?= number_format(floatval($order['total_amount']), 2) ?></td>
+                                        <td><?= date('M d, Y H:i', strtotime($order['order_date'])) ?></td>
+                                        <td>
+                                            <span class="badge badge-<?= getStatusBadgeClass($order['status'] ?? 'pending') ?>">
+                                                <?= ucfirst(htmlspecialchars($order['status'] ?? 'pending')) ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button class="btn btn-sm btn-info view-order" 
+                                                        data-id="<?= $order['order_id'] ?>"
+                                                        title="View Order Details">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-success update-status" 
+                                                        data-id="<?= $order['order_id'] ?>"
+                                                        title="Update Status">
+                                                    <i class="bi bi-arrow-up-circle"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>

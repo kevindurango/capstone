@@ -55,8 +55,35 @@ class ProductController
     }
 
     // Add a new product with stock parameter
-    public function addProduct($name, $description, $price, $stock, $farmer_id, $image = null)
+    public function addProduct($name, $description = null, $price = null, $stock = null, $farmer_id = null, $image = null)
     {
+        // Check if first parameter is an array (from manager view)
+        if (is_array($name)) {
+            $data = $name;
+            $name = $data['name'] ?? '';
+            $description = $data['description'] ?? '';
+            $price = $data['price'] ?? 0;
+            $stock = $data['stock'] ?? 0;
+            $farmer_id = $data['farmer_id'] ?? null;
+            
+            // Handle image upload if it exists in the data array
+            if (isset($data['image']) && !empty($data['image'])) {
+                $image = $data['image'];
+            }
+        }
+        
+        // Validate required fields
+        if (empty($name) || empty($price) || empty($farmer_id)) {
+            error_log("ProductController: Missing required fields for adding product. Name: $name, Price: $price, Farmer ID: $farmer_id");
+            return false;
+        }
+        
+        // Validate farmer_id exists
+        if (!$this->validateFarmerId($farmer_id)) {
+            error_log("ProductController: Invalid farmer_id: $farmer_id");
+            return false;
+        }
+        
         // Validate and handle image upload
         $image_path = null;
         if ($image && isset($image['tmp_name']) && $image['tmp_name']) {
@@ -68,6 +95,23 @@ class ProductController
 
         // Add product via the Product model
         return $this->product->addProduct($name, $description, $price, $farmer_id, $stock, $image_path);
+    }
+    
+    // Helper method to validate farmer_id exists in the database
+    private function validateFarmerId($farmer_id) 
+    {
+        if (empty($farmer_id) || !is_numeric($farmer_id)) {
+            return false;
+        }
+        
+        // Use the Product model to check if the farmer exists
+        $farmers = $this->getAllFarmers();
+        foreach ($farmers as $farmer) {
+            if ($farmer['user_id'] == $farmer_id) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Enhanced edit product with stock parameter
@@ -117,10 +161,43 @@ class ProductController
         return $this->product->deleteProduct($id); // Delete product via the Product model
     }
 
+
+
     // Get product by ID
     public function getProductById($id)
     {
         return $this->product->getProductById($id);
+    }
+    
+    // Modified updateProduct method to handle different parameter formats
+    public function updateProduct($id, $data, $description = null, $price = null, $stock = null, $farmer_id = null, $image = null, $current_image = null)
+    {
+        // Check if data is an array (from manager view) or individual parameters
+        if (is_array($data)) {
+            // Extract data from the array
+            $name = $data['name'] ?? '';
+            $description = $data['description'] ?? '';
+            $price = $data['price'] ?? 0;
+            $stock = $data['stock'] ?? 0;
+            $farmer_id = $data['farmer_id'] ?? null;
+            
+            // Handle image
+            $image = null;
+            $current_image = $data['current_image'] ?? '';
+            
+            if (isset($data['image']) && is_array($data['image']) && !empty($data['image']['tmp_name'])) {
+                $image = $data['image'];
+            } elseif (isset($_FILES['image']) && !empty($_FILES['image']['tmp_name'])) {
+                $image = $_FILES['image'];
+            }
+            
+            // Call editProduct with extracted parameters
+            return $this->editProduct($id, $name, $description, $price, $stock, $farmer_id, $image, $current_image);
+        } else {
+            // Original format with individual parameters
+            // In this case, $data is actually the name parameter
+            return $this->editProduct($id, $data, $description, $price, $stock, $farmer_id, $image, $current_image);
+        }
     }
 
     // Handle image upload securely

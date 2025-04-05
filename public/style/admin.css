@@ -79,7 +79,6 @@ h4 {
 /* Dashboard Main */
 .dashboard-main {
   margin-left: 250px; /* Offset for sidebar */
-  padding: 30px;
   background-color: #f3f4f6; /* Light gray */
   min-height: 100vh;
 }
