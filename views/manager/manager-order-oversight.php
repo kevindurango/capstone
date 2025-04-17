@@ -44,10 +44,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['update_status'])) {
         $orderId = $_POST['order_id'];
         $newStatus = $_POST['new_status'];
-        $orderClass->updateOrderStatus($orderId, $newStatus);
-        $logClass->logActivity($_SESSION['user_id'], "Updated order #$orderId status to $newStatus");
-        header("Location: manager-order-oversight.php");
-        exit();
+        
+        // Add debug logging
+        error_log("Attempting to update order #$orderId to status: $newStatus");
+        
+        // Check for valid order ID
+        if (!is_numeric($orderId) || $orderId <= 0) {
+            $error = "Invalid order ID";
+            error_log("Invalid order ID: $orderId");
+        } else {
+            // Fix: Add proper error handling and result checking for updateOrderStatus
+            $result = $orderClass->updateOrderStatus($orderId, $newStatus);
+            
+            if ($result) {
+                $logClass->logActivity($_SESSION['user_id'], "Updated order #$orderId status to $newStatus");
+                // Add success message
+                $success = "Order #$orderId status updated to $newStatus";
+                error_log("Successfully updated order #$orderId to status: $newStatus");
+            } else {
+                $error = "Failed to update order status: " . $orderClass->getLastError();
+                error_log("Failed to update order #$orderId status. Error: " . $orderClass->getLastError());
+            }
+            
+            // Don't redirect - show the success/error message instead
+            // This will prevent form resubmission issues
+        }
     }
     
     if (isset($_POST['logout'])) {
@@ -56,6 +77,65 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         header("Location: manager-login.php");
         exit();
     }
+    
+    // Handle export orders
+    if (isset($_POST['export_orders'])) {
+        $startDate = $_POST['export_start_date'] ?? '';
+        $endDate = $_POST['export_end_date'] ?? '';
+        
+        // Validate dates
+        if (empty($startDate) || empty($endDate)) {
+            $error = "Both start and end dates are required for export";
+        } else {
+            // Get orders within date range
+            $ordersToExport = $orderClass->getOrdersByDateRange($startDate, $endDate);
+            
+            if (!empty($ordersToExport)) {
+                $logClass->logActivity($_SESSION['user_id'], "Exported orders from $startDate to $endDate");
+                exportOrdersToCSV($ordersToExport, $startDate, $endDate);
+                exit();
+            } else {
+                $error = "No orders found in the selected date range";
+            }
+        }
+    }
+}
+
+/**
+ * Generate and force download CSV file with order data
+ * @param array $orders Order data to export
+ * @param string $startDate Start date of export range
+ * @param string $endDate End date of export range
+ */
+function exportOrdersToCSV($orders, $startDate, $endDate) {
+    // Set headers for CSV download
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="orders_' . $startDate . '_to_' . $endDate . '.csv"');
+    
+    // Create output stream
+    $output = fopen('php://output', 'w');
+    
+    // Add BOM for Excel compatibility
+    fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+    
+    // Add CSV headers
+    fputcsv($output, ['Order ID', 'Customer Name', 'Email', 'Items', 'Total Amount', 'Status', 'Order Date']);
+    
+    // Add order data rows
+    foreach ($orders as $order) {
+        fputcsv($output, [
+            $order['order_id'] ?? 'N/A',
+            $order['customer_name'] ?? 'N/A',
+            $order['email'] ?? 'N/A',
+            $order['item_count'] ?? '0',
+            $order['total_amount'] ?? '0.00',
+            $order['status'] ?? 'pending',
+            $order['order_date'] ?? 'Unknown'
+        ]);
+    }
+    
+    fclose($output);
+    exit;
 }
 ?>
 
@@ -82,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <div class="row">
             <!-- Sidebar -->
             <?php include '../global/manager-sidebar.php'; ?>
-
+            
             <!-- Main Content -->
             <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
                 <!-- Breadcrumb -->
@@ -92,6 +172,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <li class="breadcrumb-item active">Order Management</li>
                     </ol>
                 </nav>
+    
+                <!-- Success/Error Messages -->
+                <?php if (isset($success)): ?>
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <i class="bi bi-check-circle-fill"></i> <?= htmlspecialchars($success) ?>
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                <?php endif; ?>
+
+                <?php if (isset($error)): ?>
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill"></i> <?= htmlspecialchars($error) ?>
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                <?php endif; ?>
 
                 <!-- Enhanced Page Header -->
                 <div class="page-header d-flex justify-content-between align-items-center">
@@ -102,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <p class="text-muted mb-0">Monitor and process customer orders</p>
                     </div>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-success mr-2" onclick="exportOrderReport()">
+                        <button class="btn btn-success mr-2" data-toggle="modal" data-target="#exportModal">
                             <i class="bi bi-file-earmark-excel"></i> Export Report
                         </button>
                         <form method="POST" class="mb-0">
@@ -112,6 +211,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </form>
                     </div>
                 </div>
+
+                <?php if (isset($error)): ?>
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill"></i> <?= htmlspecialchars($error) ?>
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                <?php endif; ?>
 
                 <!-- Order Statistics Cards -->
                 <div class="row mb-4">
@@ -279,6 +387,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
     </div>
 
+    <!-- Export Orders Modal -->
+    <div class="modal fade" id="exportModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-excel"></i> Export Orders Report</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <form method="POST">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="export_start_date">Start Date <span class="text-danger">*</span></label>
+                            <input type="date" id="export_start_date" name="export_start_date" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="export_end_date">End Date <span class="text-danger">*</span></label>
+                            <input type="date" id="export_end_date" name="export_end_date" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" name="export_orders" class="btn btn-success">
+                            <i class="bi bi-download"></i> Download Report
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Order Details Modal -->
     <div class="modal fade" id="orderDetailsModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -302,15 +440,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <h5 class="modal-title"><i class="bi bi-arrow-up-circle"></i> Update Order Status</h5>
                     <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
-                <form method="POST">
+                <form method="POST" action="manager-order-oversight.php">
                     <div class="modal-body">
                         <input type="hidden" name="order_id" id="status_order_id">
                         <div class="form-group">
                             <label>New Status</label>
                             <select name="new_status" class="form-control" required>
-                                <option value="processing">Processing</option>
+                                <!-- Removed the "processing" option as it's not in the database enum values -->
+                                <option value="pending">Pending</option>
                                 <option value="completed">Completed</option>
-                                <option value="cancelled">Cancelled</option>
+                                <option value="canceled">Canceled</option>
                             </select>
                         </div>
                     </div>
@@ -327,6 +466,50 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
     <script src="../../public/js/manager-orders.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Set default dates (current month)
+            const today = new Date();
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            // Format dates for input fields: YYYY-MM-DD
+            const formatDate = (date) => {
+                return date.toISOString().split('T')[0];
+            };
+            
+            // Set default date values
+            $('#export_start_date').val(formatDate(firstDay));
+            $('#export_end_date').val(formatDate(today));
+            
+            // Ensure end date is not before start date
+            $('#export_start_date').on('change', function() {
+                const startDate = new Date($(this).val());
+                const endDateInput = $('#export_end_date');
+                const endDate = new Date(endDateInput.val());
+                
+                if (endDate < startDate) {
+                    endDateInput.val($(this).val());
+                }
+            });
+            
+            $('#export_end_date').on('change', function() {
+                const endDate = new Date($(this).val());
+                const startDateInput = $('#export_start_date');
+                const startDate = new Date(startDateInput.val());
+                
+                if (startDate > endDate) {
+                    startDateInput.val($(this).val());
+                }
+            });
+
+            // Update status button handler
+            $('.update-status').click(function() {
+                const orderId = $(this).data('id');
+                $('#status_order_id').val(orderId);
+                $('#updateStatusModal').modal('show');
+            });
+        });
+    </script>
 </body>
 </html>
 

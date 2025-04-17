@@ -562,11 +562,9 @@ const styles = StyleSheet.create({
   },
   headerProfileButton: {
     padding: 8,
-    accessibilityLabel: "View profile",
   },
   menuButton: {
     padding: 8,
-    accessibilityLabel: "Open sidebar menu",
   },
   scrollView: {
     flex: 1,

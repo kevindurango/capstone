@@ -7,11 +7,15 @@ if (!isset($_SESSION['manager_logged_in']) || $_SESSION['manager_logged_in'] !==
     exit();
 }
 
-require_once '../../models/Sales.php';
+require_once '../../models/SalesManager.php';
 require_once '../../models/Log.php';
 
-$salesClass = new Sales();
+$salesClass = new SalesManager();
 $logClass = new Log();
+
+// Get date parameters for filtering
+$startDate = isset($_GET['start']) && !empty($_GET['start']) ? $_GET['start'] : null;
+$endDate = isset($_GET['end']) && !empty($_GET['end']) ? $_GET['end'] : null;
 
 // Fetch sales metrics
 $dailySales = $salesClass->getDailySales();
@@ -21,7 +25,17 @@ $totalRevenue = $salesClass->getTotalRevenue();
 $averageOrderValue = $salesClass->getAverageOrderValue();
 $salesByCategory = $salesClass->getSalesByCategory();
 $topProducts = $salesClass->getTopProducts(5); // Get top 5 products
-$revenueData = $salesClass->getRevenueData(); // For chart
+$revenueData = $salesClass->getRevenueData($startDate, $endDate); // For chart
+
+// Handle date filter form submission
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['filterDates'])) {
+    $startDate = $_POST['startDate'];
+    $endDate = $_POST['endDate'];
+    
+    // Redirect to same page with date parameters
+    header("Location: manager-sales-management.php?start=$startDate&end=$endDate");
+    exit();
+}
 
 // Handle POST actions
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['logout'])) {
@@ -89,22 +103,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['logout'])) {
                 </div>
 
                 <!-- Date Filter Section -->
-                <form id="dateFilterForm" class="date-filter-container">
+                <form id="dateFilterForm" method="POST" class="date-filter-container mb-4">
                     <div class="row align-items-end">
                         <div class="col-md-4">
                             <div class="date-input-group">
                                 <label for="startDate"><i class="bi bi-calendar3"></i> Start Date:</label>
-                                <input type="date" id="startDate" name="startDate" class="form-control" required>
+                                <input type="date" id="startDate" name="startDate" class="form-control" 
+                                       value="<?= $startDate ?? date('Y-m-d', strtotime('-30 days')) ?>" required>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="date-input-group">
                                 <label for="endDate"><i class="bi bi-calendar3"></i> End Date:</label>
-                                <input type="date" id="endDate" name="endDate" class="form-control" required>
+                                <input type="date" id="endDate" name="endDate" class="form-control" 
+                                       value="<?= $endDate ?? date('Y-m-d') ?>" required>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <button type="submit" class="btn btn-primary w-100">
+                            <button type="submit" name="filterDates" class="btn btn-primary w-100">
                                 <i class="bi bi-funnel"></i> Apply Filter
                             </button>
                         </div>
@@ -191,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['logout'])) {
                                 <?php foreach ($topProducts as $product): ?>
                                 <tr>
                                     <td><?= htmlspecialchars($product['name']) ?></td>
-                                    <td><?= htmlspecialchars($product['category']) ?></td>
+                                    <td><?= htmlspecialchars($product['category'] ?? 'Uncategorized') ?></td>
                                     <td><?= number_format($product['units_sold']) ?></td>
                                     <td>₱<?= number_format($product['revenue'], 2) ?></td>
                                     <td>
@@ -275,30 +291,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['logout'])) {
 
         // Export functionality
         function exportSalesReport() {
-            const startDate = document.getElementById('startDate')?.value || '';
-            const endDate = document.getElementById('endDate')?.value || '';
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
             
             // Redirect to export endpoint with date parameters
             window.location.href = `export-sales.php?start=${startDate}&end=${endDate}`;
         }
 
-        // Handle date filter form submission
+        // Initialize date validation
         document.getElementById('dateFilterForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
+            const startDate = new Date(document.getElementById('startDate').value);
+            const endDate = new Date(document.getElementById('endDate').value);
             
-            if (new Date(startDate) > new Date(endDate)) {
+            if (startDate > endDate) {
+                e.preventDefault();
                 alert('Start date cannot be after end date');
                 return;
             }
-            
-            // Here you would implement date filtering logic
-            // For now just show an alert
-            alert(`Filtering data from ${startDate} to ${endDate}`);
-            
-            // In a real implementation, you would make an AJAX request to refresh the data
-            // window.location.href = `?start=${startDate}&end=${endDate}`;
         });
     </script>
 </body>

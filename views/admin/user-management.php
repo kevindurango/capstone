@@ -10,11 +10,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 // Include models
 require_once '../../models/User.php';
 require_once '../../models/Log.php';
-require_once '../../models/DriverModel.php';
 
 $userClass = new User();
 $logClass  = new Log();
-$driverModel = new DriverModel();
 
 // Fetch all users and roles
 $users = $userClass->getUsers();
@@ -55,28 +53,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && hash_equals($_SESSION['csrf_token'],
             $_POST['address']
         );
         
-        // Handle driver details if role is driver (role_id = 6)
-        if ($userId && $_POST['role_id'] == 6) {
-            try {
-                $driverData = [
-                    'user_id' => $userId,
-                    'vehicle_type' => $_POST['vehicle_type'] ?? '',
-                    'license_number' => $_POST['license_number'] ?? '',
-                    'vehicle_plate' => $_POST['vehicle_plate'] ?? '',
-                    'availability_status' => 'offline',
-                    'max_load_capacity' => !empty($_POST['max_load_capacity']) ? $_POST['max_load_capacity'] : null,
-                    'current_location' => $_POST['current_location'] ?? '',
-                    'contact_number' => $_POST['contact_number']
-                ];
-                
-                error_log("Adding driver details: " . print_r($driverData, true));
-                $driverModel->saveDriverDetails($driverData);
-            } catch (Exception $e) {
-                error_log("Error creating driver details: " . $e->getMessage());
-                $_SESSION['error'] = "User created but failed to add driver details.";
-            }
-        }
-        
         $logClass->logActivity($_SESSION['user_id'], 'Added new user: ' . $_POST['username']);
         header("Location: user-management.php");
         exit();
@@ -86,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && hash_equals($_SESSION['csrf_token'],
     if (isset($_POST['edit_user'])) {
         $password = !empty($_POST['password']) ? $_POST['password'] : null;
         
-        // First update the user details
+        // Update the user details
         $userClass->updateUser(
             $_POST['user_id'],
             $_POST['username'],
@@ -99,53 +75,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && hash_equals($_SESSION['csrf_token'],
             $_POST['address']
         );
         
-        // Handle driver details if role is driver
-        if ($_POST['role_id'] == 6) {
-            try {
-                $driverData = [
-                    'user_id' => $_POST['user_id'],
-                    'vehicle_type' => $_POST['vehicle_type'] ?? '',
-                    'license_number' => $_POST['license_number'] ?? '',
-                    'vehicle_plate' => $_POST['vehicle_plate'] ?? '',
-                    'availability_status' => 'offline',
-                    'max_load_capacity' => !empty($_POST['max_load_capacity']) ? $_POST['max_load_capacity'] : null,
-                    'current_location' => $_POST['current_location'] ?? '',
-                    'contact_number' => $_POST['contact_number']
-                ];
-                
-                error_log("Updating driver details: " . print_r($driverData, true));
-                $driverModel->saveDriverDetails($driverData);
-            } catch (Exception $e) {
-                error_log("Error updating driver details: " . $e->getMessage());
-                $_SESSION['error'] = "User updated but failed to update driver details.";
-            }
-        }
-        
         $logClass->logActivity($_SESSION['user_id'], 'Edited user: ' . $_POST['username']);
         header("Location: user-management.php");
         exit();
     }
 
-    // Fix the Delete User handler
+    // Delete User handler
     if (isset($_POST['delete_user']) && isset($_POST['user_id'])) {
         try {
             $userId = $_POST['user_id'];
             
-            // Check if user is a driver first
-            $userRole = $userClass->getUserRole($userId);
-            if ($userRole == 6) { // Only delete driver details if user is actually a driver
-                try {
-                    $driverModel->deleteDriverDetails($userId);
-                } catch (Exception $e) {
-                    error_log("Error deleting driver details: " . $e->getMessage());
-                    // Continue with user deletion even if driver details deletion fails
-                }
-            }
-            
             // Use admin_user_id from the session for logging
             $adminUserId = $_SESSION['admin_user_id'] ?? $_SESSION['user_id'] ?? null;
             
-            // Then delete the user
+            // Delete the user
             if ($userClass->deleteUser($userId)) {
                 if ($adminUserId) {
                     $logClass->logActivity($adminUserId, 'Deleted user ID: ' . $userId);
@@ -173,17 +116,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && hash_equals($_SESSION['csrf_token'],
         session_destroy();
         header("Location: admin-login.php");
         exit();
-    }
-}
-
-// Fetch driver details
-$driverDetails = [];
-foreach ($users as $user) {
-    if ($user['role_id'] == 6) { // If user is a driver
-        $details = $driverModel->getDriverDetailsByUserId($user['user_id']);
-        if ($details) {
-            $driverDetails[$user['user_id']] = $details;
-        }
     }
 }
 ?>
@@ -319,14 +251,7 @@ foreach ($users as $user) {
                               data-first-name="<?= htmlspecialchars($user['first_name']) ?>"
                               data-last-name="<?= htmlspecialchars($user['last_name']) ?>"
                               data-contact-number="<?= htmlspecialchars($user['contact_number']) ?>"
-                              data-address="<?= htmlspecialchars($user['address']) ?>"
-                              <?php if (isset($driverDetails[$user['user_id']])): ?>
-                              data-vehicle-type="<?= htmlspecialchars($driverDetails[$user['user_id']]['vehicle_type']) ?>"
-                              data-license-number="<?= htmlspecialchars($driverDetails[$user['user_id']]['license_number']) ?>"
-                              data-vehicle-plate="<?= htmlspecialchars($driverDetails[$user['user_id']]['vehicle_plate']) ?>"
-                              data-max-load-capacity="<?= htmlspecialchars($driverDetails[$user['user_id']]['max_load_capacity']) ?>"
-                              data-current-location="<?= htmlspecialchars($driverDetails[$user['user_id']]['current_location']) ?>"
-                              <?php endif; ?>>
+                              data-address="<?= htmlspecialchars($user['address']) ?>">
                         <i class="bi bi-pencil"></i>
                       </button>
                       <button type="button" class="btn btn-danger btn-sm btn-action delete-btn" 
@@ -368,14 +293,6 @@ foreach ($users as $user) {
                   <input type="text" name="last_name" class="form-control mb-3" placeholder="Last Name" required>
                   <input type="text" name="contact_number" class="form-control mb-3" placeholder="Contact Number">
                   <textarea name="address" class="form-control mb-3" placeholder="Address"></textarea>
-                  <!-- Driver details section -->
-                  <div id="driver_details" style="display: none;">
-                    <input type="text" name="vehicle_type" class="form-control mb-3" placeholder="Vehicle Type" data-required>
-                    <input type="text" name="license_number" class="form-control mb-3" placeholder="License Number" data-required>
-                    <input type="text" name="vehicle_plate" class="form-control mb-3" placeholder="Vehicle Plate" data-required>
-                    <input type="number" name="max_load_capacity" class="form-control mb-3" placeholder="Max Load Capacity" data-required>
-                    <input type="text" name="current_location" class="form-control mb-3" placeholder="Current Location" data-required>
-                  </div>
                 </div>
                 <div class="modal-footer">
                   <button type="submit" name="add_user" class="btn btn-primary">Add User</button>
@@ -411,14 +328,6 @@ foreach ($users as $user) {
                   <input type="text" name="last_name" id="edit_last_name" class="form-control mb-3" placeholder="Last Name" required>
                   <input type="text" name="contact_number" id="edit_contact_number" class="form-control mb-3" placeholder="Contact Number">
                   <textarea name="address" id="edit_address" class="form-control mb-3" placeholder="Address"></textarea>
-                  <!-- Driver details section -->
-                  <div id="edit_driver_details" style="display: none;">
-                    <input type="text" name="vehicle_type" id="edit_vehicle_type" class="form-control mb-3" placeholder="Vehicle Type" data-required>
-                    <input type="text" name="license_number" id="edit_license_number" class="form-control mb-3" placeholder="License Number" data-required>
-                    <input type="text" name="vehicle_plate" id="edit_vehicle_plate" class="form-control mb-3" placeholder="Vehicle Plate" data-required>
-                    <input type="number" name="max_load_capacity" id="edit_max_load_capacity" class="form-control mb-3" placeholder="Max Load Capacity" data-required>
-                    <input type="text" name="current_location" id="edit_current_location" class="form-control mb-3" placeholder="Current Location" data-required>
-                  </div>
                 </div>
                 <div class="modal-footer">
                   <button type="submit" name="edit_user" class="btn btn-warning">Update User</button>
@@ -447,19 +356,6 @@ foreach ($users as $user) {
           document.getElementById('edit_contact_number').value = button.dataset.contactNumber;
           document.getElementById('edit_address').value = button.dataset.address;
 
-          // Handle driver fields
-          const driverSection = document.getElementById('edit_driver_details');
-          if (button.dataset.roleId == 6) {
-              driverSection.style.display = 'block';
-              document.getElementById('edit_vehicle_type').value = button.dataset.vehicleType || '';
-              document.getElementById('edit_license_number').value = button.dataset.licenseNumber || '';
-              document.getElementById('edit_vehicle_plate').value = button.dataset.vehiclePlate || '';
-              document.getElementById('edit_max_load_capacity').value = button.dataset.maxLoadCapacity || '';
-              document.getElementById('edit_current_location').value = button.dataset.currentLocation || '';
-          } else {
-              driverSection.style.display = 'none';
-          }
-
           $('#editUserModal').modal('show');
         });
       });
@@ -485,7 +381,6 @@ foreach ($users as $user) {
                               firstName.includes(searchTerm) || 
                               lastName.includes(searchTerm);
           
-          // Fix the role comparison to be case-insensitive and more precise
           const matchesRole = !roleSelected || 
                              role.toLowerCase() === roleSelected.toLowerCase();
 
@@ -566,35 +461,6 @@ foreach ($users as $user) {
           printWindow.print();
         }, 500);
       };
-
-      // Show/hide driver fields based on role selection
-      function toggleDriverFields(roleId, formPrefix = '') {
-        const driverSection = document.getElementById(formPrefix + 'driver_details');
-        if (driverSection) {
-            driverSection.style.display = roleId == 6 ? 'block' : 'none';
-            
-            // Make fields required only when visible
-            const requiredFields = driverSection.querySelectorAll('input[data-required]');
-            requiredFields.forEach(field => {
-                field.required = roleId == 6;
-            });
-        }
-      }
-
-      // Add event listeners
-      document.getElementById('role_id').addEventListener('change', function() {
-          toggleDriverFields(this.value);
-      });
-
-      document.getElementById('edit_role_id').addEventListener('change', function() {
-          toggleDriverFields(this.value, 'edit_');
-      });
-
-      // Initialize driver fields visibility
-      toggleDriverFields(document.getElementById('role_id').value);
-      if (document.getElementById('edit_role_id')) {
-          toggleDriverFields(document.getElementById('edit_role_id').value, 'edit_');
-      }
 
       // Delete user confirmation
       $('.delete-btn').click(function() {

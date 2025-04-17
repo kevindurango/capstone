@@ -1,4 +1,8 @@
 <?php
+// Enable error reporting
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 // Set headers to allow cross-origin requests and specify content type
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
@@ -9,17 +13,57 @@ header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers
 // For OPTIONS preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
+    echo json_encode(['status' => 'success']);
     exit();
 }
 
-// Include database connection
-require_once 'config/database.php';
+// Ensure we catch all errors
+function handleError($errno, $errstr, $errfile, $errline) {
+    http_response_code(500);
+    echo json_encode([
+        'status' => 'error',
+        'message' => $errstr,
+        'file' => $errfile,
+        'line' => $errline
+    ]);
+    exit();
+}
+set_error_handler('handleError');
+
+// Include database connection file
+require_once __DIR__ . '/../api/config/database.php'; // Ensure this file contains the correct credentials
+
+// Create a new database connection
+$conn = new mysqli($host, $username, $password, $dbname);
+
+// Check connection
+if ($conn->connect_error) {
+    http_response_code(500);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Database connection failed'
+    ]);
+    exit();
+}
 
 error_log("[DEBUG] Starting registration process");
 
-// Get posted data
-$data = json_decode(file_get_contents("php://input"), true);
-error_log("[DEBUG] Raw input received: " . file_get_contents("php://input"));
+// Get raw POST data and log it
+$rawData = file_get_contents("php://input");
+error_log("Received raw data: " . $rawData);
+
+// Decode JSON data
+$data = json_decode($rawData, true);
+
+// Check if JSON is valid
+if (json_last_error() !== JSON_ERROR_NONE) {
+    http_response_code(400);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Invalid JSON data provided'
+    ]);
+    exit();
+}
 
 // Initialize response array
 $response = array();
@@ -142,27 +186,33 @@ try {
         )
     );
     
+    // Ensure proper JSON response
+    header('Content-Type: application/json');
     echo json_encode($response);
+    exit();
     
 } catch (Exception $e) {
-    error_log("[ERROR] Registration failed: " . $e->getMessage());
+    error_log("Registration error: " . $e->getMessage());
     
     // Rollback transaction on error
     if ($conn && $conn->connect_errno == 0) {
         $conn->rollback();
     }
     
-    $response = array(
-        "status" => "error",
-        "message" => $e->getMessage()
-    );
-    
     http_response_code(400);
-    echo json_encode($response);
-}
-
-// Close connection
-if ($conn) {
-    $conn->close();
+    echo json_encode([
+        'status' => 'error',
+        'message' => $e->getMessage()
+    ]);
+    exit();
+} finally {
+    // Always ensure we send a valid JSON response
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+    }
+    
+    if ($conn) {
+        $conn->close();
+    }
 }
 ?>

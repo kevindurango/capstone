@@ -20,36 +20,22 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* Fix for the login and register routes */}
       <Tabs.Screen
-        name="login"
-        options={{
-          title: "Login",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="log-in-outline" size={24} color={color} />
-          ),
-          // Use href to redirect to the auth folder
-          href: "/(auth)/login",
-        }}
-      />
-
-      <Tabs.Screen
-        name="register"
-        options={{
-          title: "Register",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="person-add-outline" size={24} color={color} />
-          ),
-          href: "/(auth)/register",
-        }}
-      />
-
-      <Tabs.Screen
-        name="main"
+        name="market"
         options={{
           title: "Market",
           tabBarIcon: ({ color }) => (
             <Ionicons name="basket-outline" size={24} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="cog" size={24} color={color} />
           ),
         }}
       />

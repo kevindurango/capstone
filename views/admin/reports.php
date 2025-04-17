@@ -9,49 +9,82 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 
 require_once '../../models/Database.php';
+require_once '../../models/Log.php';  // Include Log model for activity logging
 
 // Database Connection
 $database = new Database();
 $conn = $database->connect();
 
-// Fetch Order Summary
-$orderSummaryQuery = "SELECT order_status, COUNT(*) AS total FROM orders GROUP BY order_status";
+// Get Admin User ID from Session - For logging
+$admin_user_id = $_SESSION['admin_user_id'] ?? null;
+
+// Process date range filter
+$startDate = isset($_GET['start_date']) ? $_GET['start_date'] : null;
+$endDate = isset($_GET['end_date']) ? $_GET['end_date'] : null;
+
+// Add date filter condition if dates are provided
+$dateFilterCondition = '';
+if ($startDate && $endDate) {
+    $dateFilterCondition = " WHERE o.order_date BETWEEN '$startDate 00:00:00' AND '$endDate 23:59:59'";
+    
+    // Log the report generation activity
+    if ($admin_user_id) {
+        $log = new Log();
+        $log->logActivity($admin_user_id, "Generated date-range report from $startDate to $endDate");
+    }
+}
+
+// Fetch Order Summary with date filter
+$orderSummaryQuery = "SELECT order_status, COUNT(*) AS total FROM orders o";
+$orderSummaryQuery .= $dateFilterCondition;
+$orderSummaryQuery .= " GROUP BY order_status";
 $orderSummaryStmt = $conn->query($orderSummaryQuery);
 $orderSummary = $orderSummaryStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Payment Summary
-$paymentSummaryQuery = "SELECT payment_status, COUNT(*) AS total FROM payments GROUP BY payment_status";
+// Fetch Payment Summary with date filter
+$paymentSummaryQuery = "SELECT payment_status, COUNT(*) AS total FROM payments p";
+if ($startDate && $endDate) {
+    $paymentSummaryQuery .= " WHERE p.payment_date BETWEEN '$startDate 00:00:00' AND '$endDate 23:59:59'";
+}
+$paymentSummaryQuery .= " GROUP BY payment_status";
 $paymentSummaryStmt = $conn->query($paymentSummaryQuery);
 $paymentSummary = $paymentSummaryStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Product Summary
+// Fetch Product Summary (keeping as is since products don't have date ranges)
 $productSummaryQuery = "SELECT status, COUNT(*) AS total FROM products GROUP BY status";
 $productSummaryStmt = $conn->query($productSummaryQuery);
 $productSummary = $productSummaryStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Recent Orders
-$recentOrdersQuery = "SELECT o.order_id, u.username AS consumer_name, o.order_status, o.order_date, p.pickup_id, p.pickup_date, p.pickup_location, p.assigned_to, p.pickup_notes
+// Fetch Recent Orders with date filter
+$recentOrdersQuery = "SELECT o.order_id, u.username AS consumer_name, o.order_status, o.order_date, 
+                      p.pickup_id, p.pickup_date, p.pickup_location, p.pickup_notes, p.contact_person
                       FROM orders AS o
                       JOIN users AS u ON o.consumer_id = u.user_id
-                      LEFT JOIN pickups AS p ON o.order_id = p.order_id
-                      ORDER BY o.order_date DESC
-                      LIMIT 10";
+                      LEFT JOIN pickups AS p ON o.order_id = p.order_id";
+if ($startDate && $endDate) {
+    $recentOrdersQuery .= $dateFilterCondition;
+    $recentOrdersQuery .= " ORDER BY o.order_date DESC";
+} else {
+    $recentOrdersQuery .= " ORDER BY o.order_date DESC LIMIT 10";
+}
 $recentOrdersStmt = $conn->query($recentOrdersQuery);
 $recentOrders = $recentOrdersStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Calculate Total Orders
-$totalOrdersQuery = "SELECT COUNT(*) as total FROM orders";
+// Calculate Total Orders with date filter
+$totalOrdersQuery = "SELECT COUNT(*) as total FROM orders o";
+$totalOrdersQuery .= $dateFilterCondition;
 $totalOrdersStmt = $conn->query($totalOrdersQuery);
 $totalOrders = $totalOrdersStmt->fetch(PDO::FETCH_ASSOC)['total'];
 
-// Calculate Total Revenue - Improved to work with schema
-// Based on the database schema, there's no direct revenue column in payments
-// Let's calculate it from orderitems table instead
+// Calculate Total Revenue with date filter
 try {
     $totalRevenueQuery = "SELECT SUM(oi.price * oi.quantity) as total 
                          FROM orderitems oi
                          JOIN orders o ON oi.order_id = o.order_id
                          WHERE o.order_status = 'completed'";
+    if ($startDate && $endDate) {
+        $totalRevenueQuery .= " AND o.order_date BETWEEN '$startDate 00:00:00' AND '$endDate 23:59:59'";
+    }
     $totalRevenueStmt = $conn->query($totalRevenueQuery);
     $totalRevenue = $totalRevenueStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
 } catch (PDOException $e) {
@@ -59,21 +92,35 @@ try {
     error_log("Error in revenue calculation: " . $e->getMessage());
 }
 
-// Calculate Total Products
+// Calculate Total Products (keeping as is)
 $totalProductsQuery = "SELECT COUNT(*) as total FROM products";
 $totalProductsStmt = $conn->query($totalProductsQuery);
 $totalProducts = $totalProductsStmt->fetch(PDO::FETCH_ASSOC)['total'];
 
-// Calculate Average Order Value
-$avgOrderValueQuery = "SELECT AVG(oi.price * oi.quantity) as avg_value 
-                      FROM orderitems oi
-                      GROUP BY oi.order_id";
+// Calculate Average Order Value with date filter
 try {
+    $avgOrderValueQuery = "SELECT AVG(subquery.order_total) as avg_value FROM (
+                          SELECT o.order_id, SUM(oi.price * oi.quantity) as order_total
+                          FROM orders o
+                          JOIN orderitems oi ON o.order_id = oi.order_id";
+    if ($startDate && $endDate) {
+        $avgOrderValueQuery .= " WHERE o.order_date BETWEEN '$startDate 00:00:00' AND '$endDate 23:59:59'";
+    }
+    $avgOrderValueQuery .= " GROUP BY o.order_id) as subquery";
+    
     $avgOrderValueStmt = $conn->query($avgOrderValueQuery);
     $avgOrderValue = $avgOrderValueStmt->fetch(PDO::FETCH_ASSOC)['avg_value'] ?? 0;
 } catch (PDOException $e) {
     $avgOrderValue = 0;
     error_log("Error in average order calculation: " . $e->getMessage());
+}
+
+// Get date range for display
+$reportTitle = "Reports Overview";
+if ($startDate && $endDate) {
+    $formattedStartDate = date('F j, Y', strtotime($startDate));
+    $formattedEndDate = date('F j, Y', strtotime($endDate));
+    $reportTitle = "Reports: $formattedStartDate to $formattedEndDate";
 }
 
 // Handle logout
@@ -141,7 +188,7 @@ if (isset($_POST['logout'])) {
                 </nav>
 
                 <div class="report-header d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3">
-                    <h1 class="h2 text-success">Reports Overview</h1>
+                    <h1 class="h2 text-success"><?= $reportTitle ?></h1>
                     <div class="btn-toolbar">
                         <button class="btn btn-export mr-2" onclick="exportToPDF()">
                             <i class="bi bi-file-earmark-pdf"></i> Export to PDF
@@ -159,17 +206,34 @@ if (isset($_POST['logout'])) {
 
                 <!-- Date Filter Section (No-print) -->
                 <div class="date-filter no-print">
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="d-flex flex-wrap preset-date-ranges">
+                                <button type="button" class="btn btn-outline-success mr-2 mb-2" onclick="setDateRange('today')">Today</button>
+                                <button type="button" class="btn btn-outline-success mr-2 mb-2" onclick="setDateRange('yesterday')">Yesterday</button>
+                                <button type="button" class="btn btn-outline-success mr-2 mb-2" onclick="setDateRange('this-week')">This Week</button>
+                                <button type="button" class="btn btn-outline-success mr-2 mb-2" onclick="setDateRange('last-week')">Last Week</button>
+                                <button type="button" class="btn btn-outline-success mr-2 mb-2" onclick="setDateRange('this-month')">This Month</button>
+                                <button type="button" class="btn btn-outline-success mr-2 mb-2" onclick="setDateRange('last-month')">Last Month</button>
+                                <button type="button" class="btn btn-outline-success mr-2 mb-2" onclick="setDateRange('last-30-days')">Last 30 Days</button>
+                                <button type="button" class="btn btn-outline-success mr-2 mb-2" onclick="setDateRange('last-90-days')">Last 90 Days</button>
+                                <button type="button" class="btn btn-outline-success mr-2 mb-2" onclick="setDateRange('this-year')">This Year</button>
+                                <button type="button" class="btn btn-outline-success mr-2 mb-2" onclick="setDateRange('last-year')">Last Year</button>
+                                <button type="button" class="btn btn-outline-success mr-2 mb-2" onclick="setDateRange('all-time')">All Time</button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="row">
                         <div class="col-md-4">
                             <div class="form-group">
                                 <label for="start-date">Start Date</label>
-                                <input type="date" class="form-control" id="start-date">
+                                <input type="date" class="form-control" id="start-date" value="<?= htmlspecialchars($startDate) ?>">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="form-group">
                                 <label for="end-date">End Date</label>
-                                <input type="date" class="form-control" id="end-date">
+                                <input type="date" class="form-control" id="end-date" value="<?= htmlspecialchars($endDate) ?>">
                             </div>
                         </div>
                         <div class="col-md-4 d-flex align-items-end">
@@ -313,7 +377,7 @@ if (isset($_POST['logout'])) {
                                                             data-pickup-id="<?= htmlspecialchars($order['pickup_id'] ?? 'N/A') ?>"
                                                             data-pickup-date="<?= htmlspecialchars($order['pickup_date'] ?? 'N/A') ?>"
                                                             data-pickup-location="<?= htmlspecialchars($order['pickup_location'] ?? 'N/A') ?>"
-                                                            data-assigned-to="<?= htmlspecialchars($order['assigned_to'] ?? 'N/A') ?>"
+                                                            data-contact-person="<?= htmlspecialchars($order['contact_person'] ?? 'N/A') ?>"
                                                             data-pickup-notes="<?= htmlspecialchars($order['pickup_notes'] ?? 'N/A') ?>"
                                                             data-toggle="modal" data-target="#pickupDetailsModal">
                                                         View Pickup Details
@@ -349,7 +413,7 @@ if (isset($_POST['logout'])) {
                     <p><strong>Pickup ID:</strong> <span id="pickup-id"></span></p>
                     <p><strong>Pickup Date:</strong> <span id="pickup-date"></span></p>
                     <p><strong>Pickup Location:</strong> <span id="pickup-location"></span></p>
-                    <p><strong>Assigned To:</strong> <span id="assigned-to"></span></p>
+                    <p><strong>Contact Person:</strong> <span id="assigned-to"></span></p>
                     <p><strong>Pickup Notes:</strong> <span id="pickup-notes"></span></p>
                 </div>
                 <div class="modal-footer">
@@ -445,18 +509,18 @@ if (isset($_POST['logout'])) {
                 var pickupId = $(this).data('pickup-id');
                 var pickupDate = $(this).data('pickup-date');
                 var pickupLocation = $(this).data('pickup-location');
-                var assignedTo = $(this).data('assigned-to');
+                var contactPerson = $(this).data('contact-person');
                 var pickupNotes = $(this).data('pickup-notes');
 
                 $('#pickup-id').text(pickupId);
                 $('#pickup-date').text(pickupDate);
                 $('#pickup-location').text(pickupLocation);
-                $('#assigned-to').text(assignedTo);
+                $('#assigned-to').text(contactPerson);
                 $('#pickup-notes').text(pickupNotes);
             });
         });
 
-        // PDF Export function - now functional
+        // PDF Export function with date range
         function exportToPDF() {
             // Show loading indicator
             const loadingDiv = document.createElement('div');
@@ -470,12 +534,19 @@ if (isset($_POST['logout'])) {
             // Create a new PDF document
             const doc = new jsPDF('p', 'mm', 'a4');
             
+            // Get date range information
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const dateRangeText = startDate && endDate 
+                ? `Report Period: ${formatDateForDisplay(startDate)} to ${formatDateForDisplay(endDate)}`
+                : 'Report Period: All Time';
+            
             // Add title
             doc.setFontSize(18);
             doc.setTextColor(40, 167, 69); // Green color
             doc.text('Farmers Market Reports', 105, 15, { align: 'center' });
             
-            // Add date
+            // Add date range and generation date
             doc.setFontSize(10);
             doc.setTextColor(100);
             const today = new Date();
@@ -485,19 +556,31 @@ if (isset($_POST['logout'])) {
                 day: 'numeric' 
             });
             doc.text(`Generated on: ${dateStr}`, 105, 22, { align: 'center' });
+            doc.text(dateRangeText, 105, 28, { align: 'center' });
             
             // Define the sections to capture
             const sectionsToCapture = [
-                { selector: '.row:nth-child(3)', title: 'Summary Statistics', y: 30 },
-                { selector: '.row.mb-4', title: 'Detailed Reports', y: 90 },
-                { selector: '.card.shadow-sm', title: 'Recent Orders', y: 180 }
+                { selector: '.row:nth-child(3)', title: 'Summary Statistics', y: 35 },
+                { selector: '.row.mb-4', title: 'Detailed Reports', y: 95 },
+                { selector: '.card.shadow-sm', title: 'Recent Orders', y: 185 }
             ];
             
             // Function to process each section
             const captureSection = (index) => {
                 if (index >= sectionsToCapture.length) {
                     // All sections processed, save the PDF
-                    const filename = `FarmersMarketReport_${today.getFullYear()}${(today.getMonth()+1).toString().padStart(2,'0')}${today.getDate().toString().padStart(2,'0')}.pdf`;
+                    let filename = `FarmersMarketReport_`;
+                    
+                    // Include date range in filename if available
+                    if (startDate && endDate) {
+                        const startPart = startDate.replace(/-/g, '');
+                        const endPart = endDate.replace(/-/g, '');
+                        filename += `${startPart}_to_${endPart}`;
+                    } else {
+                        filename += `${today.getFullYear()}${(today.getMonth()+1).toString().padStart(2,'0')}${today.getDate().toString().padStart(2,'0')}`;
+                    }
+                    
+                    filename += '.pdf';
                     doc.save(filename);
                     
                     // Remove loading indicator
@@ -541,8 +624,18 @@ if (isset($_POST['logout'])) {
             // Start capturing sections
             captureSection(0);
         }
+        
+        // Helper function to format dates for display in PDFs
+        function formatDateForDisplay(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
 
-        // Date filter function placeholder
+        // Date filter function
         function applyDateFilter() {
             const startDate = document.getElementById('start-date').value;
             const endDate = document.getElementById('end-date').value;
@@ -557,9 +650,89 @@ if (isset($_POST['logout'])) {
                 return;
             }
             
-            // In a real implementation, you would refresh the page with date parameters
-            // or make an AJAX call to get filtered data
-            alert(`Filter applied from ${startDate} to ${endDate}`);
+            // Redirect to the same page with date parameters
+            window.location.href = `?start_date=${startDate}&end_date=${endDate}`;
+        }
+        
+        // Preset date range function
+        function setDateRange(range) {
+            const today = new Date();
+            let startDate = new Date();
+            let endDate = new Date();
+            
+            // Calculate start and end dates based on selected preset
+            switch(range) {
+                case 'today':
+                    // Start and end are both today
+                    break;
+                    
+                case 'yesterday':
+                    startDate.setDate(today.getDate() - 1);
+                    endDate.setDate(today.getDate() - 1);
+                    break;
+                    
+                case 'this-week':
+                    // Start of week (Sunday)
+                    const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
+                    startDate.setDate(today.getDate() - dayOfWeek);
+                    break;
+                    
+                case 'last-week':
+                    // Last week (Sunday to Saturday)
+                    const lastWeekDay = today.getDay();
+                    startDate.setDate(today.getDate() - lastWeekDay - 7);
+                    endDate.setDate(today.getDate() - lastWeekDay - 1);
+                    break;
+                    
+                case 'this-month':
+                    // Start of current month
+                    startDate.setDate(1);
+                    break;
+                    
+                case 'last-month':
+                    // Last month
+                    startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                    endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+                    break;
+                    
+                case 'last-30-days':
+                    // Last 30 days
+                    startDate.setDate(today.getDate() - 30);
+                    break;
+                    
+                case 'last-90-days':
+                    // Last 90 days
+                    startDate.setDate(today.getDate() - 90);
+                    break;
+                    
+                case 'this-year':
+                    // Start of current year
+                    startDate = new Date(today.getFullYear(), 0, 1);
+                    break;
+                    
+                case 'last-year':
+                    // Last year
+                    startDate = new Date(today.getFullYear() - 1, 0, 1);
+                    endDate = new Date(today.getFullYear() - 1, 11, 31);
+                    break;
+                    
+                case 'all-time':
+                    // Set to a far past date for "all time"
+                    startDate = new Date(2000, 0, 1);
+                    break;
+            }
+            
+            // Format dates for input fields (YYYY-MM-DD)
+            document.getElementById('start-date').value = formatDateForInput(startDate);
+            document.getElementById('end-date').value = formatDateForInput(endDate);
+            
+            // Auto-apply the filter
+            applyDateFilter();
+        }
+        
+        // Helper function to format dates for input fields
+        function formatDateForInput(date) {
+            return date.toISOString().split('T')[0];
         }
     </script>
 </body>

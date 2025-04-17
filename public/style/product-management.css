@@ -46,7 +46,6 @@ main.product-management-page {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-fill-color: transparent;
   font-weight: 600;
   letter-spacing: -0.5px;
   margin-bottom: 5px;
@@ -101,22 +100,6 @@ main.product-management-page {
 .card-title i {
   margin-right: 10px;
   color: var(--primary-color);
-}
-
-/* Dashboard card styling */
-.dashboard-card {
-  background: linear-gradient(145deg, #ffffff, #f8f9fa);
-  border-radius: var(--border-radius);
-  box-shadow: var(--box-shadow);
-  padding: 1.5rem;
-  height: 100%;
-  transition: var(--transition);
-  border: none;
-}
-
-.dashboard-card:hover {
-  box-shadow: var(--box-shadow);
-  transform: translateY(-3px);
 }
 
 /* Action buttons */
@@ -279,21 +262,6 @@ main.product-management-page {
   border-radius: 50px;
   font-size: 0.85rem;
   font-weight: 500;
-}
-
-.status-active {
-  background-color: var(--primary-light);
-  color: var(--primary-color);
-}
-
-.status-pending {
-  background-color: var(--warning-light);
-  color: var(--warning-color);
-}
-
-.status-inactive {
-  background-color: var(--danger-light);
-  color: var(--danger-color);
 }
 
 .action-btn-container {
@@ -478,22 +446,6 @@ select.form-control,
   border-radius: 8px;
 }
 
-/* Product image styling */
-.product-thumbnail {
-  width: 50px;
-  height: 50px;
-  object-fit: cover;
-  border-radius: 6px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease;
-  cursor: pointer;
-}
-
-.product-thumbnail:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
 /* Add the no-image styling */
 .no-image {
   display: inline-block;
@@ -511,7 +463,9 @@ select.form-control,
 }
 
 /* Editable cell styling */
-.editable-price {
+.editable-price,
+.editable-name,
+.editable-stock {
   cursor: pointer;
   position: relative;
   transition: var(--transition);
@@ -519,11 +473,15 @@ select.form-control,
   border-radius: 4px;
 }
 
-.editable-price:hover {
+.editable-price:hover,
+.editable-name:hover,
+.editable-stock:hover {
   background-color: var(--primary-light);
 }
 
-.editable-price:hover::after {
+.editable-price:hover::after,
+.editable-name:hover::after,
+.editable-stock:hover::after {
   content: "Double-click to edit";
   position: absolute;
   bottom: -30px;
@@ -539,7 +497,7 @@ select.form-control,
   opacity: 0.9;
 }
 
-.editable-price input.inline-price-input {
+.inline-edit-input {
   width: 100%;
   padding: 5px 8px;
   border: 2px solid var(--primary-color);
@@ -550,7 +508,7 @@ select.form-control,
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
-.editable-price input.inline-price-input:focus {
+.inline-edit-input:focus {
   outline: none;
   border-color: var(--primary-color);
   box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
@@ -633,26 +591,21 @@ select.form-control,
 }
 
 /* Improved actionable elements highlighting */
-.action-btn-container .btn-sm,
 .btn,
 .editable-price,
-.pagination .page-link,
-.filters-container .btn,
+.editable-name,
+.editable-stock,
 .product-checkbox,
 #selectAll {
   transition: all 0.2s ease-in-out;
 }
 
-.action-btn-container .btn-sm:hover,
-.btn:hover,
-.pagination .page-link:hover {
+.btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-.action-btn-container .btn-sm:active,
-.btn:active,
-.pagination .page-link:active {
+.btn:active {
   transform: translateY(0);
 }
 
@@ -700,11 +653,395 @@ select.form-control,
     margin-top: 10px;
   }
 
-  .editable-price:hover::after {
+  .editable-price:hover::after,
+  .editable-name:hover::after,
+  .editable-stock:hover::after {
     display: none;
   }
 
   .filters-container .row {
     margin-bottom: 10px;
+  }
+}
+
+/* Action buttons styling */
+.action-btn-group {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+
+.action-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: none;
+  font-size: 14px;
+  position: relative;
+}
+
+.action-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.action-btn:active {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn::after {
+  content: attr(title);
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-10px);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.action-btn:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.action-btn-approve {
+  background-color: #28a745;
+  color: white;
+}
+
+.action-btn-approve:hover {
+  background-color: #218838;
+}
+
+.action-btn-reject {
+  background-color: #dc3545;
+  color: white;
+}
+
+.action-btn-reject:hover {
+  background-color: #c82333;
+}
+
+.action-btn-edit {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.action-btn-edit:hover {
+  background-color: #e0a800;
+}
+
+.action-btn-delete {
+  background-color: #dc3545;
+  color: white;
+}
+
+.action-btn-delete:hover {
+  background-color: #bd2130;
+}
+
+.action-btn i {
+  font-size: 1rem;
+}
+
+/* Button group appearance */
+.action-btn-group {
+  display: inline-flex;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.action-btn-group .action-btn {
+  border-radius: 0;
+  margin: 0;
+}
+
+.action-btn-group .action-btn:first-child {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.action-btn-group .action-btn:last-child {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+/* Modal styling */
+.modal-content {
+  border-radius: var(--border-radius);
+  border: none;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+  background: linear-gradient(145deg, #f8f9fa, #e9ecef);
+  border-bottom: 1px solid #dee2e6;
+}
+
+.modal-title {
+  color: var(--dark-color);
+  font-weight: 600;
+}
+
+/* description cell specific styles */
+.description-cell {
+  max-width: 200px;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 60px;
+}
+
+/* unit badge styling */
+.unit-badge {
+  font-size: 0.8em;
+  vertical-align: middle;
+  background-color: #e9ecef;
+  color: #495057;
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin-left: 3px;
+}
+
+/* Table cell spacing optimization */
+.table td,
+.table th {
+  vertical-align: middle !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0.5rem;
+}
+
+/* Make action buttons more compact on smaller screens */
+@media (max-width: 992px) {
+  .table .action-btn {
+    padding: 0.25rem;
+    font-size: 0.75rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Add admin header styling */
+.admin-header {
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  color: white;
+  padding: 10px 0;
+}
+.admin-badge {
+  background-color: #6a11cb;
+  color: white;
+  font-size: 0.8rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-left: 10px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding: 0.5rem 0;
+}
+
+#driverDetails {
+  background-color: #f8f9fa;
+  border-color: #dee2e6 !important;
+}
+
+#assigned_to option[data-status="available"] {
+  background-color: #d4edda;
+}
+
+#assigned_to option[data-status="busy"] {
+  background-color: #fff3cd;
+}
+
+#assigned_to option[data-status="offline"] {
+  background-color: #f8f9fa;
+}
+
+.driver-status {
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* Improve select element styling */
+#assigned_to {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* Update driver status styling in select */
+#assigned_to option {
+  padding: 8px;
+  font-weight: normal;
+}
+
+#assigned_to option[data-status="available"] {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+#assigned_to option[data-status="busy"] {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+#assigned_to option[data-status="offline"] {
+  background-color: #f8f9fa;
+  color: #6c757d;
+}
+
+/* Driver details container styling */
+#driverDetails {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  padding: 10px;
+  margin-top: 10px;
+}
+
+#driverDetails small {
+  color: #495057;
+  font-size: 0.9rem;
+  margin-bottom: 5px;
+}
+
+#driverStatus.text-success {
+  color: #28a745 !important;
+  font-weight: 600;
+}
+
+#driverStatus.text-warning {
+  color: #ffc107 !important;
+  font-weight: 600;
+}
+
+#driverStatus.text-secondary {
+  color: #6c757d !important;
+  font-weight: 600;
+}
+
+/* Enhanced Modal Select Styling */
+.modal select.form-control {
+  height: auto !important;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.modal select.form-control option {
+  padding: 10px 15px;
+  margin: 2px 0;
+  line-height: 1.5;
+  min-height: 40px;
+  display: block;
+  white-space: normal;
+  border-bottom: 1px solid #eee;
+}
+
+#assigned_to option[data-status="available"] {
+  background-color: #d4edda;
+  color: #155724;
+  font-weight: 500;
+}
+
+#assigned_to option[data-status="busy"] {
+  background-color: #fff3cd;
+  color: #856404;
+  font-weight: 500;
+}
+
+#assigned_to option[data-status="offline"] {
+  background-color: #f8f9fa;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+/* Modal Select Container */
+.modal .form-group select {
+  width: 100%;
+  font-size: 14px;
+}
+
+/* Ensure text doesn't get cut off */
+.modal select option {
+  word-wrap: break-word;
+  white-space: normal !important;
+}
+
+/* Success modal styling */
+#successModal .modal-content {
+  border: none;
+  box-shadow: 0 10px 25px rgba(40, 167, 69, 0.2);
+}
+
+#successModal .modal-header {
+  background: linear-gradient(45deg, #218838, #28a745);
+  border-bottom: none;
+}
+
+#successModal .modal-body {
+  padding: 2.5rem 1.5rem;
+}
+
+#successModal .bi-check-circle-fill {
+  color: #28a745;
+  filter: drop-shadow(0 4px 6px rgba(40, 167, 69, 0.3));
+  animation: successPulse 1.5s infinite;
+}
+
+#successModal .btn-success {
+  background: linear-gradient(45deg, #218838, #28a745);
+  border: none;
+  border-radius: 50px;
+  padding: 8px 30px;
+  font-weight: 500;
+  box-shadow: 0 4px 10px rgba(40, 167, 69, 0.2);
+  transition: all 0.3s;
+}
+
+#successModal .btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(40, 167, 69, 0.3);
+}
+
+@keyframes successPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
   }
 }

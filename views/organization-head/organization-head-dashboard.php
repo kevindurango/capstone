@@ -13,14 +13,15 @@ require_once '../../models/Order.php';
 require_once '../../models/Log.php';
 require_once '../../models/Dashboard.php';
 require_once '../../models/Database.php';
+require_once '../../models/Pickup.php';
 
+// Initialize classes
 $database = new Database();
 $conn = $database->connect();
-
-// Instantiate necessary classes
 $orderClass = new Order();
 $logClass = new Log();
 $dashboard = new Dashboard();
+$pickupClass = new Pickup();
 
 // Get Organization Head User ID from Session
 $organization_head_user_id = $_SESSION['organization_head_user_id'] ?? null;
@@ -60,17 +61,6 @@ if (!isset($_SESSION['organization_id'])) {
 if ($_SESSION['organization_head_logged_in'] === true && $_SESSION['role'] === 'Organization Head' && isset($organization_head_user_id)) {
     $logClass->logActivity($organization_head_user_id, "Organization Head logged in.");
 }
-
-// Fetch orders with pickup details
-$orders = $orderClass->getOrdersWithPickupDetails();
-
-// Fetch dashboard metrics
-$productCount = $dashboard->getProductCount();
-$orderCountPending = $dashboard->getOrderCountByStatus('pending');
-$orderCountCompleted = $dashboard->getOrderCountByStatus('completed');
-$orderCountCanceled = $dashboard->getOrderCountByStatus('canceled');
-$salesData = $dashboard->getSalesData();
-$feedbackCount = $dashboard->getFeedbackCount();
 
 // Handle logout functionality
 if (isset($_POST['logout'])) {
@@ -126,74 +116,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) &&
     }
 }
 
-// Get Organization Statistics
-$statsQuery = "SELECT 
-    COUNT(DISTINCT d.user_id) as total_drivers,
-    COUNT(DISTINCT CASE WHEN dd.availability_status = 'available' THEN d.user_id END) as available_drivers,
-    COUNT(DISTINCT CASE WHEN dd.availability_status = 'busy' THEN d.user_id END) as busy_drivers,
-    COUNT(DISTINCT CASE WHEN dd.availability_status = 'offline' THEN d.user_id END) as offline_drivers,
-    COUNT(DISTINCT p.pickup_id) as total_pickups,
-    COUNT(DISTINCT CASE WHEN p.pickup_status = 'pending' THEN p.pickup_id END) as pending_pickups,
-    COUNT(DISTINCT CASE WHEN p.pickup_status = 'completed' THEN p.pickup_id END) as completed_pickups,
-    COUNT(DISTINCT CASE WHEN p.pickup_status = 'scheduled' THEN p.pickup_id END) as scheduled_pickups,
-    COUNT(DISTINCT CASE WHEN p.pickup_status = 'in transit' THEN p.pickup_id END) as in_transit_pickups,
-    COUNT(DISTINCT CASE WHEN p.pickup_status = 'canceled' THEN p.pickup_id END) as canceled_pickups,
-    COALESCE(AVG(dd.rating), 0) as avg_driver_rating
-FROM users d
-JOIN driver_details dd ON d.user_id = dd.user_id 
-LEFT JOIN pickups p ON dd.user_id = p.assigned_to AND DATE(p.pickup_date) = CURDATE()
-WHERE d.role_id = 6";
+// ======= FETCH DATA FOR DASHBOARD =======
 
-$stmt = $conn->prepare($statsQuery);
-$stmt->execute();
-$stats = $stmt->fetch(PDO::FETCH_ASSOC);
+// Get essential dashboard data
+$orders = $orderClass->getOrdersWithPickupDetails(10); // Limit to 10 recent orders
+$stats = [
+    'total_products' => $dashboard->getProductCount(),
+    'pending_orders' => $dashboard->getOrderCountByStatus('pending'),
+    'completed_orders' => $dashboard->getOrderCountByStatus('completed'),
+    'canceled_orders' => $dashboard->getOrderCountByStatus('canceled'),
+    'total_pickups' => $pickupClass->getPickupCountTotal(),
+    'pending_pickups' => $pickupClass->getPickupCountByStatus('pending'),
+    'completed_pickups' => $pickupClass->getPickupCountByStatus('completed'),
+    'assigned_pickups' => $pickupClass->getPickupCountByStatus('assigned')
+];
+
+// Summary statistics
+$totalSales = $dashboard->getTotalSalesAmount() ?? 0;
+$pendingDeliveries = $pickupClass->getPickupCountByStatus('pending') + $pickupClass->getPickupCountByStatus('assigned');
+$recentOrdersCount = count($orders);
 
 // Get Today's Pickups
-$pickupsQuery = "SELECT 
-    p.pickup_id,
-    p.pickup_status,
-    p.pickup_date,
-    p.pickup_location,
-    CONCAT(d.first_name, ' ', d.last_name) as driver_name,
-    dd.vehicle_type,
-    dd.availability_status,
-    o.order_id
-FROM pickups p
-LEFT JOIN users d ON p.assigned_to = d.user_id
-LEFT JOIN driver_details dd ON d.user_id = dd.user_id
-JOIN orders o ON p.order_id = o.order_id
-WHERE DATE(p.pickup_date) = CURDATE()
-ORDER BY p.pickup_date ASC";
+$todayPickups = $pickupClass->getTodayPickups();
 
-$stmt = $conn->prepare($pickupsQuery);
-$stmt->execute();
-$todayPickups = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Get Active Drivers
-$driversQuery = "SELECT 
-    u.user_id,
-    CONCAT(u.first_name, ' ', u.last_name) as driver_name,
-    dd.vehicle_type,
-    dd.vehicle_plate,
-    dd.availability_status,
-    dd.current_location,
-    dd.rating,
-    COUNT(p.pickup_id) as active_pickups
-FROM users u
-JOIN driver_details dd ON u.user_id = dd.user_id
-LEFT JOIN pickups p ON u.user_id = p.assigned_to AND p.pickup_status IN ('pending', 'in transit')
-WHERE u.role_id = 6
-GROUP BY u.user_id
-ORDER BY dd.availability_status = 'available' DESC, dd.rating DESC";
-
-$stmt = $conn->prepare($driversQuery);
-$stmt->execute();
-$activeDrivers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Get Organization Head User ID and Name from Database
-$organization_head_user_id = $_SESSION['organization_head_user_id'] ?? null;
+// Get Organization Head Name
 $organization_head_name = 'Organization Head'; // Default value
-
 if ($organization_head_user_id) {
     $userQuery = "SELECT CONCAT(first_name, ' ', last_name) as full_name FROM users WHERE user_id = :user_id";
     $stmt = $conn->prepare($userQuery);
@@ -215,88 +162,16 @@ if ($hour < 12) {
     $greeting = 'Good Evening';
 }
 
-// Fetch Order Status Distribution
+// Fetch Chart Data
 $orderStatusQuery = "SELECT order_status, COUNT(*) AS total FROM orders GROUP BY order_status";
 $orderStatusStmt = $conn->prepare($orderStatusQuery);
 $orderStatusStmt->execute();
 $orderStatusData = $orderStatusStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Driver Availability
-$driverAvailabilityQuery = "SELECT availability_status, COUNT(*) AS total FROM driver_details GROUP BY availability_status";
-$driverAvailabilityStmt = $conn->prepare($driverAvailabilityQuery);
-$driverAvailabilityStmt->execute();
-$driverAvailabilityData = $driverAvailabilityStmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Helper function for pickup status colors
-function getStatusBadgeClass($status) {
-    $status = strtolower($status);
-    switch ($status) {
-        case 'pending':
-            return 'pending';
-        case 'completed':
-            return 'completed';
-        case 'scheduled':
-            return 'scheduled';
-        case 'in transit':
-        case 'in-transit':
-            return 'in-transit';
-        case 'canceled':
-        case 'cancelled':
-            return 'canceled';
-        case 'available':
-            return 'success';
-        case 'busy':
-            return 'warning';
-        case 'offline':
-            return 'secondary';
-        default:
-            return 'info';
-    }
-}
-
-// Add this to check for chart data issues
-?>
-<script>
-function validateChartData(data) {
-    console.log('Chart Data:', data);
-    
-    // Check if data exists and is in the right format
-    if (!data || !Array.isArray(data.datasets) || data.datasets.length === 0) {
-        console.error('Invalid chart data structure');
-        return false;
-    }
-    
-    // Check if the data array has values
-    const dataValues = data.datasets[0].data;
-    if (!dataValues || !Array.isArray(dataValues) || dataValues.length === 0) {
-        console.error('No data values found');
-        return false;
-    }
-    
-    // Check if all values are numbers
-    const allNumbers = dataValues.every(value => typeof value === 'number');
-    if (!allNumbers) {
-        console.error('Data values must be numbers');
-        return false;
-    }
-    
-    return true;
-}
-</script>
-
-<?php 
-// Helper function for pickup status colors for chart colors
-function getPickupStatusColor($status) {
-    $status = strtolower($status);
-    switch ($status) {
-        case 'pending': return '#ffc107';
-        case 'scheduled': return '#17a2b8';
-        case 'in transit': case 'in-transit': return '#007bff';
-        case 'completed': return '#28a745';
-        case 'canceled': case 'cancelled': return '#dc3545';
-        default: return '#6c757d';
-    }
-}
+$pickupStatusQuery = "SELECT pickup_status, COUNT(*) AS total FROM pickups GROUP BY pickup_status";
+$pickupStatusStmt = $conn->prepare($pickupStatusQuery);
+$pickupStatusStmt->execute();
+$pickupStatusData = $pickupStatusStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Prepare chart data for JavaScript
 $orderStatusLabels = [];
@@ -306,11 +181,39 @@ foreach ($orderStatusData as $data) {
     $orderStatusValues[] = (int)$data['total'];
 }
 
-$driverStatusLabels = [];
-$driverStatusValues = [];
-foreach ($driverAvailabilityData as $data) {
-    $driverStatusLabels[] = ucfirst($data['availability_status']);
-    $driverStatusValues[] = (int)$data['total'];
+$pickupStatusLabels = [];
+$pickupStatusValues = [];
+foreach ($pickupStatusData as $data) {
+    $pickupStatusLabels[] = ucfirst($data['pickup_status']);
+    $pickupStatusValues[] = (int)$data['total'];
+}
+
+// Helper functions
+function getStatusBadgeClass($status) {
+    $status = strtolower($status);
+    switch ($status) {
+        case 'pending': return 'pending';
+        case 'completed': return 'completed';
+        case 'assigned': return 'scheduled';
+        case 'in transit': case 'in-transit': return 'in-transit';
+        case 'canceled': case 'cancelled': return 'canceled';
+        case 'available': return 'success';
+        case 'busy': return 'warning';
+        case 'offline': return 'secondary';
+        default: return 'info';
+    }
+}
+
+function getPickupStatusColor($status) {
+    $status = strtolower($status);
+    switch ($status) {
+        case 'pending': return '#ffc107';
+        case 'assigned': return '#17a2b8';
+        case 'in transit': case 'in-transit': return '#007bff';
+        case 'completed': return '#28a745';
+        case 'canceled': return '#dc3545';
+        default: return '#6c757d';
+    }
 }
 ?>
 
@@ -400,18 +303,6 @@ foreach ($driverAvailabilityData as $data) {
                 <section class="quick-actions mb-4">
                     <h5 class="mb-3"><i class="bi bi-lightning-fill text-warning"></i> Quick Actions</h5>
                     <div class="action-container">
-                        <a href="driver-management.php" class="action-card" data-type="drivers">
-                            <div class="action-card-icon">
-                                <i class="bi bi-truck"></i>
-                            </div>
-                            <div class="action-card-content">
-                                <h4>Manage Drivers</h4>
-                                <p>Assign and monitor delivery drivers</p>
-                            </div>
-                            <div class="action-card-arrow">
-                                <i class="bi bi-arrow-right"></i>
-                            </div>
-                        </a>
                         <a href="pickup-scheduling.php" class="action-card" data-type="pickups">
                             <div class="action-card-icon">
                                 <i class="bi bi-calendar-check"></i>
@@ -439,145 +330,198 @@ foreach ($driverAvailabilityData as $data) {
                     </div>
                 </section>
                 
-                <!-- Statistics Cards -->
-                <section id="statistics">
-                    <div class="row mb-4">
-                        <!-- Available Drivers Card -->
-                        <div class="col-md-3 mb-4">
-                            <div class="dashboard-card">
-                                <i class="bi bi-person-check-fill text-success card-icon"></i>
-                                <div class="card-title">Available Drivers</div>
-                                <div class="card-text"><?= $stats['available_drivers'] ?></div>
-                            </div>
-                        </div>
-                        
-                        <!-- Products Card -->
-                        <div class="col-md-3 mb-4">
-                            <div class="dashboard-card">
-                                <i class="bi bi-box-fill text-warning card-icon"></i>
-                                <div class="card-title">Products</div>
-                                <div class="card-text"><?= $productCount ?></div>
-                            </div>
-                        </div>
-                        
-                        <!-- Orders Pending Card -->
-                        <div class="col-md-3 mb-4">
-                            <div class="dashboard-card">
-                                <i class="bi bi-clock-fill text-primary card-icon"></i>
-                                <div class="card-title">Orders Pending</div>
-                                <div class="card-text"><?= $orderCountPending ?></div>
-                            </div>
-                        </div>
-                        
-                        <!-- Pending Pickups Card -->
-                        <div class="col-md-3 mb-4">
-                            <div class="dashboard-card">
-                                <i class="bi bi-hourglass-split text-info card-icon"></i>
-                                <div class="card-title">Pending Pickups</div>
-                                <div class="card-text"><?= $stats['pending_pickups'] ?></div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Charts Row -->
+                <!-- Statistics Dashboard -->
+                <section id="dashboard-summary" class="mb-4">
+                    <h5 class="section-title"><i class="bi bi-graph-up text-primary"></i> Dashboard Summary</h5>
                     <div class="row">
-                        <!-- Order Status Chart -->
-                        <div class="col-md-6 mb-4">
-                            <div class="stat-card">
-                                <div class="chart-title">Order Status Distribution</div>
-                                <div class="chart-container">
-                                    <canvas id="orderStatusChart"></canvas>
+                        <!-- Stats Overview Cards -->
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="dashboard-card primary-card">
+                                <div class="card-icon-container">
+                                    <i class="bi bi-box-fill card-icon"></i>
+                                </div>
+                                <div class="card-content">
+                                    <div class="card-title">Total Products</div>
+                                    <div class="card-text"><?= $stats['total_products'] ?></div>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- Driver Status Chart -->
-                        <div class="col-md-6 mb-4">
-                            <div class="stat-card">
-                                <div class="chart-title">Driver Availability</div>
-                                <div class="chart-container">
-                                    <canvas id="driverStatusChart"></canvas>
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="dashboard-card warning-card">
+                                <div class="card-icon-container">
+                                    <i class="bi bi-clock-fill card-icon"></i>
+                                </div>
+                                <div class="card-content">
+                                    <div class="card-title">Pending Orders</div>
+                                    <div class="card-text"><?= $stats['pending_orders'] ?></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="dashboard-card success-card">
+                                <div class="card-icon-container">
+                                    <i class="bi bi-truck card-icon"></i>
+                                </div>
+                                <div class="card-content">
+                                    <div class="card-title">Pending Pickups</div>
+                                    <div class="card-text"><?= $stats['pending_pickups'] ?></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="dashboard-card info-card">
+                                <div class="card-icon-container">
+                                    <i class="bi bi-check2-circle card-icon"></i>
+                                </div>
+                                <div class="card-content">
+                                    <div class="card-title">Completed Pickups</div>
+                                    <div class="card-text"><?= $stats['completed_pickups'] ?></div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </section>
                 
-                <!-- Today's Activity Section -->
-                <div class="row">
-                    <!-- Today's Pickups -->
-                    <div class="col-md-6 mb-4">
-                        <div class="card activity-card">
-                            <div class="card-header">
-                                <h5 class="mb-0"><i class="bi bi-truck text-success"></i> Today's Pickups</h5>
+                <!-- Data Visualization Section -->
+                <section id="data-visualization" class="mb-4">
+                    <div class="row">
+                        <!-- Order Status Chart -->
+                        <div class="col-md-6 mb-4">
+                            <div class="stat-card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-pie-chart-fill text-primary"></i> Order Status Distribution</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="orderStatusChart"></canvas>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="card-body">
-                                <?php if (!empty($todayPickups)): ?>
-                                    <div class="pickup-timeline">
-                                        <?php foreach ($todayPickups as $pickup): ?>
-                                            <div class="pickup-item">
-                                                <div class="d-flex justify-content-between">
-                                                    <h6>Pickup #<?= $pickup['pickup_id'] ?></h6>
-                                                    <span class="pickup-time"><?= date('g:i A', strtotime($pickup['pickup_date'])) ?></span>
-                                                </div>
-                                                <p class="mb-1">
-                                                    <span class="badge badge-<?= getStatusBadgeClass($pickup['pickup_status']) ?>">
-                                                        <?= ucfirst($pickup['pickup_status']) ?>
-                                                    </span>
-                                                    <span class="ml-2"><?= $pickup['pickup_location'] ?></span>
-                                                </p>
-                                                <small class="text-muted">
-                                                    <i class="bi bi-person"></i> Driver: <?= $pickup['driver_name'] ?? 'Unassigned' ?>
-                                                </small>
-                                            </div>
-                                        <?php endforeach; ?>
+                        </div>
+                        
+                        <!-- Pickup Status Chart -->
+                        <div class="col-md-6 mb-4">
+                            <div class="stat-card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-bar-chart-fill text-success"></i> Pickup Status Distribution</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="pickupStatusChart"></canvas>
                                     </div>
-                                <?php else: ?>
-                                    <div class="empty-state">
-                                        <i class="bi bi-calendar-x"></i>
-                                        <p>No pickups scheduled for today</p>
-                                    </div>
-                                <?php endif; ?>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Active Drivers -->
-                    <div class="col-md-6 mb-4">
-                        <div class="card activity-card">
-                            <div class="card-header">
-                                <h5 class="mb-0"><i class="bi bi-people-fill text-primary"></i> Active Drivers</h5>
-                            </div>
-                            <div class="card-body">
-                                <?php if (!empty($activeDrivers)): ?>
-                                    <?php foreach ($activeDrivers as $driver): ?>
-                                        <div class="driver-card <?= $driver['availability_status'] ?>">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <h6 class="mb-1"><?= htmlspecialchars($driver['driver_name']) ?></h6>
-                                                    <small>
-                                                        <i class="bi bi-truck"></i> <?= $driver['vehicle_type'] ?> • <?= $driver['vehicle_plate'] ?>
+                </section>
+                
+                <!-- Activity Center -->
+                <section id="activity-center" class="mb-4">
+                    <h5 class="section-title"><i class="bi bi-activity text-danger"></i> Activity Center</h5>
+                    <div class="row">
+                        <!-- Today's Pickups -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card activity-card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-truck text-success"></i> Today's Pickups</h5>
+                                    <span class="badge badge-pill badge-light"><?= count($todayPickups) ?> scheduled</span>
+                                </div>
+                                <div class="card-body">
+                                    <?php if (!empty($todayPickups)): ?>
+                                        <div class="pickup-timeline">
+                                            <?php foreach ($todayPickups as $pickup): ?>
+                                                <div class="pickup-item">
+                                                    <div class="d-flex justify-content-between">
+                                                        <h6>Pickup #<?= $pickup['pickup_id'] ?></h6>
+                                                        <span class="pickup-time"><?= date('g:i A', strtotime($pickup['pickup_date'])) ?></span>
+                                                    </div>
+                                                    <p class="mb-1">
+                                                        <span class="badge badge-<?= getStatusBadgeClass($pickup['pickup_status']) ?>">
+                                                            <?= ucfirst($pickup['pickup_status']) ?>
+                                                        </span>
+                                                        <span class="ml-2"><?= $pickup['pickup_location'] ?></span>
+                                                    </p>
+                                                    <?php if (!empty($pickup['contact_person'])): ?>
+                                                    <small class="text-muted">
+                                                        <i class="bi bi-person"></i> Contact: <?= htmlspecialchars($pickup['contact_person']) ?>
                                                     </small>
+                                                    <?php endif; ?>
                                                 </div>
-                                                <div class="text-right">
-                                                    <span class="badge badge-<?= getStatusBadgeClass($driver['availability_status']) ?>">
-                                                        <?= ucfirst($driver['availability_status']) ?>
-                                                    </span>
-                                                    <div><small><?= $driver['active_pickups'] ?> active pickups</small></div>
-                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="empty-state">
+                                            <i class="bi bi-calendar-x"></i>
+                                            <p>No pickups scheduled for today</p>
+                                            <a href="pickup-scheduling.php" class="btn btn-sm btn-outline-primary mt-2">Schedule New Pickup</a>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="card-footer text-muted text-center">
+                                    <a href="pickup-scheduling.php" class="text-decoration-none">View all pickups <i class="bi bi-arrow-right"></i></a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Status Summary -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card activity-card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-list-check text-warning"></i> Status Summary</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="status-grid">
+                                        <div class="status-item">
+                                            <div class="status-icon bg-warning text-white">
+                                                <i class="bi bi-hourglass-split"></i>
+                                            </div>
+                                            <div class="status-details">
+                                                <div class="status-value"><?= $stats['pending_orders'] ?></div>
+                                                <div class="status-label">Pending Orders</div>
                                             </div>
                                         </div>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <div class="empty-state">
-                                        <i class="bi bi-person-x"></i>
-                                        <p>No active drivers at the moment</p>
+                                        
+                                        <div class="status-item">
+                                            <div class="status-icon bg-success text-white">
+                                                <i class="bi bi-check-circle"></i>
+                                            </div>
+                                            <div class="status-details">
+                                                <div class="status-value"><?= $stats['completed_orders'] ?></div>
+                                                <div class="status-label">Completed Orders</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="status-item">
+                                            <div class="status-icon bg-info text-white">
+                                                <i class="bi bi-clock-history"></i>
+                                            </div>
+                                            <div class="status-details">
+                                                <div class="status-value"><?= $stats['assigned_pickups'] ?></div>
+                                                <div class="status-label">Assigned Pickups</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="status-item">
+                                            <div class="status-icon bg-danger text-white">
+                                                <i class="bi bi-x-circle"></i>
+                                            </div>
+                                            <div class="status-details">
+                                                <div class="status-value"><?= $stats['canceled_orders'] ?></div>
+                                                <div class="status-label">Canceled Orders</div>
+                                            </div>
+                                        </div>
                                     </div>
-                                <?php endif; ?>
+                                </div>
+                                <div class="card-footer text-muted text-center">
+                                    <a href="organization-head-order-management.php" class="text-decoration-none">View order details <i class="bi bi-arrow-right"></i></a>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                </section>
                 
                 <!-- Recent Orders Table -->
                 <div class="card table-container mb-4">
@@ -811,11 +755,33 @@ foreach ($driverAvailabilityData as $data) {
                 if (window.orderStatusChart) {
                     window.orderStatusChart.update();
                 }
-                if (window.driverStatusChart) {
-                    window.driverStatusChart.update();
+                if (window.pickupStatusChart) {
+                    window.pickupStatusChart.update();
                 }
             });
         });
+
+        // Function to validate chart data before rendering
+        function validateChartData(data) {
+            if (!data || !data.labels || !data.datasets || data.datasets.length === 0) {
+                console.error('Invalid chart data structure:', data);
+                return false;
+            }
+            
+            // Check if we have both labels and data
+            if (data.labels.length === 0 || data.datasets[0].data.length === 0) {
+                console.warn('Chart has no data to display');
+                return false;
+            }
+            
+            // Check if data matches labels
+            if (data.labels.length !== data.datasets[0].data.length) {
+                console.error('Chart labels and data count mismatch');
+                return false;
+            }
+            
+            return true;
+        }
 
         // Function to initialize charts
         function initializeCharts() {
@@ -842,7 +808,7 @@ foreach ($driverAvailabilityData as $data) {
                         data: orderChartData,
                         options: {
                             responsive: true,
-                            maintainAspectRatio: true, // Change to true to prevent stretching
+                            maintainAspectRatio: true,
                             plugins: {
                                 legend: {
                                     position: 'bottom',
@@ -850,37 +816,50 @@ foreach ($driverAvailabilityData as $data) {
                                         padding: 20,
                                         usePointStyle: true
                                     }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const value = context.raw;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const percentage = Math.round((value / total) * 100);
+                                            return `${context.label}: ${value} (${percentage}%)`;
+                                        }
+                                    }
                                 }
                             }
                         }
                     });
+                } else {
+                    // Display a message when there's no data
+                    $(orderStatusCtx).parent().html('<div class="empty-chart-message"><i class="bi bi-exclamation-circle"></i><p>No order status data available</p></div>');
                 }
             }
-
-            // Driver Status Chart
-            const driverStatusCtx = document.getElementById('driverStatusChart');
-            if (driverStatusCtx && typeof Chart !== 'undefined') {
+            
+            // Pickup Status Chart
+            const pickupStatusCtx = document.getElementById('pickupStatusChart');
+            if (pickupStatusCtx && typeof Chart !== 'undefined') {
                 // Clear any existing chart instance to prevent duplicates
-                if (window.driverStatusChart instanceof Chart) {
-                    window.driverStatusChart.destroy();
+                if (window.pickupStatusChart instanceof Chart) {
+                    window.pickupStatusChart.destroy();
                 }
                 
-                const driverChartData = {
-                    labels: <?= json_encode($driverStatusLabels) ?>,
+                const pickupChartData = {
+                    labels: <?= json_encode($pickupStatusLabels) ?>,
                     datasets: [{
-                        data: <?= json_encode($driverStatusValues) ?>,
-                        backgroundColor: ['#28a745', '#ffc107', '#6c757d'],
+                        data: <?= json_encode($pickupStatusValues) ?>,
+                        backgroundColor: ['#ffc107', '#17a2b8', '#007bff', '#28a745', '#dc3545'],
                         borderWidth: 1
                     }]
                 };
 
-                if (validateChartData(driverChartData)) {
-                    window.driverStatusChart = new Chart(driverStatusCtx, {
+                if (validateChartData(pickupChartData)) {
+                    window.pickupStatusChart = new Chart(pickupStatusCtx, {
                         type: 'pie',
-                        data: driverChartData,
+                        data: pickupChartData,
                         options: {
                             responsive: true,
-                            maintainAspectRatio: true, // Change to true to prevent stretching
+                            maintainAspectRatio: true,
                             plugins: {
                                 legend: {
                                     position: 'bottom',
@@ -888,10 +867,23 @@ foreach ($driverAvailabilityData as $data) {
                                         padding: 20,
                                         usePointStyle: true
                                     }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const value = context.raw;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const percentage = Math.round((value / total) * 100);
+                                            return `${context.label}: ${value} (${percentage}%)`;
+                                        }
+                                    }
                                 }
                             }
                         }
                     });
+                } else {
+                    // Display a message when there's no data
+                    $(pickupStatusCtx).parent().html('<div class="empty-chart-message"><i class="bi bi-exclamation-circle"></i><p>No pickup status data available</p></div>');
                 }
             }
         }

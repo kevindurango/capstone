@@ -27,30 +27,45 @@ const createApiService = () => ({
       const baseUrl = getApiBaseUrlSync();
       const url = `${baseUrl}${endpoint}`;
 
-      console.log("[Register API] Making request to:", url);
+      console.log("[API] Making request to:", url);
+      console.log("[API] Request payload:", options.body);
 
       const response = await fetch(url, {
         ...options,
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
           ...(options.headers || {}),
         },
       });
 
-      const responseData = await response.json();
+      const textResponse = await response.text();
+      console.log("[API] Raw response:", textResponse);
+
+      // If response is empty, throw error
+      if (!textResponse) {
+        throw new Error("Empty response from server");
+      }
+
+      let jsonResponse;
+      try {
+        jsonResponse = JSON.parse(textResponse);
+      } catch (parseError) {
+        console.error("[API] JSON parse error:", parseError);
+        throw new Error(`Server returned invalid JSON: ${textResponse}`);
+      }
 
       if (!response.ok) {
-        console.error("[Register API] Response error:", responseData);
         throw {
           status: response.status,
-          message: responseData.message || "An error occurred",
-          data: responseData,
+          message: jsonResponse?.message || "An error occurred",
+          data: jsonResponse,
         };
       }
 
-      return responseData;
+      return jsonResponse;
     } catch (error) {
-      console.error("[Register API] Fetch error:", error);
+      console.error("[API] Fetch error:", error);
       throw error;
     }
   },
@@ -79,16 +94,17 @@ export default function RegisterScreen() {
         !contactNumber ||
         !address
       ) {
-        alert("All fields are required");
+        Alert.alert("Error", "All fields are required");
         return;
       }
 
       if (password !== confirmPassword) {
-        alert("Passwords don't match!");
+        Alert.alert("Error", "Passwords don't match!");
         return;
       }
 
       setIsLoading(true);
+      console.log("[Register] Starting registration...");
 
       const payload = {
         fullName,
@@ -99,16 +115,16 @@ export default function RegisterScreen() {
         address: address,
       };
 
-      console.log("[Register] Sending registration request...");
+      console.log("[Register] Payload:", payload);
 
       const response = await apiService.fetch("/register.php", {
         method: "POST",
         body: JSON.stringify(payload),
       });
 
-      console.log("[Register] Response:", response);
+      console.log("[Register] Server response:", response);
 
-      if (response && response.status === "success") {
+      if (response?.status === "success") {
         Alert.alert("Success", "Registration successful!", [
           {
             text: "OK",
@@ -116,16 +132,13 @@ export default function RegisterScreen() {
           },
         ]);
       } else {
-        const errorMessage =
-          response?.message || "Registration failed. Please try again.";
-        console.error("[Register] Error:", errorMessage);
-        Alert.alert("Registration Failed", errorMessage);
+        throw new Error(response?.message || "Registration failed");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("[Register] Error:", error);
       Alert.alert(
-        "Error",
-        "Connection error. Please check your internet connection and try again."
+        "Registration Failed",
+        error.message || "Unable to complete registration. Please try again."
       );
     } finally {
       setIsLoading(false);
@@ -281,17 +294,6 @@ export default function RegisterScreen() {
             <TouchableOpacity onPress={() => router.back()}>
               <ThemedText style={styles.backText}>Go Back</ThemedText>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.settingsButton}
-              onPress={() => router.push("/settings")}
-            >
-              <Ionicons
-                name="settings-outline"
-                size={20}
-                color={COLORS.light}
-              />
-            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -305,7 +307,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingTop: 20, // Reduced from 40
+    paddingTop: 20,
     paddingBottom: 40,
     paddingHorizontal: 20,
   },
@@ -314,7 +316,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: {
-    fontSize: 25, // Modify this to adjust the header text size
+    fontSize: 24, // Reduced from 32
     fontWeight: "bold",
     color: COLORS.light,
     textAlign: "center",
@@ -334,7 +336,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 10,
     color: COLORS.light,
-    fontSize: 12, // Change this to adjust input text size
+    fontSize: 14, // Reduced from 16
   },
   userTypeContainer: {
     flexDirection: "row",
@@ -357,7 +359,7 @@ const styles = StyleSheet.create({
   },
   userTypeText: {
     color: COLORS.light,
-    fontSize: 14, // Modify this to adjust the user type button text size
+    fontSize: 14, // Reduced from 18
     fontWeight: "600",
   },
   userTypeTextActive: {
@@ -372,28 +374,20 @@ const styles = StyleSheet.create({
   buttonText: {
     color: COLORS.light,
     textAlign: "center",
-    fontSize: 13, // Adjust the button text size here
+    fontSize: 15, // Reduced from 18
     fontWeight: "bold",
   },
   backText: {
     color: COLORS.light,
     textAlign: "center",
-    fontSize: 16, // Add this line to adjust the "Go Back" text size
+    fontSize: 12, // Reduced from 14
   },
   bottomContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     marginTop: 20,
-    position: "relative",
     width: "100%",
-  },
-  settingsButton: {
-    position: "absolute",
-    right: 0,
-    padding: 10,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 20,
   },
   disabledButton: {
     opacity: 0.7,

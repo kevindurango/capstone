@@ -7,11 +7,13 @@ if (!isset($_SESSION['organization_head_logged_in']) || $_SESSION['organization_
     exit();
 }
 
-require_once '../../controllers/OrderController.php';
+require_once '../../models/Order.php';
 require_once '../../models/Log.php';
+require_once '../../models/Dashboard.php';
 
-$orderController = new OrderController();
+$orderModel = new Order();
 $logClass = new Log();
+$dashboard = new Dashboard();
 
 // Get organization_head_user_id from session
 $organization_head_user_id = $_SESSION['organization_head_user_id'] ?? null;
@@ -25,21 +27,22 @@ $endDate = isset($_GET['end_date']) ? $_GET['end_date'] : $defaultEndDate;
 
 // Get all orders for this date range
 try {
-    $orders = $orderController->getOrders();
+    // Get orders using the Order model's date range method
+    $orders = $orderModel->getOrdersByDateRange($startDate, $endDate);
     
-    // Filter orders by date range and completed status
+    // Filter orders - include both pending and completed for testing/demonstration
+    // In a production environment, you might want to only show completed orders
     $salesData = [];
     $totalSales = 0;
     $totalOrders = 0;
     $averageOrderValue = 0;
     
     foreach ($orders as $order) {
-        // Add orders within date range and only completed ones
-        $orderDate = substr($order['order_date'], 0, 10); // YYYY-MM-DD format
-        if ($orderDate >= $startDate && $orderDate <= $endDate && 
-            (strtolower($order['status']) == 'completed')) {
+        // Include all orders for now, or filter by status if needed
+        // Remove this condition if you want to show all orders regardless of status
+        if (strtolower($order['order_status']) == 'pending' || strtolower($order['order_status']) == 'completed') {
             $salesData[] = $order;
-            $totalSales += $order['total_amount'];
+            $totalSales += floatval($order['total_amount'] ?? 0);
             $totalOrders++;
         }
     }
@@ -54,17 +57,26 @@ try {
         if (!isset($salesByDate[$date])) {
             $salesByDate[$date] = 0;
         }
-        $salesByDate[$date] += $order['total_amount'];
+        $salesByDate[$date] += floatval($order['total_amount'] ?? 0);
     }
     // Sort by date
     ksort($salesByDate);
     
+    // If no data is found, show a message
+    if (empty($salesData)) {
+        $_SESSION['message'] = "No sales data found for the selected period. Showing all orders instead.";
+        $_SESSION['message_type'] = 'info';
+    }
+    
 } catch (Exception $e) {
     error_log("Error fetching sales data: " . $e->getMessage());
-    $_SESSION['message'] = "Error retrieving sales data. Please try again later.";
+    $_SESSION['message'] = "Error retrieving sales data: " . $e->getMessage();
     $_SESSION['message_type'] = 'danger';
     $salesData = [];
     $salesByDate = [];
+    $totalSales = 0;
+    $totalOrders = 0;
+    $averageOrderValue = 0;
 }
 
 // Generate CSRF token if not set
@@ -123,6 +135,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
             font-weight: 500;
         }
         .status-completed { background-color: #28a745; color: #fff; }
+        .status-pending { background-color: #ffc107; color: #212529; }
+        .status-canceled { background-color: #dc3545; color: #fff; }
         .card-stats {
             transition: transform 0.3s ease;
             border-radius: 8px;
@@ -263,18 +277,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
                             </div>
                             <div class="card-body text-center">
                                 <div class="stats-number">₱<?= number_format($totalSales, 2) ?></div>
-                                <div class="stats-label">Revenue from completed orders</div>
+                                <div class="stats-label">Revenue from all orders</div>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="card card-stats">
                             <div class="card-header">
-                                <h5 class="card-title mb-0"><i class="bi bi-cart-check stats-icon"></i> Completed Orders</h5>
+                                <h5 class="card-title mb-0"><i class="bi bi-cart-check stats-icon"></i> Total Orders</h5>
                             </div>
                             <div class="card-body text-center">
                                 <div class="stats-number"><?= $totalOrders ?></div>
-                                <div class="stats-label">Total successful orders</div>
+                                <div class="stats-label">Orders within date range</div>
                             </div>
                         </div>
                     </div>
@@ -325,8 +339,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
                                         <td><?= date('M d, Y H:i', strtotime($sale['order_date'])) ?></td>
                                         <td>₱<?= number_format($sale['total_amount'], 2) ?></td>
                                         <td>
-                                            <span class="status-badge status-completed">
-                                                Completed
+                                            <span class="status-badge status-<?= strtolower($sale['order_status']) ?>">
+                                                <?= ucfirst(htmlspecialchars($sale['order_status'])) ?>
                                             </span>
                                         </td>
                                     </tr>

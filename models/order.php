@@ -2,6 +2,7 @@
 
 class Order {
     private $pdo;  // PDO database connection object
+    private $lastError = '';  // Add this property to store the last error message
 
     public function __construct() {
         // Establish database connection in the constructor
@@ -28,7 +29,7 @@ class Order {
                     p.pickup_status,
                     p.pickup_location,
                     p.pickup_date,
-                    p.assigned_to,
+                    p.contact_person,
                     p.pickup_notes
                 FROM orders AS o
                 JOIN users AS u ON o.consumer_id = u.user_id
@@ -45,7 +46,7 @@ class Order {
                     'pickup_id' => null,
                     'pickup_location' => 'Not set',
                     'pickup_date' => date('Y-m-d H:i:s'), // Current date as default
-                    'assigned_to' => 'Unassigned',
+                    'contact_person' => 'Unassigned',
                     'pickup_notes' => 'No notes',
                     'pickup_status' => 'pending'
                 ], $row);
@@ -107,39 +108,61 @@ class Order {
      * @return bool True on success, false on failure.
      */
     public function updateOrderStatus(int $order_id, string $new_status): bool {
-        // Validate the order status to avoid invalid input
-        $allowedStatuses = ['pending', 'processing', 'shipped', 'delivered', 'completed', 'canceled'];
+        // Validate the status value based on our database schema's enum values
+        $allowedStatuses = ['pending', 'processing', 'completed', 'canceled'];
 
         if (!in_array($new_status, $allowedStatuses)) {
-            error_log("Invalid order status provided for order ID $order_id: " . htmlspecialchars($new_status));
+            $this->lastError = "Invalid order status: $new_status. Allowed values are: " . implode(", ", $allowedStatuses);
+            error_log($this->lastError);
             return false;
         }
 
         try {
-            // Debugging statements
-            error_log("Updating order ID $order_id to status $new_status");
+            // Debug the query and values
+            error_log("Executing SQL: UPDATE orders SET order_status = '$new_status' WHERE order_id = $order_id");
 
-            $stmt = $this->pdo->prepare("
-                UPDATE orders
-                SET order_status = :new_status
-                WHERE order_id = :order_id
-            ");
+            $stmt = $this->pdo->prepare("UPDATE orders SET order_status = :new_status WHERE order_id = :order_id");
             $stmt->bindParam(':new_status', $new_status, PDO::PARAM_STR);
             $stmt->bindParam(':order_id', $order_id, PDO::PARAM_INT);
             $result = $stmt->execute();
 
-            // Debugging statement to check if the update was successful
-            if ($result) {
-                error_log("Order ID $order_id updated to status $new_status successfully.");
-            } else {
-                error_log("Failed to update order ID $order_id to status $new_status.");
+            if (!$result) {
+                $errorInfo = $stmt->errorInfo();
+                $this->lastError = "Database error: " . ($errorInfo[2] ?? 'Unknown error');
+                error_log($this->lastError);
+                return false;
             }
 
-            return $result;
+            // Check if any rows were affected
+            if ($stmt->rowCount() === 0) {
+                $this->lastError = "Order not found or status already set to '$new_status'";
+                error_log($this->lastError);
+                // We'll still return true if the order exists but status was already set
+                // Let's verify order exists
+                $checkStmt = $this->pdo->prepare("SELECT 1 FROM orders WHERE order_id = :id");
+                $checkStmt->bindParam(':id', $order_id, PDO::PARAM_INT);
+                $checkStmt->execute();
+                if ($checkStmt->fetchColumn() === false) {
+                    // Order doesn't exist
+                    $this->lastError = "Order ID $order_id not found";
+                    return false;
+                }
+            }
+
+            return true;
         } catch (PDOException $e) {
-            error_log("Database error updating order status for order ID $order_id: " . $e->getMessage());
+            $this->lastError = "Database error: " . $e->getMessage();
+            error_log($this->lastError);
             return false;
         }
+    }
+
+    /**
+     * Returns the last error that occurred.
+     * @return string The last error message.
+     */
+    public function getLastError(): string {
+        return $this->lastError;
     }
 
     /**
@@ -509,6 +532,47 @@ class Order {
     function validatePickupStatus($status) {
         $valid_statuses = ['pending', 'assigned', 'in_transit', 'completed', 'cancelled'];
         return in_array(strtolower($status), $valid_statuses);
+    }
+
+    /**
+     * Get orders within a specific date range
+     * @param string $startDate Start date in Y-m-d format
+     * @param string $endDate End date in Y-m-d format
+     * @return array Orders within the date range
+     */
+    public function getOrdersByDateRange($startDate, $endDate) {
+        try {
+            // Add one day to end date to include orders from that day
+            $adjustedEndDate = date('Y-m-d', strtotime($endDate . ' +1 day'));
+            
+            $sql = "SELECT o.*, 
+                    u.first_name, u.last_name, u.email, 
+                    COUNT(oi.order_item_id) as item_count,
+                    SUM(oi.price * oi.quantity) as total_amount
+                    FROM orders o
+                    LEFT JOIN users u ON o.consumer_id = u.user_id
+                    LEFT JOIN orderitems oi ON o.order_id = oi.order_id
+                    WHERE o.order_date BETWEEN :start_date AND :end_date
+                    GROUP BY o.order_id
+                    ORDER BY o.order_date DESC";
+            
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->bindParam(':start_date', $startDate);
+            $stmt->bindParam(':end_date', $adjustedEndDate);
+            $stmt->execute();
+            
+            $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Add customer name field for better display
+            foreach ($orders as &$order) {
+                $order['customer_name'] = trim($order['first_name'] . ' ' . $order['last_name']);
+            }
+            
+            return $orders;
+        } catch (PDOException $e) {
+            error_log("Error getting orders by date range: " . $e->getMessage());
+            return [];
+        }
     }
 }
 

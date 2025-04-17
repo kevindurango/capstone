@@ -48,7 +48,7 @@ if (isset($_POST['update_pickup'])) {
     $pickup_status = $_POST['pickup_status'];
     $pickup_date = $_POST['pickup_date'];
     $pickup_location = $_POST['pickup_location'];
-    $assigned_to = $_POST['assigned_to'];
+    $contact_person = $_POST['contact_person'];
     $pickup_notes = $_POST['pickup_notes'];
 
     // Get the old pickup data for logging purposes
@@ -63,7 +63,7 @@ if (isset($_POST['update_pickup'])) {
                     SET pickup_status = :pickup_status,
                         pickup_date = :pickup_date,
                         pickup_location = :pickup_location,
-                        assigned_to = :assigned_to,
+                        contact_person = :contact_person,
                         pickup_notes = :pickup_notes
                     WHERE pickup_id = :pickup_id";
 
@@ -72,7 +72,7 @@ if (isset($_POST['update_pickup'])) {
     $updateStmt->bindParam(':pickup_status', $pickup_status, PDO::PARAM_STR);
     $updateStmt->bindParam(':pickup_date', $pickup_date, PDO::PARAM_STR);
     $updateStmt->bindParam(':pickup_location', $pickup_location, PDO::PARAM_STR);
-    $updateStmt->bindParam(':assigned_to', $assigned_to, PDO::PARAM_STR);
+    $updateStmt->bindParam(':contact_person', $contact_person, PDO::PARAM_STR);
     $updateStmt->bindParam(':pickup_notes', $pickup_notes, PDO::PARAM_STR);
 
     if ($updateStmt->execute()) {
@@ -89,7 +89,7 @@ if (isset($_POST['update_pickup'])) {
                     'new_status' => $pickup_status,
                     'pickup_date' => $pickup_date,
                     'pickup_location' => $pickup_location,
-                    'assigned_to' => $assigned_to,
+                    'contact_person' => $contact_person,
                     'pickup_notes' => $pickup_notes
                 ]
             );
@@ -116,18 +116,11 @@ $query = "SELECT
             p.pickup_status,
             p.pickup_date,
             p.pickup_location,
-            p.assigned_to,
-            CONCAT(d.first_name, ' ', d.last_name) AS driver_name,
-            dd.vehicle_type,
-            dd.vehicle_plate,
-            dd.availability_status,
-            dd.max_load_capacity,
+            p.contact_person,
             p.pickup_notes
           FROM pickups AS p
           JOIN orders AS o ON p.order_id = o.order_id
-          JOIN users AS c ON o.consumer_id = c.user_id
-          LEFT JOIN users AS d ON p.assigned_to = d.user_id
-          LEFT JOIN driver_details AS dd ON d.user_id = dd.user_id";
+          JOIN users AS c ON o.consumer_id = c.user_id";
 
 $whereClauses = [];
 $queryParams = [];
@@ -135,7 +128,7 @@ $queryParams = [];
 if (!empty($search)) {
     $whereClauses[] = "(p.pickup_status LIKE :search
                         OR p.pickup_location LIKE :search
-                        OR p.assigned_to LIKE :search
+                        OR p.contact_person LIKE :search
                         OR c.username LIKE :search
                         OR o.order_id LIKE :search)"; // Add search by order_id as well.
 
@@ -273,6 +266,54 @@ if ($admin_user_id) {
             transform: translateY(-5px);
         }
 
+        /* Batch action buttons styling */
+        .batch-actions-bar .btn {
+            height: 36px; /* Fixed height */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            padding: 0.25rem 0.5rem;
+            margin: 0 4px; /* Even spacing between buttons */
+            min-width: 110px; /* Minimum width to ensure uniformity */
+        }
+        
+        .batch-actions-bar .d-flex {
+            gap: 8px; /* Consistent spacing between flex items */
+        }
+        
+        .batch-actions-bar .bi {
+            margin-right: 6px;
+            font-size: 1rem;
+        }
+        
+        .batch-actions-bar .card {
+            border: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+        }
+        
+        .batch-actions-bar .card-body {
+            padding: 1rem;
+        }
+        
+        .batch-actions-bar .card-title {
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        /* Pickup checkbox styling */
+        .custom-control-input:checked ~ .custom-control-label::before {
+            background-color: #28a745;
+            border-color: #28a745;
+        }
+        
+        .custom-checkbox {
+            margin-right: 10px;
+        }
+
     </style>
 </head>
 <body>
@@ -363,6 +404,30 @@ if ($admin_user_id) {
                     </form>
                 </div>
 
+                <!-- Batch Actions Bar -->
+                <div class="batch-actions-bar mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title mb-3"><i class="bi bi-layers"></i> Bulk Actions</h5>
+                            <div class="d-flex flex-wrap justify-content-between">
+                                <button type="button" id="selectAllBtn" class="btn btn-outline-primary flex-fill mx-1 mb-0">
+                                    <i class="bi bi-check-all"></i> Select All
+                                </button>
+                                <button type="button" id="approveSelectedBtn" class="btn btn-success flex-fill mx-1 mb-0">
+                                    <i class="bi bi-check-circle"></i> Approve
+                                </button>
+                                <button type="button" id="rejectSelectedBtn" class="btn btn-warning flex-fill mx-1 mb-0">
+                                    <i class="bi bi-x-circle"></i> Reject
+                                </button>
+                                <button type="button" id="deleteSelectedBtn" class="btn btn-danger flex-fill mx-1 mb-0">
+                                    <i class="bi bi-trash"></i> Delete
+                                </button>
+                            </div>
+                            <div id="batchActionStatus" class="mt-2" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Pickups Content -->
                 <?php if (count($pickups) > 0): ?>
                     <!-- Card View for Pickups -->
@@ -382,21 +447,8 @@ if ($admin_user_id) {
                                         <p><strong><i class="bi bi-calendar-event"></i> Date:</strong> <?= htmlspecialchars(date("F j, Y, g:i A", strtotime($pickup['pickup_date']))) ?></p>
                                         <p><strong><i class="bi bi-geo-alt"></i> Location:</strong> <?= htmlspecialchars($pickup['pickup_location']) ?></p>
                                         <p>
-                                            <strong><i class="bi bi-person-badge"></i> Assigned To:</strong> 
-                                            <?php if (!empty($pickup['driver_name'])): ?>
-                                                <?= htmlspecialchars($pickup['driver_name']) ?>
-                                                <?php if (!empty($pickup['vehicle_type'])): ?>
-                                                    <span class="badge badge-info">
-                                                        <?= htmlspecialchars($pickup['vehicle_type']) ?> - <?= htmlspecialchars($pickup['vehicle_plate']) ?>
-                                                    </span>
-                                                <?php endif; ?>
-                                                <span class="badge badge-<?= $pickup['availability_status'] === 'available' ? 'success' : 
-                                                                        ($pickup['availability_status'] === 'busy' ? 'warning' : 'danger') ?>">
-                                                    <?= ucfirst(htmlspecialchars($pickup['availability_status'])) ?>
-                                                </span>
-                                            <?php else: ?>
-                                                <span class="text-muted">No driver assigned</span>
-                                            <?php endif; ?>
+                                            <strong><i class="bi bi-person-badge"></i> Contact Person:</strong> 
+                                            <?= htmlspecialchars($pickup['contact_person']) ?>
                                         </p>
                                         <div class="pickup-notes">
                                             <strong><i class="bi bi-card-text"></i> Notes:</strong> <?= htmlspecialchars($pickup['pickup_notes'] ?: 'No notes available') ?>
@@ -410,7 +462,7 @@ if ($admin_user_id) {
                                                 data-pickup-status="<?= htmlspecialchars($pickup['pickup_status']) ?>"
                                                 data-pickup-date="<?= htmlspecialchars($pickup['pickup_date']) ?>"
                                                 data-pickup-location="<?= htmlspecialchars($pickup['pickup_location']) ?>"
-                                                data-assigned-to="<?= htmlspecialchars($pickup['assigned_to']) ?>"
+                                                data-contact-person="<?= htmlspecialchars($pickup['contact_person']) ?>"
                                                 data-pickup-notes="<?= htmlspecialchars($pickup['pickup_notes']) ?>">
                                             <i class="bi bi-pencil"></i> Edit Details
                                         </button>
@@ -516,9 +568,8 @@ if ($admin_user_id) {
                                         <label for="pickup_status"><i class="bi bi-tag"></i> Pickup Status</label>
                                         <select class="form-control" id="pickup_status" name="pickup_status">
                                             <option value="pending">Pending</option>
-                                            <option value="scheduled">Scheduled</option>
-                                            <option value="ready">Ready</option>
-                                            <option value="in transit">In Transit</option>
+                                            <option value="assigned">Assigned</option>
+                                            <option value="in_transit">In Transit</option>
                                             <option value="completed">Completed</option>
                                             <option value="canceled">Canceled</option>
                                         </select>
@@ -530,38 +581,15 @@ if ($admin_user_id) {
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="pickup_location"><i class="bi bi-geo-alt"></i> Pickup Location</label>
-                                        <input type="text" class="form-control" id="pickup_location" name="pickup_location">
+                                        <label><i class="bi bi-geo-alt"></i> Pickup Location</label>
+                                        <input type="text" class="form-control" value="Municipal Agriculture Office" disabled>
+                                        <input type="hidden" name="pickup_location" value="Municipal Agriculture Office">
+                                        <small class="text-muted">All pickups are processed at the Municipal Agriculture Office</small>
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="assigned_to"><i class="bi bi-person"></i> Assign Driver</label>
-                                        <select class="form-control" id="assigned_to" name="assigned_to">
-                                            <option value="">-- Select Driver --</option>
-                                            <?php
-                                            // Fetch available drivers
-                                            $driversQuery = "SELECT u.user_id, CONCAT(u.first_name, ' ', u.last_name) as driver_name, 
-                                                            dd.vehicle_type, dd.vehicle_plate, dd.availability_status
-                                                            FROM users u 
-                                                            JOIN driver_details dd ON u.user_id = dd.user_id 
-                                                            WHERE u.role_id = 6 
-                                                            ORDER BY dd.availability_status = 'available' DESC, u.last_name";
-                                            $driversStmt = $conn->prepare($driversQuery);
-                                            $driversStmt->execute();
-                                            while ($driver = $driversStmt->fetch(PDO::FETCH_ASSOC)) {
-                                                $status_class = $driver['availability_status'] == 'available' ? 'text-success' : 
-                                                              ($driver['availability_status'] == 'busy' ? 'text-warning' : 'text-danger');
-                                                echo "<option value='" . $driver['user_id'] . "' " . 
-                                                     "data-vehicle='" . htmlspecialchars($driver['vehicle_type']) . " - " . 
-                                                     htmlspecialchars($driver['vehicle_plate']) . "' " .
-                                                     "class='" . $status_class . "'>" .
-                                                     htmlspecialchars($driver['driver_name']) . 
-                                                     " (" . ucfirst($driver['availability_status']) . ")" .
-                                                     "</option>";
-                                            }
-                                            ?>
-                                        </select>
-                                        <small class="form-text text-muted vehicle-info"></small>
+                                        <label for="contact_person"><i class="bi bi-person"></i> Contact Person</label>
+                                        <input type="text" class="form-control" id="contact_person" name="contact_person" placeholder="Person responsible for pickup">
                                     </div>
 
                                     <div class="form-group">
@@ -600,40 +628,137 @@ if ($admin_user_id) {
             
             // Handle edit pickup button click
             $('.edit-pickup-btn').click(function () {
-                // Get data from button attributes using the correct data attribute names
-                const pickupId = $(this).data('pickupId');
-                const pickupStatus = $(this).data('pickupStatus');
-                const pickupDate = $(this).data('pickupDate');
-                const pickupLocation = $(this).data('pickupLocation');
-                const assignedTo = $(this).data('assignedTo');
-                const pickupNotes = $(this).data('pickupNotes');
+                // Get data from button attributes using hyphens for data attributes
+                const pickupId = $(this).attr('data-pickup-id');
+                const pickupStatus = $(this).attr('data-pickup-status');
+                const pickupDate = $(this).attr('data-pickup-date');
+                const pickupLocation = $(this).attr('data-pickup-location');
+                const contactPerson = $(this).attr('data-contact-person');
+                const pickupNotes = $(this).attr('data-pickup-notes');
 
-                console.log('Debug - Pickup Status:', pickupStatus); // Debug line
+                console.log('Debug - Pickup ID:', pickupId);
+                console.log('Debug - Pickup Status:', pickupStatus);
+                console.log('Debug - Contact Person:', contactPerson);
 
+                // Normalize status values to match dropdown options
+                let normalizedStatus = pickupStatus;
+                if (pickupStatus === 'in transit') {
+                    normalizedStatus = 'in_transit';
+                }
+                
                 // Populate the modal form
                 $('#pickup_id').val(pickupId);
-                $('#pickup_status').val(pickupStatus);
+                $('#pickup_status').val(normalizedStatus);
                 $('#pickup_date').val(formatDateForInput(pickupDate));
                 $('#pickup_location').val(pickupLocation);
-                $('#assigned_to').val(assignedTo);
+                $('#contact_person').val(contactPerson);
                 $('#pickup_notes').val(pickupNotes);
                 
                 // Update modal title with pickup ID
                 $('#editPickupModalLabel').html('<i class="bi bi-truck"></i> Edit Pickup #' + pickupId);
-
-                // Update vehicle info if a driver is selected
-                updateVehicleInfo();
             });
 
-            // Handle driver selection change
-            $('#assigned_to').change(function() {
-                updateVehicleInfo();
+            // Add checkboxes to each pickup card
+            $('.pickup-card').each(function() {
+                const cardHeader = $(this).find('.card-header');
+                const pickupId = $(this).find('.edit-pickup-btn').data('pickup-id');
+                
+                // Add checkbox before the pickup ID
+                const checkbox = $('<div class="custom-control custom-checkbox d-inline-block mr-2">' +
+                    '<input type="checkbox" class="custom-control-input pickup-checkbox" id="pickup-' + pickupId + '" data-pickup-id="' + pickupId + '">' +
+                    '<label class="custom-control-label" for="pickup-' + pickupId + '"></label>' +
+                    '</div>');
+                
+                cardHeader.prepend(checkbox);
             });
 
-            function updateVehicleInfo() {
-                const selectedOption = $('#assigned_to option:selected');
-                const vehicleInfo = selectedOption.data('vehicle');
-                $('.vehicle-info').text(vehicleInfo ? 'Vehicle: ' + vehicleInfo : '');
+            // Select All Button
+            $('#selectAllBtn').click(function() {
+                const allChecked = $('.pickup-checkbox:checked').length === $('.pickup-checkbox').length;
+                $('.pickup-checkbox').prop('checked', !allChecked);
+                updateBatchButtons();
+            });
+
+            // Update batch action buttons based on selection
+            function updateBatchButtons() {
+                const selectedCount = $('.pickup-checkbox:checked').length;
+                
+                // Only enable batch buttons if pickups are selected
+                $('#approveSelectedBtn, #rejectSelectedBtn, #deleteSelectedBtn').prop('disabled', selectedCount === 0);
+                
+                // Show count of selected items
+                if (selectedCount > 0) {
+                    $('#batchActionStatus').html('<div class="alert alert-info mb-0">' + selectedCount + ' pickup(s) selected</div>').show();
+                } else {
+                    $('#batchActionStatus').hide();
+                }
+            }
+
+            // Listen for checkbox changes
+            $(document).on('change', '.pickup-checkbox', function() {
+                updateBatchButtons();
+            });
+
+            // Initialize batch buttons state
+            updateBatchButtons();
+
+            // Batch Action Handlers
+            $('#approveSelectedBtn').click(function() {
+                processBatchAction('completed', 'approve');
+            });
+
+            $('#rejectSelectedBtn').click(function() {
+                processBatchAction('canceled', 'reject');
+            });
+
+            $('#deleteSelectedBtn').click(function() {
+                if (confirm('Are you sure you want to delete the selected pickups? This action cannot be undone.')) {
+                    processBatchAction('delete', 'delete');
+                }
+            });
+
+            // Function to process batch actions via AJAX
+            function processBatchAction(status, action) {
+                const selectedIds = [];
+                $('.pickup-checkbox:checked').each(function() {
+                    selectedIds.push($(this).data('pickup-id'));
+                });
+
+                if (selectedIds.length === 0) {
+                    alert('Please select at least one pickup to ' + action);
+                    return;
+                }
+
+                // Show processing message
+                $('#batchActionStatus').html('<div class="alert alert-warning mb-0"><i class="bi bi-hourglass-split"></i> Processing...</div>').show();
+
+                // AJAX call to process the action
+                $.ajax({
+                    url: '../../ajax/pickup-actions.php',
+                    type: 'POST',
+                    data: {
+                        action: action,
+                        status: status,
+                        pickup_ids: selectedIds,
+                        csrf_token: $('input[name="csrf_token"]').val()
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            $('#batchActionStatus').html('<div class="alert alert-success mb-0"><i class="bi bi-check-circle"></i> ' + response.message + '</div>');
+                            
+                            // Reload the page after a short delay
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1500);
+                        } else {
+                            $('#batchActionStatus').html('<div class="alert alert-danger mb-0"><i class="bi bi-exclamation-circle"></i> ' + response.message + '</div>');
+                        }
+                    },
+                    error: function() {
+                        $('#batchActionStatus').html('<div class="alert alert-danger mb-0"><i class="bi bi-exclamation-circle"></i> An error occurred while processing your request.</div>');
+                    }
+                });
             }
 
             // Auto-dismiss alerts after 5 seconds

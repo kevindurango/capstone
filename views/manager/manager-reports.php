@@ -9,37 +9,121 @@ if (!isset($_SESSION['manager_logged_in']) || $_SESSION['manager_logged_in'] !==
 }
 
 require_once '../../models/Database.php';
+require_once '../../models/Log.php';
 
 // Database Connection
 $database = new Database();
 $conn = $database->connect();
+$log = new Log();
 
-// Fetch Order Summary
+$manager_user_id = $_SESSION['manager_user_id'] ?? null;
+
+// Handle date range filtering
+$startDate = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-d', strtotime('-30 days'));
+$endDate = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d');
+
+// Add WHERE clause for date filtering
+$dateFilterClause = " WHERE o.order_date BETWEEN '$startDate 00:00:00' AND '$endDate 23:59:59'";
+
+// Handle Export functionality
+if (isset($_GET['export']) && $_GET['export'] == 'csv') {
+    // Set headers for CSV download
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="market_report_' . $startDate . '_to_' . $endDate . '.csv"');
+    
+    // Create output stream
+    $output = fopen('php://output', 'w');
+    
+    // Add CSV headers
+    fputcsv($output, ['Report Type', 'Category', 'Count', 'Date Range']);
+    
+    // Export Order Summary
+    $orderSummaryQuery = "SELECT order_status, COUNT(*) AS total 
+                          FROM orders 
+                          WHERE order_date BETWEEN '$startDate 00:00:00' AND '$endDate 23:59:59' 
+                          GROUP BY order_status";
+    $orderSummaryStmt = $conn->query($orderSummaryQuery);
+    while ($row = $orderSummaryStmt->fetch(PDO::FETCH_ASSOC)) {
+        fputcsv($output, ['Order', ucfirst($row['order_status']), $row['total'], "$startDate to $endDate"]);
+    }
+    
+    // Export Pickup Summary
+    $pickupSummaryQuery = "SELECT p.pickup_status, COUNT(*) AS total 
+                           FROM pickups p 
+                           JOIN orders o ON p.order_id = o.order_id 
+                           WHERE o.order_date BETWEEN '$startDate 00:00:00' AND '$endDate 23:59:59' 
+                           GROUP BY p.pickup_status";
+    $pickupSummaryStmt = $conn->query($pickupSummaryQuery);
+    while ($row = $pickupSummaryStmt->fetch(PDO::FETCH_ASSOC)) {
+        fputcsv($output, ['Pickup', ucfirst($row['pickup_status']), $row['total'], "$startDate to $endDate"]);
+    }
+    
+    // Export Product Summary
+    $productSummaryQuery = "SELECT status, COUNT(*) AS total 
+                            FROM products 
+                            WHERE created_at BETWEEN '$startDate 00:00:00' AND '$endDate 23:59:59' 
+                            GROUP BY status";
+    $productSummaryStmt = $conn->query($productSummaryQuery);
+    while ($row = $productSummaryStmt->fetch(PDO::FETCH_ASSOC)) {
+        fputcsv($output, ['Product', ucfirst($row['status']), $row['total'], "$startDate to $endDate"]);
+    }
+    
+    // Export Order Details
+    $orderDetailsQuery = "SELECT o.order_id, u.username AS consumer_name, o.order_status, o.order_date,
+                         p.pickup_status, p.pickup_date, SUM(oi.price * oi.quantity) AS order_total 
+                         FROM orders o
+                         JOIN users u ON o.consumer_id = u.user_id
+                         LEFT JOIN pickups p ON o.order_id = p.order_id
+                         LEFT JOIN orderitems oi ON o.order_id = oi.order_id
+                         WHERE o.order_date BETWEEN '$startDate 00:00:00' AND '$endDate 23:59:59'
+                         GROUP BY o.order_id
+                         ORDER BY o.order_date DESC";
+    $orderDetailsStmt = $conn->query($orderDetailsQuery);
+    
+    // Add a separator line
+    fputcsv($output, []);
+    fputcsv($output, ['Detailed Order Report', $startDate, 'to', $endDate]);
+    fputcsv($output, ['Order ID', 'Customer', 'Order Status', 'Order Date', 'Pickup Status', 'Pickup Date', 'Order Total']);
+    
+    while ($row = $orderDetailsStmt->fetch(PDO::FETCH_ASSOC)) {
+        fputcsv($output, [
+            $row['order_id'],
+            $row['consumer_name'],
+            ucfirst($row['order_status']),
+            date("Y-m-d H:i", strtotime($row['order_date'])),
+            ucfirst($row['pickup_status'] ?? 'Not Set'),
+            $row['pickup_date'] ? date("Y-m-d H:i", strtotime($row['pickup_date'])) : 'Not Scheduled',
+            '₱' . number_format($row['order_total'] ?? 0, 2)
+        ]);
+    }
+    
+    // Close the output stream
+    fclose($output);
+    exit;
+}
+
+// Fetch Order Summary - updated to match actual schema
 $orderSummaryQuery = "SELECT order_status, COUNT(*) AS total FROM orders GROUP BY order_status";
 $orderSummaryStmt = $conn->query($orderSummaryQuery);
 $orderSummary = $orderSummaryStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Payment Summary
-$paymentSummaryQuery = "SELECT payment_status, COUNT(*) AS total FROM payments GROUP BY payment_status";
-$paymentSummaryStmt = $conn->query($paymentSummaryQuery);
-$paymentSummary = $paymentSummaryStmt->fetchAll(PDO::FETCH_ASSOC);
+// Fetch Pickup Summary - Updated to use actual pickup_status values
+$pickupSummaryQuery = "SELECT pickup_status, COUNT(*) AS total FROM pickups GROUP BY pickup_status";
+$pickupSummaryStmt = $conn->query($pickupSummaryQuery);
+$pickupSummary = $pickupSummaryStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Product Summary
+// Fetch Product Summary - using actual status values in the products table
 $productSummaryQuery = "SELECT status, COUNT(*) AS total FROM products GROUP BY status";
 $productSummaryStmt = $conn->query($productSummaryQuery);
 $productSummary = $productSummaryStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Recent Orders with driver information based on the actual database schema
+// Fetch Recent Orders with customer and pickup information
 $recentOrdersQuery = "SELECT o.order_id, u.username AS consumer_name, o.order_status, o.order_date, 
-                      p.pickup_id, p.pickup_date, p.pickup_location, p.assigned_to,
-                      u2.first_name AS driver_first_name, u2.last_name AS driver_last_name,
-                      dd.vehicle_type, dd.license_number, dd.vehicle_plate,
-                      p.pickup_notes
+                      p.pickup_id, p.pickup_date, p.office_location AS pickup_location, p.pickup_status,
+                      p.contact_person, p.pickup_notes
                       FROM orders AS o
                       JOIN users AS u ON o.consumer_id = u.user_id
                       LEFT JOIN pickups AS p ON o.order_id = p.order_id
-                      LEFT JOIN users AS u2 ON p.assigned_to = u2.user_id
-                      LEFT JOIN driver_details AS dd ON u2.user_id = dd.user_id
                       ORDER BY o.order_date DESC
                       LIMIT 10";
 $recentOrdersStmt = $conn->query($recentOrdersQuery);
@@ -51,8 +135,18 @@ $pendingOrdersStmt = $conn->query($pendingOrdersQuery);
 $pendingOrders = $pendingOrdersStmt->fetch(PDO::FETCH_ASSOC);
 $pendingOrderCount = $pendingOrders['pending_count'];
 
+// Count today's pickups
+$todayPickupsQuery = "SELECT COUNT(*) AS today_count FROM pickups 
+                      WHERE DATE(pickup_date) = CURDATE()";
+$todayPickupsStmt = $conn->query($todayPickupsQuery);
+$todayPickups = $todayPickupsStmt->fetch(PDO::FETCH_ASSOC);
+$todayPickupCount = $todayPickups['today_count'];
+
 // Handle logout
 if (isset($_POST['logout'])) {
+    if ($manager_user_id) {
+        $log->logActivity($manager_user_id, "Manager logged out");
+    }
     session_unset();
     session_destroy();
     header("Location: manager-login.php");
@@ -85,14 +179,14 @@ if (isset($_POST['logout'])) {
         .card-title {
             font-weight: 600;
             color: #2c3e50;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #f8f9fa;
-            padding-bottom: 10px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #f8f9fa;
+            padding-bottom: 5px;
         }
         .chart-container {
             position: relative;
-            height: 220px;
-            margin-bottom: 15px;
+            height: 120px;
+            margin-bottom: 0;
         }
         .badge-pill {
             font-weight: 600;
@@ -101,6 +195,8 @@ if (isset($_POST['logout'])) {
         .list-group-item {
             border-left: none;
             border-right: none;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.9rem;
         }
         #pendingOrdersBadge {
             position: absolute;
@@ -147,6 +243,90 @@ if (isset($_POST['logout'])) {
             font-weight: 600;
             letter-spacing: -0.5px;
         }
+        .stats-card {
+            border-radius: 8px;
+            padding: 12px;
+            transition: transform 0.3s ease;
+            height: 100%;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        .stats-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .stats-card .icon {
+            font-size: 1.75rem;
+        }
+        .stats-card .count {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 0;
+        }
+        .stats-card .title {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin: 0;
+        }
+        .card-body {
+            padding: 0.75rem;
+        }
+        .list-group {
+            margin-top: 0.5rem !important;
+        }
+        /* New styles for export section */
+        .export-section {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border-left: 4px solid #28a745;
+        }
+        
+        .export-section h5 {
+            font-weight: 600;
+            color: #28a745;
+            margin-bottom: 15px;
+        }
+        
+        .date-picker-container {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .date-picker-container .form-group {
+            margin-bottom: 0;
+            flex-grow: 1;
+            min-width: 140px;
+        }
+        
+        .export-btn {
+            background-color: #28a745;
+            border-color: #28a745;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .export-btn:hover {
+            background-color: #218838;
+            border-color: #1e7e34;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        @media (max-width: 768px) {
+            .date-picker-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .date-picker-container .form-group {
+                margin-bottom: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -158,7 +338,7 @@ if (isset($_POST['logout'])) {
     <div class="container-fluid">
         <div class="row">
             <!-- Include Sidebar -->
-            <?php include '../../views/global/manager-sidebar.php'; ?>
+            <?php include '../global/manager-sidebar.php'; ?>
 
             <!-- Main Content -->
             <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4 py-4">
@@ -175,15 +355,94 @@ if (isset($_POST['logout'])) {
                     <div>
                         <h1 class="h2"><i class="bi bi-bar-chart-line-fill text-success"></i> Reports Overview</h1>
                         <p class="text-muted">View and analyze system performance metrics</p>
-                        <?php if($pendingOrderCount > 0): ?>
-                            <span class="badge badge-danger"><?= $pendingOrderCount ?> pending orders</span>
-                        <?php endif; ?>
+                        <div>
+                            <?php if($pendingOrderCount > 0): ?>
+                                <span class="badge badge-warning"><?= $pendingOrderCount ?> pending orders</span>
+                            <?php endif; ?>
+                            <?php if($todayPickupCount > 0): ?>
+                                <span class="badge badge-info ml-2"><?= $todayPickupCount ?> pickups today</span>
+                            <?php endif; ?>
+                        </div>
                     </div>
                     <form method="POST" onsubmit="return confirm('Are you sure you want to logout?');">
                         <button type="submit" name="logout" class="btn btn-danger">
                             <i class="bi bi-box-arrow-right"></i> Logout
                         </button>
                     </form>
+                </div>
+
+                <!-- New Export Section -->
+                <div class="export-section">
+                    <h5><i class="bi bi-file-earmark-spreadsheet"></i> Generate Report</h5>
+                    <form id="exportForm" method="GET" action="manager-reports.php">
+                        <div class="date-picker-container">
+                            <div class="form-group">
+                                <label for="start_date">Start Date:</label>
+                                <input type="date" class="form-control" id="start_date" name="start_date" 
+                                       value="<?= htmlspecialchars($startDate) ?>" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="end_date">End Date:</label>
+                                <input type="date" class="form-control" id="end_date" name="end_date" 
+                                       value="<?= htmlspecialchars($endDate) ?>" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="report_type">Report Format:</label>
+                                <select class="form-control" id="report_type" name="report_type">
+                                    <option value="csv">CSV (Excel Compatible)</option>
+                                </select>
+                            </div>
+                            <div class="form-group d-flex align-items-end">
+                                <input type="hidden" name="export" value="csv">
+                                <button type="submit" class="btn btn-success export-btn">
+                                    <i class="bi bi-download"></i> Export Report
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Quick Statistics -->
+                <div class="row mb-3">
+                    <div class="col-md-4 mb-3">
+                        <div class="stats-card bg-white">
+                            <div class="d-flex align-items-center">
+                                <div class="icon text-primary mr-3">
+                                    <i class="bi bi-cart-fill"></i>
+                                </div>
+                                <div>
+                                    <p class="title">Total Orders</p>
+                                    <p class="count"><?= array_sum(array_column($orderSummary, 'total')) ?></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="stats-card bg-white">
+                            <div class="d-flex align-items-center">
+                                <div class="icon text-success mr-3">
+                                    <i class="bi bi-truck"></i>
+                                </div>
+                                <div>
+                                    <p class="title">Total Pickups</p>
+                                    <p class="count"><?= array_sum(array_column($pickupSummary, 'total')) ?></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="stats-card bg-white">
+                            <div class="d-flex align-items-center">
+                                <div class="icon text-warning mr-3">
+                                    <i class="bi bi-box-seam"></i>
+                                </div>
+                                <div>
+                                    <p class="title">Total Products</p>
+                                    <p class="count"><?= array_sum(array_column($productSummary, 'total')) ?></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Report Summary -->
@@ -207,7 +466,7 @@ if (isset($_POST['logout'])) {
                                             switch($order['order_status']) {
                                                 case 'pending': $badgeClass = 'warning'; break;
                                                 case 'completed': $badgeClass = 'success'; break;
-                                                case 'cancelled': $badgeClass = 'danger'; break;
+                                                case 'canceled': $badgeClass = 'danger'; break;
                                             }
                                             ?>
                                             <span class="badge badge-<?= $badgeClass ?> badge-pill"><?= $order['total'] ?></span>
@@ -218,30 +477,30 @@ if (isset($_POST['logout'])) {
                         </div>
                     </div>
 
-                    <!-- Payment Summary -->
+                    <!-- Pickup Summary -->
                     <div class="col-md-4 mb-4">
                         <div class="card h-100">
                             <div class="card-body">
                                 <h5 class="card-title d-flex align-items-center">
-                                    <i class="bi bi-credit-card-fill me-2 text-success"></i> Payment Summary
+                                    <i class="bi bi-truck me-2 text-success"></i> Pickup Summary
                                 </h5>
                                 <div class="chart-container">
-                                    <canvas id="paymentChart"></canvas>
+                                    <canvas id="pickupChart"></canvas>
                                 </div>
                                 <ul class="list-group mt-3">
-                                    <?php foreach ($paymentSummary as $payment): ?>
+                                    <?php foreach ($pickupSummary as $pickup): ?>
                                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                                            <?= ucfirst($payment['payment_status']) ?>
+                                            <?= ucfirst($pickup['pickup_status']) ?>
                                             <?php
                                             $badgeClass = 'primary';
-                                            switch($payment['payment_status']) {
-                                                case 'paid': $badgeClass = 'success'; break;
+                                            switch($pickup['pickup_status']) {
                                                 case 'pending': $badgeClass = 'warning'; break;
-                                                case 'failed': $badgeClass = 'danger'; break;
-                                                case 'refunded': $badgeClass = 'info'; break;
+                                                case 'assigned': $badgeClass = 'info'; break;
+                                                case 'completed': $badgeClass = 'success'; break;
+                                                case 'cancelled': $badgeClass = 'danger'; break;
                                             }
                                             ?>
-                                            <span class="badge badge-<?= $badgeClass ?> badge-pill"><?= $payment['total'] ?></span>
+                                            <span class="badge badge-<?= $badgeClass ?> badge-pill"><?= $pickup['total'] ?></span>
                                         </li>
                                     <?php endforeach; ?>
                                 </ul>
@@ -252,7 +511,7 @@ if (isset($_POST['logout'])) {
                     <!-- Product Summary -->
                     <div class="col-md-4 mb-4">
                         <div class="card h-100">
-                            <div class="card-body"> <!-- Fix: Changed from 'card->body' to 'card-body' -->
+                            <div class="card-body">
                                 <h5 class="card-title d-flex align-items-center">
                                     <i class="bi bi-box-seam-fill me-2 text-warning"></i> Product Summary
                                 </h5>
@@ -266,9 +525,9 @@ if (isset($_POST['logout'])) {
                                             <?php
                                             $badgeClass = 'primary';
                                             switch($product['status']) {
-                                                case 'active': $badgeClass = 'success'; break;
-                                                case 'inactive': $badgeClass = 'secondary'; break;
-                                                case 'out_of_stock': $badgeClass = 'danger'; break;
+                                                case 'pending': $badgeClass = 'warning'; break;
+                                                case 'approved': $badgeClass = 'success'; break;
+                                                case 'rejected': $badgeClass = 'danger'; break;
                                             }
                                             ?>
                                             <span class="badge badge-<?= $badgeClass ?> badge-pill"><?= $product['total'] ?></span>
@@ -297,8 +556,9 @@ if (isset($_POST['logout'])) {
                                 <thead class="thead-light">
                                     <tr>
                                         <th>Order ID</th>
-                                        <th>Consumer</th>
-                                        <th>Status</th>
+                                        <th>Customer</th>
+                                        <th>Order Status</th>
+                                        <th>Pickup Status</th>
                                         <th>Order Date</th>
                                         <th>Actions</th>
                                     </tr>
@@ -311,29 +571,41 @@ if (isset($_POST['logout'])) {
                                                 <td><?= htmlspecialchars($order['consumer_name']) ?></td>
                                                 <td>
                                                     <?php
-                                                    $statusClass = 'secondary';
+                                                    $orderStatusClass = 'secondary';
                                                     switch($order['order_status']) {
-                                                        case 'pending': $statusClass = 'warning'; break;
-                                                        case 'completed': $statusClass = 'success'; break;
-                                                        case 'cancelled': $statusClass = 'danger'; break;
-                                                        case 'processing': $statusClass = 'info'; break;
+                                                        case 'pending': $orderStatusClass = 'warning'; break;
+                                                        case 'completed': $orderStatusClass = 'success'; break;
+                                                        case 'canceled': $orderStatusClass = 'danger'; break;
                                                     }
                                                     ?>
-                                                    <span class="badge badge-<?= $statusClass ?>">
+                                                    <span class="badge badge-<?= $orderStatusClass ?>">
                                                         <?= htmlspecialchars(ucfirst($order['order_status'])) ?>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <?php
+                                                    $pickupStatusClass = 'secondary';
+                                                    switch($order['pickup_status'] ?? '') {
+                                                        case 'pending': $pickupStatusClass = 'warning'; break;
+                                                        case 'scheduled': $pickupStatusClass = 'primary'; break;
+                                                        case 'assigned': $pickupStatusClass = 'info'; break;
+                                                        case 'completed': $pickupStatusClass = 'success'; break;
+                                                        case 'cancelled': $pickupStatusClass = 'danger'; break;
+                                                        default: $pickupStatusClass = 'secondary';
+                                                    }
+                                                    ?>
+                                                    <span class="badge badge-<?= $pickupStatusClass ?>">
+                                                        <?= htmlspecialchars(ucfirst($order['pickup_status'] ?? 'Not Set')) ?>
                                                     </span>
                                                 </td>
                                                 <td><?= htmlspecialchars(date("F j, Y, g:i A", strtotime($order['order_date']))) ?></td>
                                                 <td>
                                                     <button type="button" class="btn btn-info btn-sm view-pickup-details-btn"
-                                                            data-pickup-id="<?= htmlspecialchars($order['pickup_id']) ?>"
-                                                            data-pickup-date="<?= htmlspecialchars($order['pickup_date']) ?>"
-                                                            data-pickup-location="<?= htmlspecialchars($order['pickup_location']) ?>"
-                                                            data-assigned-to="<?= htmlspecialchars($order['assigned_to']) ?>"
-                                                            data-driver-name="<?= htmlspecialchars(($order['driver_first_name'] && $order['driver_last_name']) ? $order['driver_first_name'].' '.$order['driver_last_name'] : '') ?>"
-                                                            data-vehicle-type="<?= htmlspecialchars($order['vehicle_type'] ?? '') ?>"
-                                                            data-vehicle-plate="<?= htmlspecialchars($order['vehicle_plate'] ?? '') ?>"
-                                                            data-pickup-notes="<?= htmlspecialchars($order['pickup_notes']) ?>"
+                                                            data-pickup-id="<?= htmlspecialchars($order['pickup_id'] ?? '') ?>"
+                                                            data-pickup-date="<?= htmlspecialchars($order['pickup_date'] ?? '') ?>"
+                                                            data-pickup-location="<?= htmlspecialchars($order['pickup_location'] ?? 'Municipal Agriculture Office') ?>"
+                                                            data-contact-person="<?= htmlspecialchars($order['contact_person'] ?? '') ?>"
+                                                            data-pickup-notes="<?= htmlspecialchars($order['pickup_notes'] ?? '') ?>"
                                                             data-toggle="modal" data-target="#pickupDetailsModal">
                                                         <i class="bi bi-info-circle"></i> View Details
                                                     </button>
@@ -342,7 +614,7 @@ if (isset($_POST['logout'])) {
                                         <?php endforeach; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="5" class="text-center">No recent orders found.</td>
+                                            <td colspan="6" class="text-center">No recent orders found.</td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -372,12 +644,7 @@ if (isset($_POST['logout'])) {
                             <p><strong><i class="bi bi-tag"></i> Pickup ID:</strong> <span id="pickup-id" class="text-primary"></span></p>
                             <p><strong><i class="bi bi-calendar-event"></i> Pickup Date:</strong> <span id="pickup-date"></span></p>
                             <p><strong><i class="bi bi-geo-alt"></i> Pickup Location:</strong> <span id="pickup-location"></span></p>
-                            <div class="driver-info mt-3 mb-3 p-2 border rounded bg-white">
-                                <h6><i class="bi bi-person-badge"></i> Driver Information</h6>
-                                <p><strong>Name:</strong> <span id="driver-name"></span></p>
-                                <p><strong>Vehicle Type:</strong> <span id="vehicle-type"></span></p>
-                                <p><strong>Vehicle Plate:</strong> <span id="vehicle-plate"></span></p>
-                            </div>
+                            <p><strong><i class="bi bi-person"></i> Contact Person:</strong> <span id="contact-person"></span></p>
                             <hr>
                             <p><strong><i class="bi bi-sticky"></i> Pickup Notes:</strong></p>
                             <div id="pickup-notes" class="p-2 border rounded bg-white"></div>
@@ -386,6 +653,9 @@ if (isset($_POST['logout'])) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <a href="manager-pickup-management.php" class="btn btn-primary">
+                        <i class="bi bi-truck"></i> Manage Pickups
+                    </a>
                 </div>
             </div>
         </div>
@@ -443,17 +713,17 @@ if (isset($_POST['logout'])) {
                 }
             }
         });
-
-        // Payment Summary Chart
-        const paymentChartColors = ['#28a745', '#ffc107', '#dc3545', '#17a2b8'];
-        const paymentCtx = document.getElementById('paymentChart').getContext('2d');
-        const paymentChart = new Chart(paymentCtx, {
-            type: 'doughnut',
+        
+        // Pickup Summary Chart
+        const pickupChartColors = ['#ffc107', '#17a2b8', '#28a745', '#dc3545', '#6610f2'];
+        const pickupCtx = document.getElementById('pickupChart').getContext('2d');
+        const pickupChart = new Chart(pickupCtx, {
+            type: 'pie',
             data: {
-                labels: <?= json_encode(array_column($paymentSummary, 'payment_status')) ?>,
+                labels: <?= json_encode(array_column($pickupSummary, 'pickup_status')) ?>,
                 datasets: [{
-                    data: <?= json_encode(array_column($paymentSummary, 'total')) ?>,
-                    backgroundColor: paymentChartColors,
+                    data: <?= json_encode(array_column($pickupSummary, 'total')) ?>,
+                    backgroundColor: pickupChartColors,
                     borderWidth: 1,
                     borderColor: '#fff'
                 }]
@@ -461,7 +731,6 @@ if (isset($_POST['logout'])) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '65%',
                 plugins: {
                     legend: {
                         display: true,
@@ -485,20 +754,19 @@ if (isset($_POST['logout'])) {
                 }
             }
         });
-
+        
         // Product Summary Chart
-        const productChartColors = ['#20c997', '#6f42c1', '#fd7e14', '#17a2b8'];
+        const productChartColors = ['#ffc107', '#28a745', '#dc3545', '#17a2b8', '#6610f2'];
         const productCtx = document.getElementById('productChart').getContext('2d');
         const productChart = new Chart(productCtx, {
-            type: 'bar',
+            type: 'pie',
             data: {
                 labels: <?= json_encode(array_column($productSummary, 'status')) ?>,
                 datasets: [{
-                    label: 'Products',
                     data: <?= json_encode(array_column($productSummary, 'total')) ?>,
                     backgroundColor: productChartColors,
-                    borderRadius: 5,
-                    maxBarThickness: 50
+                    borderWidth: 1,
+                    borderColor: '#fff'
                 }]
             },
             options: {
@@ -506,57 +774,98 @@ if (isset($_POST['logout'])) {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        display: false
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20
+                        }
                     },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                const label = context.dataset.label || '';
-                                return `${label}: ${context.raw}`;
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((acc, val) => acc + val, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} (${percentage}%)`;
                             }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            precision: 0
                         }
                     }
                 }
             }
         });
-
-        // View Pickup Details
-        $(document).ready(function () {
-            $('.view-pickup-details-btn').click(function () {
-                var pickupId = $(this).data('pickup-id');
-                var pickupDate = $(this).data('pickup-date');
-                var pickupLocation = $(this).data('pickup-location');
-                var driverName = $(this).data('driver-name');
-                var vehicleType = $(this).data('vehicle-type');
-                var vehiclePlate = $(this).data('vehicle-plate');
-                var pickupNotes = $(this).data('pickup-notes');
-
-                $('#pickup-id').text(pickupId || 'Not assigned');
-                $('#pickup-date').text(pickupDate ? new Date(pickupDate).toLocaleString() : 'Not scheduled');
-                $('#pickup-location').text(pickupLocation || 'Not specified');
+        
+        // Add validation for date range form
+        document.addEventListener('DOMContentLoaded', function() {
+            const exportForm = document.getElementById('exportForm');
+            const startDateInput = document.getElementById('start_date');
+            const endDateInput = document.getElementById('end_date');
+            
+            exportForm.addEventListener('submit', function(e) {
+                const startDate = new Date(startDateInput.value);
+                const endDate = new Date(endDateInput.value);
+                const today = new Date();
                 
-                // Driver information
-                if (driverName) {
-                    $('#driver-name').text(driverName);
-                    $('#vehicle-type').text(vehicleType || 'Not specified');
-                    $('#vehicle-plate').text(vehiclePlate || 'Not specified');
-                    $('.driver-info').show();
-                } else {
-                    $('#driver-name').text('Not assigned');
-                    $('#vehicle-type').text('N/A');
-                    $('#vehicle-plate').text('N/A');
-                    $('.driver-info').show(); // Still show the section but with N/A values
+                // Clear any previous error messages
+                document.querySelectorAll('.date-error').forEach(el => el.remove());
+                
+                // Validate date range
+                if (startDate > endDate) {
+                    e.preventDefault();
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'alert alert-danger date-error mt-2';
+                    errorMsg.textContent = 'Start date cannot be after end date';
+                    exportForm.appendChild(errorMsg);
+                    return false;
                 }
                 
-                $('#pickup-notes').text(pickupNotes || 'No notes available');
+                // Validate against future dates
+                if (endDate > today) {
+                    e.preventDefault();
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'alert alert-danger date-error mt-2';
+                    errorMsg.textContent = 'End date cannot be in the future';
+                    exportForm.appendChild(errorMsg);
+                    return false;
+                }
+                
+                // Validate range isn't too large (example: limit to 1 year)
+                const oneYearInMs = 365 * 24 * 60 * 60 * 1000;
+                if (endDate - startDate > oneYearInMs) {
+                    e.preventDefault();
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'alert alert-warning date-error mt-2';
+                    errorMsg.textContent = 'Date range exceeds 1 year. Please select a shorter period for best performance.';
+                    exportForm.appendChild(errorMsg);
+                    return false;
+                }
+            });
+        });
+        
+        // Fix the HTML comment in JavaScript context
+        // Modal event handlers for pickup details
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get all buttons that open the pickup details modal
+            const viewDetailsButtons = document.querySelectorAll('.view-pickup-details-btn');
+            
+            // Add click event listener to each button
+            viewDetailsButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // Get data from button attributes
+                    const pickupId = this.getAttribute('data-pickup-id') || 'Not assigned';
+                    const pickupDate = this.getAttribute('data-pickup-date') || 'Not scheduled';
+                    const pickupLocation = this.getAttribute('data-pickup-location') || 'Not specified';
+                    const contactPerson = this.getAttribute('data-contact-person') || 'Not specified';
+                    const pickupNotes = this.getAttribute('data-pickup-notes') || 'No notes available';
+                    
+                    // Set modal content
+                    document.getElementById('pickup-id').textContent = pickupId;
+                    document.getElementById('pickup-date').textContent = pickupDate ? new Date(pickupDate).toLocaleString() : 'Not scheduled';
+                    document.getElementById('pickup-location').textContent = pickupLocation;
+                    document.getElementById('contact-person').textContent = contactPerson;
+                    document.getElementById('pickup-notes').textContent = pickupNotes;
+                });
             });
         });
     </script>

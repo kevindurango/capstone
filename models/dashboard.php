@@ -28,11 +28,16 @@ class Dashboard {
         return $stmt->fetchColumn();
     }
 
-    // Get count of shipping info by status
+    // Get count of shipping info by status - Fixed to use pickups table instead of shippinginfo
     public function getPickupCountByStatus($status) {
-        $stmt = $this->db->prepare("SELECT COUNT(*) FROM shippinginfo WHERE shipping_status = ?");
-        $stmt->execute([$status]);
-        return $stmt->fetchColumn();
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM pickups WHERE pickup_status = ?");
+            $stmt->execute([$status]);
+            return $stmt->fetchColumn();
+        } catch (PDOException $e) {
+            error_log("Error getting pickup count by status: " . $e->getMessage());
+            return 0;
+        }
     }
 
     // Get sales data
@@ -313,6 +318,88 @@ class Dashboard {
         } catch (PDOException $e) {
             error_log("Error getting low stock products: " . $e->getMessage());
             return [];
+        }
+    }
+
+    /**
+     * Get pending pickups with details
+     * @param int $limit Optional number of pickups to retrieve
+     * @return array Array of pending pickups with order details
+     */
+    public function getPendingPickups($limit = 5) {
+        try {
+            $query = "SELECT p.*, o.order_date, u.username as customer_name 
+                     FROM pickups p 
+                     LEFT JOIN orders o ON p.order_id = o.order_id 
+                     LEFT JOIN users u ON o.consumer_id = u.user_id 
+                     WHERE p.pickup_status = 'pending' 
+                     ORDER BY p.pickup_date ASC";
+            
+            if ($limit > 0) {
+                $query .= " LIMIT :limit";
+            }
+            
+            $stmt = $this->db->prepare($query);
+            
+            if ($limit > 0) {
+                $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
+            }
+            
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error in getPendingPickups: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get assigned pickups count
+     * @return int Number of assigned pickups
+     */
+    public function getAssignedPickupsCount() {
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM pickups WHERE pickup_status = 'assigned'");
+            $stmt->execute();
+            return $stmt->fetchColumn();
+        } catch (PDOException $e) {
+            error_log("Error getting assigned pickups count: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Get completed pickups count
+     * @return int Number of completed pickups
+     */
+    public function getCompletedPickupsCount() {
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM pickups WHERE pickup_status = 'completed'");
+            $stmt->execute();
+            return $stmt->fetchColumn();
+        } catch (PDOException $e) {
+            error_log("Error getting completed pickups count: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Get total sales amount from all orders
+     * @return float Total sales amount
+     */
+    public function getTotalSalesAmount() {
+        try {
+            $stmt = $this->db->query("
+                SELECT SUM(oi.price * oi.quantity) as total_sales 
+                FROM orderitems oi 
+                INNER JOIN orders o ON oi.order_id = o.order_id
+            ");
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            return $result['total_sales'] ? floatval($result['total_sales']) : 0;
+        } catch (PDOException $e) {
+            error_log("Error getting total sales amount: " . $e->getMessage());
+            return 0;
         }
     }
 }

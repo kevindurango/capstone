@@ -131,11 +131,7 @@ class User
                 $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
                 $stmt->execute();
                 
-                // Delete pickups assigned to this user (if the user is a driver)
-                $query = "UPDATE pickups SET assigned_to = NULL WHERE assigned_to = :user_id";
-                $stmt = $this->conn->prepare($query);
-                $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
-                $stmt->execute();
+                // Removed driver-related code that was handling pickups
             } catch (PDOException $e) {
                 // Log the error but continue - some tables might not exist or have different structures
                 error_log("Error deleting related records: " . $e->getMessage());

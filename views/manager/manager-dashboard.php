@@ -21,9 +21,21 @@ try {
     $orderCountPending = $dashboard->getOrderCountByStatus('pending');
     $orderCountCompleted = $dashboard->getOrderCountByStatus('completed');
     $orderCountCanceled = $dashboard->getOrderCountByStatus('canceled');
-    $pickupCountPending = $dashboard->getPickupCountByStatus('pending');
-    $pickupCountShipped = $dashboard->getPickupCountByStatus('shipped');
-    $pickupCountDelivered = $dashboard->getPickupCountByStatus('delivered');
+    
+        // Update pickup status counts with proper error handling
+    try {
+        $pickupCountPending = $dashboard->getPickupCountByStatus('pending');
+        $pickupCountAssigned = $dashboard->getPickupCountByStatus('assigned');
+        $pickupCountCompleted = $dashboard->getPickupCountByStatus('completed');
+    } catch (Exception $e) {
+        // Set default values if there's an error
+        $pickupCountPending = 0;
+        $pickupCountAssigned = 0;
+        $pickupCountCompleted = 0;
+        // Don't set dataLoadSuccess to false for this specific error
+        // as we want the page to still function with default values
+        error_log("Error getting pickup counts: " . $e->getMessage());
+    }
 
     // Fetch revenue data with fallbacks
     $totalRevenue = method_exists($dashboard, 'getTotalRevenue') ? $dashboard->getTotalRevenue() : 15820.75;
@@ -34,49 +46,65 @@ try {
     // Get low stock products
     try {
         $lowStockProducts = $dashboard->getLowStockProducts(5);
-    } catch (Error $e) {
+    } catch (Error | Exception $e) {
         $lowStockProducts = [];
     }
 
     // Fetch recent activity with fallback
-    if (method_exists($dashboard, 'getRecentActivity')) {
-        $recentActivities = $dashboard->getRecentActivity(5);
-    } else {
-        // Fallback static activities
+    try {
+        if (method_exists($dashboard, 'getRecentActivity')) {
+            $recentActivities = $dashboard->getRecentActivity(5);
+        } else {
+            throw new Exception("Method not found");
+        }
+    } catch (Exception $e) {
+        // Fallback static activities - updated to match new schema
         $recentActivities = [
             [
                 'type' => 'product',
                 'icon' => 'box-seam',
                 'color' => 'primary',
                 'title' => 'Product inventory updated',
-                'activity' => 'Product inventory was updated', // Add activity field
-                'timestamp' => date('Y-m-d H:i:s', strtotime('-1 hour'))
+                'activity' => 'Product inventory was updated',
+                'date' => date('Y-m-d H:i:s', strtotime('-1 hour'))
             ],
             [
                 'type' => 'order',
                 'icon' => 'cart-check',
                 'color' => 'success',
                 'title' => 'New order received',
-                'activity' => 'New order was received', // Add activity field
+                'activity' => 'New order was received',
                 'status' => 'pending',
-                'timestamp' => date('Y-m-d H:i:s', strtotime('-3 hours'))
+                'date' => date('Y-m-d H:i:s', strtotime('-3 hours'))
             ],
             [
                 'type' => 'pickup',
                 'icon' => 'truck',
                 'color' => 'info',
                 'title' => 'Pickup scheduled',
-                'activity' => 'New pickup was scheduled', // Add activity field
-                'timestamp' => date('Y-m-d H:i:s', strtotime('-5 hours'))
+                'activity' => 'New pickup was scheduled',
+                'date' => date('Y-m-d H:i:s', strtotime('-5 hours'))
             ]
         ];
     }
 } catch (Exception $e) {
     $dataLoadSuccess = false;
     $errorMessage = $e->getMessage();
+    
+    // Set default values for all metrics in case of error
+    $userCount = 0;
+    $productCount = 0;
+    $orderCountPending = 0;
+    $orderCountCompleted = 0;
+    $orderCountCanceled = 0;
+    $pickupCountPending = 0;
+    $pickupCountAssigned = 0;
+    $pickupCountCompleted = 0;
+    $lowStockProducts = [];
+    $recentActivities = [];
 }
 
-// Get current dateS
+// Get current date
 $currentDate = date('l, F j, Y');
 
 // Get time-based greeting
@@ -93,7 +121,26 @@ if (isset($_POST['logout'])) {
 
 // Helper function to format time ago
 function timeAgo($datetime) {
-    // ...existing timeAgo function code...
+    $now = new DateTime();
+    $ago = new DateTime($datetime);
+    $diff = $now->diff($ago);
+    
+    if ($diff->y > 0) {
+        return $diff->y . ' ' . ($diff->y == 1 ? 'year' : 'years') . ' ago';
+    }
+    if ($diff->m > 0) {
+        return $diff->m . ' ' . ($diff->m == 1 ? 'month' : 'months') . ' ago';
+    }
+    if ($diff->d > 0) {
+        return $diff->d . ' ' . ($diff->d == 1 ? 'day' : 'days') . ' ago';
+    }
+    if ($diff->h > 0) {
+        return $diff->h . ' ' . ($diff->h == 1 ? 'hour' : 'hours') . ' ago';
+    }
+    if ($diff->i > 0) {
+        return $diff->i . ' ' . ($diff->i == 1 ? 'minute' : 'minutes') . ' ago';
+    }
+    return 'just now';
 }
 ?>
 <!DOCTYPE html>
@@ -273,7 +320,7 @@ function timeAgo($datetime) {
                             <i class="bi bi-truck text-primary card-icon"></i>
                             <h5 class="card-title">Pending Pickups</h5>
                             <div class="card-value"><?= $pickupCountPending ?></div>
-                            <a href="manager-pickup-management.php" class="btn btn-sm btn-outline-primary mt-2">
+                            <a href="manager-pickup-management.php?filter=pending" class="btn btn-sm btn-outline-primary mt-2">
                                 Manage Pickups <i class="bi bi-arrow-right"></i>
                             </a>
                         </div>
@@ -445,17 +492,18 @@ function timeAgo($datetime) {
             }
         );
 
+        // Update pickup status chart to match the new schema
         const pickupStatusChart = new Chart(
             document.getElementById('pickupStatusChart').getContext('2d'),
             {
                 type: 'pie',
                 data: {
-                    labels: ['Pending', 'Shipped', 'Delivered'],
+                    labels: ['Pending', 'Assigned', 'Completed'],
                     datasets: [{
                         data: [
                             <?= $pickupCountPending ?>,
-                            <?= $pickupCountShipped ?>,
-                            <?= $pickupCountDelivered ?>
+                            <?= $pickupCountAssigned ?>,
+                            <?= $pickupCountCompleted ?>
                         ],
                         backgroundColor: ['#17a2b8', '#fd7e14', '#198754'],
                         borderWidth: 1
