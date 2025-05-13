@@ -22,6 +22,10 @@ export default function AppLayout() {
           </TouchableOpacity>
         ),
       }}
-    />
+    >
+      {/* Define your app screens here */}
+      <Stack.Screen name="index" />
+      {/* Add other app screens as needed */}
+    </Stack>
   );
 }

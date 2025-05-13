@@ -325,12 +325,14 @@ class Product
     public function getAllProductsWithDetails()
     {
         try {
+            // Modified query to use GROUP BY to prevent duplicate products
             $query = "SELECT p.*, u.username as farmer_name, 
                      pc.category_name as category, pcm.category_id 
                      FROM products p 
                      LEFT JOIN users u ON p.farmer_id = u.user_id 
                      LEFT JOIN productcategorymapping pcm ON p.product_id = pcm.product_id 
                      LEFT JOIN productcategories pc ON pcm.category_id = pc.category_id 
+                     GROUP BY p.product_id
                      ORDER BY p.product_id DESC";
 
             $stmt = $this->conn->prepare($query);
@@ -355,6 +357,12 @@ class Product
                         // Set standardized path format
                         $product['image'] = 'uploads/products/' . $filename;
                     }
+                }
+                
+                // Get all categories for this product (since we're only showing one category in the main query)
+                $categories = $this->getProductCategories($product['product_id']);
+                if (!empty($categories)) {
+                    $product['categories'] = $categories;
                 }
             }
 

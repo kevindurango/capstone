@@ -34,6 +34,29 @@ if (!$product) {
     exit;
 }
 
+// Fetch geographic and seasonal data for this product
+$barangayProductData = [];
+try {
+    require_once '../models/Database.php';
+    $database = new Database();
+    $conn = $database->connect();
+    
+    // Get barangay production data
+    $barangayQuery = "SELECT bp.*, b.barangay_name, cs.season_name, cs.start_month, cs.end_month, 
+                      cs.planting_recommendations
+                      FROM barangay_products bp
+                      JOIN barangays b ON bp.barangay_id = b.barangay_id
+                      JOIN crop_seasons cs ON bp.season_id = cs.season_id
+                      WHERE bp.product_id = :product_id
+                      ORDER BY bp.estimated_production DESC";
+    $stmt = $conn->prepare($barangayQuery);
+    $stmt->bindParam(':product_id', $productId, PDO::PARAM_INT);
+    $stmt->execute();
+    $barangayProductData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Error fetching geographic data for product $productId: " . $e->getMessage());
+}
+
 // Create the correct relative path for images
 $imagePath = !empty($product['image']) 
     ? "../../public/" . htmlspecialchars($product['image']) 
@@ -110,6 +133,72 @@ $imagePath = !empty($product['image'])
             <?php endif; ?>
         </div>
     </div>
+    
+    <?php if (!empty($barangayProductData)): ?>
+    <!-- Geographic and Seasonal Information -->
+    <div class="mt-4">
+        <h5 class="border-bottom pb-2"><i class="bi bi-geo-alt"></i> Geographic Information</h5>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Barangay</th>
+                        <th>Season</th>
+                        <th>Production</th>
+                        <th>Planted Area</th>
+                        <th>Yield Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach($barangayProductData as $data): ?>
+                        <?php 
+                        // Calculate yield rate if planted area is available
+                        $yieldRate = (!empty($data['planted_area']) && $data['planted_area'] > 0) 
+                            ? $data['estimated_production'] / $data['planted_area']
+                            : 0;
+                        ?>
+                        <tr>
+                            <td><?= htmlspecialchars($data['barangay_name']) ?></td>
+                            <td>
+                                <span class="badge badge-info">
+                                    <?= htmlspecialchars($data['season_name']) ?>
+                                </span>
+                                <br>
+                                <small class="text-muted">
+                                    Month <?= htmlspecialchars($data['start_month']) ?>-<?= htmlspecialchars($data['end_month']) ?>
+                                </small>
+                            </td>
+                            <td>
+                                <?= number_format($data['estimated_production'], 2) ?>
+                                <span class="unit-badge"><?= htmlspecialchars($data['production_unit']) ?></span>
+                            </td>
+                            <td>
+                                <?= $data['planted_area'] ? number_format($data['planted_area'], 2) : 'N/A' ?>
+                                <span class="unit-badge"><?= htmlspecialchars($data['area_unit'] ?? 'hectare') ?></span>
+                            </td>
+                            <td>
+                                <?php if ($yieldRate > 0): ?>
+                                    <?= number_format($yieldRate, 2) ?>
+                                    <span class="unit-badge"><?= htmlspecialchars($data['production_unit']) ?>/<?= htmlspecialchars($data['area_unit'] ?? 'hectare') ?></span>
+                                <?php else: ?>
+                                    <span class="text-muted">N/A</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Planting Recommendations -->
+        <?php if (!empty($barangayProductData[0]['planting_recommendations'])): ?>
+        <div class="alert alert-info mt-3">
+            <h6><i class="bi bi-info-circle"></i> Planting Recommendations:</h6>
+            <p><?= nl2br(htmlspecialchars($barangayProductData[0]['planting_recommendations'])) ?></p>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
     
     <div class="mt-3 text-right">
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>

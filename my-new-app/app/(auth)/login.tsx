@@ -5,63 +5,80 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  BackHandler,
+  Text,
+  Image,
+  KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Dimensions,
+  StatusBar,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/Colors";
 import { authService } from "@/services/authService";
-import { getApiBaseUrlSync } from "@/services/apiConfig";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  SPACING,
+  BORDER_RADIUS,
+  SHADOWS,
+  UI_STYLES,
+  EXTENDED_COLORS,
+} from "@/constants/styles";
+import Animated, {
+  FadeInDown,
+  FadeInUp,
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  SlideInUp,
+} from "react-native-reanimated";
 
-// Create a simple API service that doesn't depend on external imports
-interface ApiOptions extends RequestInit {
-  headers?: Record<string, string>;
-}
-
-const createApiService = () => ({
-  fetch: async (endpoint: string, options: ApiOptions = {}) => {
-    try {
-      const baseUrl = getApiBaseUrlSync(); // Ensure this always fetches the latest URL
-      const url = `${baseUrl}${endpoint}`;
-
-      console.log("[API] Making request to:", url);
-
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          ...(options.headers || {}),
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("[API] Fetch error:", error);
-      throw error;
-    }
-  },
-});
-
-const apiService = createApiService();
+const { width } = Dimensions.get("window");
 
 export default function LoginScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const { login: authContextLogin, user } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+
+  // Animation values
+  const buttonScale = useSharedValue(1);
+  const buttonAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: buttonScale.value }],
+    };
+  });
 
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
         const isAuthenticated = await authService.isAuthenticated(); // Check if the user is logged in
         if (isAuthenticated) {
-          router.replace("/(tabs)/main"); // Redirect to the main screen
+          // If authenticated, check user role and redirect accordingly
+          const userData = await authService.getUserData();
+          if (userData && userData.role_id === 2) {
+            // If user is a farmer, redirect to farmer dashboard
+            console.log(
+              "[Login] Authenticated farmer detected, redirecting to farmer dashboard"
+            );
+            router.replace("/farmer/dashboard");
+          } else if (userData && userData.role_id !== 2) {
+            // For regular users/consumers
+            console.log(
+              "[Login] Authenticated consumer detected, redirecting to main"
+            );
+            router.replace("/(tabs)/main");
+          } else {
+            console.warn("[Login] User role_id is undefined or invalid");
+          }
         }
       } catch (error) {
         console.error("[Login] Error checking authentication status:", error);
@@ -71,9 +88,72 @@ export default function LoginScreen() {
     checkAuthStatus();
   }, []);
 
+  // Handle back button press to prevent going back to intro screens when logged in
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        if (user) {
+          // Handle redirects without async
+          // Start the redirection process but don't await it
+          authService
+            .getUserData()
+            .then((userData) => {
+              if (userData && userData.role_id === 2) {
+                // If user is a farmer, redirect to farmer dashboard
+                router.replace("/(tabs)/farmer-dashboard");
+              } else {
+                // For regular users/consumers
+                router.replace("/(tabs)/main");
+              }
+            })
+            .catch((error) => {
+              // Fallback to main screen if there's an error
+              console.error("[Login] Error checking user role:", error);
+              router.replace("/(tabs)/main");
+            });
+          return true; // Prevents default back behavior
+        }
+        return false; // Allow default back behavior for guests
+      }
+    );
+
+    return () => backHandler.remove();
+  }, [user, router]);
+
+  // Validate email format
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) {
+      setEmailError("Email is required");
+      return false;
+    } else if (!emailRegex.test(email)) {
+      setEmailError("Please enter a valid email address");
+      return false;
+    }
+    setEmailError("");
+    return true;
+  };
+
+  // Validate password
+  const validatePassword = (password: string) => {
+    if (!password) {
+      setPasswordError("Password is required");
+      return false;
+    } else if (password.length < 6) {
+      setPasswordError("Password should be at least 6 characters");
+      return false;
+    }
+    setPasswordError("");
+    return true;
+  };
+
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Error", "Please enter both email and password");
+    // Validate input fields
+    const isEmailValid = validateEmail(email);
+    const isPasswordValid = validatePassword(password);
+
+    if (!isEmailValid || !isPasswordValid) {
       return;
     }
 
@@ -81,162 +161,390 @@ export default function LoginScreen() {
       setLoading(true);
       console.log("[Login] Starting login process...");
 
-      const response = await apiService.fetch("/login.php", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
+      // Login with credentials - role will be determined by the server based on user_id
+      await authContextLogin({
+        email,
+        password,
       });
+      console.log("[Login] Login successful");
 
-      console.log("[Login] Response:", response);
+      // Check if the user is a farmer and redirect accordingly
+      const userData = await authService.getUserData();
 
-      if (response && response.status === "success") {
-        try {
-          const token = response.token || "dummy_token";
-          const userData = response.user || { email };
-
-          console.log("[Login] Storing auth data:", { token, userData });
-
-          const success = await authService.login(token, userData);
-
-          if (success) {
-            Alert.alert("Success", "Login successful!", [
-              {
-                text: "OK",
-                onPress: () => router.replace("/(tabs)/main"),
-              },
-            ]);
-          } else {
-            throw new Error("Failed to save authentication data");
-          }
-        } catch (storageError) {
-          console.error("[Login] Auth storage error:", storageError);
-          Alert.alert(
-            "Login Error",
-            "Failed to complete login process. Please try again."
-          );
-        }
+      if (userData && userData.role_id === 2) {
+        // If user has farmer role_id, redirect to farmer dashboard
+        console.log("[Login] Farmer detected, redirecting to farmer dashboard");
+        // Replace simple router.replace with more explicit navigation including refresh
+        router.replace({
+          pathname: "/farmer/dashboard",
+          params: { refresh: "true" },
+        });
       } else {
+        // For regular users/consumers, redirect to consumer homepage
+        console.log(
+          "[Login] Consumer detected, redirecting to consumer dashboard"
+        );
+        router.replace({
+          pathname: "/consumer/dashboard",
+          params: { refresh: "true" },
+        });
+      }
+    } catch (error: any) {
+      console.error("[Login] Error:", error);
+
+      // Show appropriate error message based on error details
+      if (error.message?.includes("credentials")) {
         Alert.alert(
           "Login Failed",
-          response?.message || "Invalid credentials. Please try again."
+          "Invalid email or password. Please try again."
+        );
+      } else {
+        Alert.alert(
+          "Login Error",
+          error.message || "Connection error. Please try again later."
         );
       }
-    } catch (error) {
-      console.error("[Login] Error:", error);
-      Alert.alert("Error", "Connection error. Please try again later.");
     } finally {
       setLoading(false);
     }
   };
 
+  const handlePressIn = () => {
+    buttonScale.value = withTiming(0.96, { duration: 100 });
+  };
+
+  const handlePressOut = () => {
+    buttonScale.value = withTiming(1, { duration: 100 });
+  };
+
   return (
-    <LinearGradient colors={COLORS.gradient} style={styles.container}>
-      <View style={styles.formContainer}>
-        <ThemedText style={styles.title}>Login</ThemedText>
-
-        <View style={styles.inputContainer}>
-          <Ionicons name="mail-outline" size={24} color={COLORS.light} />
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={COLORS.muted}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Ionicons name="lock-closed-outline" size={24} color={COLORS.light} />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor={COLORS.muted}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-        </View>
-
-        <TouchableOpacity
-          style={[styles.loginButton, loading && styles.disabledButton]}
-          onPress={handleLogin}
-          disabled={loading}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
+      <LinearGradient colors={[...COLORS.gradient]} style={styles.container}>
+        <Animated.View
+          entering={FadeInDown.delay(200).duration(800)}
+          style={styles.headerContainer}
         >
-          <ThemedText style={styles.buttonText}>
-            {loading ? "Logging in..." : "Login"}
-          </ThemedText>
-        </TouchableOpacity>
+          <ThemedText style={styles.appName}>FarmersMarket</ThemedText>
+        </Animated.View>
 
-        <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
-          <ThemedText style={styles.signupText}>
-            Don't have an account? Sign up
-          </ThemedText>
-        </TouchableOpacity>
+        <Animated.View
+          entering={SlideInUp.springify().damping(15).delay(300)}
+          style={styles.formContainer}
+        >
+          <ThemedText style={styles.title}>Welcome Back</ThemedText>
+          <ThemedText style={styles.subtitle}>Sign in to continue</ThemedText>
 
-        <TouchableOpacity onPress={() => router.back()}>
-          <ThemedText style={styles.backText}>Go Back</ThemedText>
-        </TouchableOpacity>
-      </View>
-    </LinearGradient>
+          <Animated.View entering={FadeInUp.delay(600).duration(500)}>
+            <View style={styles.inputContainer}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="mail-outline" size={20} color={COLORS.light} />
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor={COLORS.muted}
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (emailError) validateEmail(text);
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+            {emailError ? (
+              <Text style={styles.errorText}>{emailError}</Text>
+            ) : null}
+          </Animated.View>
+
+          <Animated.View entering={FadeInUp.delay(700).duration(500)}>
+            <View style={styles.inputContainer}>
+              <View style={styles.iconContainer}>
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={20}
+                  color={COLORS.light}
+                />
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                placeholderTextColor={COLORS.muted}
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (passwordError) validatePassword(text);
+                }}
+                secureTextEntry={!showPassword}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeIconContainer}
+              >
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={COLORS.light}
+                />
+              </TouchableOpacity>
+            </View>
+            {passwordError ? (
+              <Text style={styles.errorText}>{passwordError}</Text>
+            ) : null}
+          </Animated.View>
+
+          <Animated.View
+            entering={FadeInUp.delay(800).duration(500)}
+            style={styles.forgotPassword}
+          >
+            <TouchableOpacity>
+              <ThemedText style={styles.forgotPasswordText}>
+                Forgot Password?
+              </ThemedText>
+            </TouchableOpacity>
+          </Animated.View>
+
+          <Animated.View entering={FadeInUp.delay(900).duration(500)}>
+            {/* Wrap the button animation in its own container to avoid layout animation conflicts */}
+            <Animated.View style={buttonAnimatedStyle}>
+              <TouchableOpacity
+                style={[styles.loginButton, loading && styles.disabledButton]}
+                onPress={handleLogin}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color={COLORS.light} />
+                ) : (
+                  <View style={styles.buttonContent}>
+                    <ThemedText style={styles.buttonText}>Login</ThemedText>
+                    <Ionicons
+                      name="arrow-forward-outline"
+                      size={20}
+                      color={COLORS.light}
+                    />
+                  </View>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+          </Animated.View>
+
+          {/* New Register Button */}
+          <Animated.View
+            entering={FadeInUp.delay(950).duration(500)}
+            style={styles.registerButtonContainer}
+          >
+            <TouchableOpacity
+              style={styles.registerButton}
+              onPress={() => router.push("/(auth)/register")}
+            >
+              <View style={styles.buttonContent}>
+                <Ionicons
+                  name="person-add-outline"
+                  size={18}
+                  color={COLORS.light}
+                />
+                <ThemedText style={styles.registerButtonText}>
+                  Create New Account
+                </ThemedText>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+
+          <View style={styles.footerContainer}>
+            <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
+              <ThemedText style={styles.signupText}>
+                Don't have an account?{" "}
+                <Text style={styles.signupTextBold}>Sign up</Text>
+              </ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => router.push("/")}
+              style={styles.backButton}
+            >
+              <Ionicons
+                name="arrow-back-outline"
+                size={18}
+                color={COLORS.light}
+              />
+              <ThemedText style={styles.backText}>Back to Intro</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </LinearGradient>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+  },
+  headerContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: Platform.OS === "ios" ? 70 : 60,
+    paddingBottom: SPACING.lg,
+    width: "100%", // Ensure the container takes full width
+    paddingHorizontal: 20, // Add horizontal padding
+  },
+  appName: {
+    fontSize: 25, // Slightly reduce font size to prevent truncation
+    fontWeight: "800",
+    color: COLORS.light,
+    textShadowColor: "rgba(0, 0, 0, 0.6)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4, // Reduce shadow radius
+    includeFontPadding: false, // Prevent Android text cutoff
+    textAlign: "center", // Ensure text is centered
   },
   formContainer: {
     flex: 1,
-    justifyContent: "center",
-    padding: 20,
+    justifyContent: "flex-start",
+    paddingHorizontal: SPACING.horizontalPadding,
+    paddingTop: SPACING.lg,
+    borderTopLeftRadius: BORDER_RADIUS.xl,
+    borderTopRightRadius: BORDER_RADIUS.xl,
+    backgroundColor: "rgba(255, 255, 255, 0.07)",
+    ...SHADOWS.medium,
   },
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
+    fontSize: 20, // Reduced from 32 to ensure no truncation
+    fontWeight: "800",
     color: COLORS.light,
-    marginBottom: 40,
-    textAlign: "center",
+    marginBottom: SPACING.sm,
+    textAlign: "left",
+    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    includeFontPadding: false, // Prevent Android text cutoff
+  },
+  subtitle: {
+    fontSize: 16, // Reduced from 18 to ensure visibility
+    color: COLORS.light,
+    marginBottom: SPACING.xl,
+    textAlign: "left",
+    opacity: 0.9,
+    includeFontPadding: false, // Prevent Android text cutoff
   },
   inputContainer: {
-    flexDirection: "row",
+    ...UI_STYLES.inputContainer,
+    marginBottom: SPACING.xs,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: BORDER_RADIUS.md,
+    height: 56,
+  },
+  iconContainer: {
+    paddingHorizontal: SPACING.md,
+    justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 10,
-    marginBottom: 15,
-    paddingHorizontal: 15,
   },
   input: {
     flex: 1,
-    paddingVertical: 15,
-    paddingHorizontal: 10,
     color: COLORS.light,
     fontSize: 16,
+    paddingVertical: SPACING.md,
+  },
+  eyeIconContainer: {
+    paddingHorizontal: SPACING.md,
+    height: "100%",
+    justifyContent: "center",
+  },
+  errorText: {
+    color: EXTENDED_COLORS.error,
+    fontSize: 12,
+    marginLeft: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  forgotPassword: {
+    alignSelf: "flex-end",
+    marginVertical: SPACING.md,
+  },
+  forgotPasswordText: {
+    color: COLORS.accent,
+    fontSize: 14,
   },
   loginButton: {
+    ...UI_STYLES.button,
     backgroundColor: COLORS.accent,
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 20,
+    height: 56,
+    borderRadius: BORDER_RADIUS.md,
+    ...SHADOWS.medium,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   buttonText: {
     color: COLORS.light,
     textAlign: "center",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  backText: {
-    color: COLORS.light,
-    textAlign: "center",
-    marginTop: 20,
+    fontSize: 16,
+    fontWeight: "600",
+    marginRight: SPACING.sm,
   },
   disabledButton: {
     opacity: 0.7,
   },
+  registerButtonContainer: {
+    marginTop: SPACING.md,
+  },
+  registerButton: {
+    ...UI_STYLES.button,
+    backgroundColor: COLORS.primary,
+    height: 56,
+    borderRadius: BORDER_RADIUS.md,
+    ...SHADOWS.medium,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  registerButtonText: {
+    color: COLORS.light,
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: SPACING.sm,
+  },
+  footerContainer: {
+    marginTop: "auto",
+    paddingVertical: SPACING.xl,
+  },
   signupText: {
     color: COLORS.light,
     textAlign: "center",
-    marginTop: 20,
+    fontSize: 15,
+  },
+  signupTextBold: {
+    fontWeight: "700",
+    color: COLORS.accent,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: SPACING.lg,
+  },
+  backText: {
+    color: COLORS.light,
+    marginLeft: SPACING.xs,
+    fontSize: 14,
   },
 });

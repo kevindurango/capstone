@@ -59,6 +59,12 @@ foreach ($filteredProducts as $product):
                     title="Update Status">
                 <i class="bi bi-arrow-up-circle"></i>
             </button>
+            <button class="btn btn-sm btn-primary manage-planted-area" 
+                    data-id="<?= $product['product_id'] ?>"
+                    data-name="<?= htmlspecialchars($product['name']) ?>"
+                    title="Manage Planted Area">
+                <i class="bi bi-geo-alt"></i>
+            </button>
         </div>
     </td>
 </tr>

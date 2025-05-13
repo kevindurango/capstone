@@ -115,10 +115,12 @@ $totalOrders = 0;
 
 // Fetch Orders with Pagination and Search
 $query = "SELECT o.order_id, u.username AS consumer_name, o.order_status, o.order_date,
-                p.pickup_id, p.pickup_date, p.pickup_location, p.pickup_notes
+                p.pickup_id, p.pickup_date, p.pickup_location, p.pickup_notes,
+                pm.payment_id, pm.payment_status, pm.payment_date, pm.amount
           FROM orders AS o
           JOIN users AS u ON o.consumer_id = u.user_id
-          LEFT JOIN pickups AS p ON o.order_id = p.order_id";
+          LEFT JOIN pickups AS p ON o.order_id = p.order_id
+          LEFT JOIN payments AS pm ON o.order_id = pm.order_id";
 
 $whereClauses = [];
 $queryParams = [];
@@ -132,7 +134,7 @@ if (!empty($whereClauses)) {
     $query .= " WHERE " . implode(" AND ", $whereClauses);
 }
 
-$query .= " ORDER BY o.order_date DESC LIMIT :limit OFFSET :offset";
+$query = $query . " ORDER BY o.order_date DESC LIMIT :limit OFFSET :offset";
 
 // Count Query
 $countQuery = "SELECT COUNT(o.order_id) AS total FROM orders AS o JOIN users AS u ON o.consumer_id = u.user_id";
@@ -611,7 +613,7 @@ $todayCount = count($todayOrders);
                 
                 // Fetch order details via AJAX
                 $.ajax({
-                    url: 'get-order-details.php',
+                    url: '../../ajax/get-order-details.php',
                     type: 'GET',
                     data: { order_id: orderId },
                     dataType: 'json',
@@ -680,6 +682,60 @@ $todayCount = count($todayOrders);
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Payment Information -->
+                                <div class="card mb-4 border-left-purple shadow-sm">
+                                    <div class="card-header bg-gradient-purple text-white">
+                                        <i class="bi bi-credit-card mr-2"></i> Payment Information
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="info-item">
+                                                    <span class="info-label"><i class="bi bi-check-circle mr-2"></i>Status:</span>
+                                                    <span class="badge badge-${
+                                                        response.payment.status === 'completed' ? 'success' : 
+                                                        (response.payment.status === 'pending' ? 'warning' : 
+                                                        (response.payment.status === 'failed' ? 'danger' : 'secondary'))
+                                                    } badge-pill px-3 py-2">
+                                                        ${response.payment.status === 'not_processed' ? 'NOT PROCESSED' : response.payment.status.toUpperCase()}
+                                                    </span>
+                                                </div>
+                                                <div class="info-item">
+                                                    <span class="info-label"><i class="bi bi-wallet2 mr-2"></i>Method:</span>
+                                                    <span class="info-value font-weight-bold">${
+                                                        response.payment.method === 'credit_card' ? '<i class="bi bi-credit-card mr-1"></i> Credit Card' :
+                                                        response.payment.method === 'paypal' ? '<i class="bi bi-paypal mr-1"></i> PayPal' :
+                                                        response.payment.method === 'bank_transfer' ? '<i class="bi bi-bank mr-1"></i> Bank Transfer' :
+                                                        response.payment.method === 'cash_on_pickup' ? '<i class="bi bi-cash mr-1"></i> Cash on Pickup' :
+                                                        response.payment.method
+                                                    }</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                ${response.payment.date ? `
+                                                <div class="info-item">
+                                                    <span class="info-label"><i class="bi bi-calendar mr-2"></i>Date:</span>
+                                                    <span class="info-value">${new Date(response.payment.date).toLocaleString()}</span>
+                                                </div>` : ''}
+                                                ${response.payment.amount ? `
+                                                <div class="info-item">
+                                                    <span class="info-label"><i class="bi bi-cash-stack mr-2"></i>Amount:</span>
+                                                    <span class="info-value">₱${parseFloat(response.payment.amount).toFixed(2)}</span>
+                                                </div>` : ''}
+                                                ${response.payment.transaction_reference ? `
+                                                <div class="info-item">
+                                                    <span class="info-label"><i class="bi bi-hash mr-2"></i>Ref:</span>
+                                                    <span class="info-value font-monospace">${response.payment.transaction_reference}</span>
+                                                </div>` : ''}
+                                            </div>
+                                        </div>
+                                        ${response.payment.payment_notes ? `
+                                        <div class="mt-3 p-2 bg-light rounded">
+                                            <small class="text-muted"><i class="bi bi-info-circle mr-1"></i> Notes: ${response.payment.payment_notes}</small>
+                                        </div>` : ''}
                                     </div>
                                 </div>`;
                                 
@@ -795,6 +851,9 @@ $todayCount = count($todayOrders);
                                 .border-left-warning {
                                     border-left: 4px solid #f6c23e !important;
                                 }
+                                .border-left-purple {
+                                    border-left: 4px solid #7b4ea8 !important;
+                                }
                                 .bg-gradient-primary {
                                     background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
                                 }
@@ -806,6 +865,10 @@ $todayCount = count($todayOrders);
                                 }
                                 .bg-gradient-warning {
                                     background: linear-gradient(135deg, #f6c23e 0%, #dda20a 100%);
+                                }
+                                .bg-gradient-purple {
+                                    background: linear-gradient(135deg, #7b4ea8 0%, #5b3b7e 100%);
+                                    color: #fff;
                                 }
                                 .info-item {
                                     margin-bottom: 12px;
@@ -819,6 +882,8 @@ $todayCount = count($todayOrders);
                                 }
                                 .info-value {
                                     flex: 1;
+                                    color: #212529;
+                                    font-weight: 500;
                                 }
                                 .notes-text {
                                     font-style: italic;
@@ -832,6 +897,8 @@ $todayCount = count($todayOrders);
                                     display: inline-block;
                                     min-width: 200px;
                                     text-align: right;
+                                    background-color: #f8f9fa;
+                                    border-left: 4px solid #28a745;
                                 }
                                 .total-label {
                                     font-weight: 500;
@@ -848,6 +915,7 @@ $todayCount = count($todayOrders);
                                     border-radius: 0.5rem;
                                     overflow: hidden;
                                     transition: transform 0.2s, box-shadow 0.2s;
+                                    margin-bottom: 1.5rem;
                                 }
                                 .card:hover {
                                     transform: translateY(-3px);
@@ -859,6 +927,49 @@ $todayCount = count($todayOrders);
                                 }
                                 table.table td, table.table th {
                                     vertical-align: middle;
+                                }
+                                .badge {
+                                    padding: 0.5em 0.85em;
+                                    font-size: 0.85em;
+                                    font-weight: 600;
+                                }
+                                .badge-pill {
+                                    border-radius: 50rem;
+                                }
+                                .badge-success {
+                                    background-color: #2ecc71;
+                                    color: white;
+                                }
+                                .badge-warning {
+                                    background-color: #f39c12;
+                                    color: #212529;
+                                }
+                                .badge-danger {
+                                    background-color: #e74c3c;
+                                    color: white;
+                                }
+                                .badge-secondary {
+                                    background-color: #6c757d;
+                                    color: white;
+                                }
+                                /* Improved styles for the payment information section */
+                                .bg-light {
+                                    background-color: #f1f3f5 !important;
+                                }
+                                .font-monospace {
+                                    font-family: monospace;
+                                    letter-spacing: 0.5px;
+                                    color: #212529 !important;
+                                    background-color: #e9ecef;
+                                    padding: 2px 4px;
+                                    border-radius: 3px;
+                                }
+                                .text-muted {
+                                    color: #495057 !important;
+                                }
+                                /* Add a light background to the payment card body for better contrast */
+                                .border-left-purple .card-body {
+                                    background-color: #f8f5ff;
                                 }
                             `)
                             .appendTo('head');

@@ -46,7 +46,7 @@ try {
     sendErrorResponse("Database connection error. Please check server logs.");
 }
 
-error_log("[DEBUG] Starting market products fetch");
+error_log("[DEBUG] Starting market request processing");
 
 try {
     // Check if database connection is established properly
@@ -54,7 +54,47 @@ try {
         error_log("[ERROR] Database connection failed: " . ($conn->connect_error ?? "Connection not established"));
         sendErrorResponse("Database connection error. Please check server logs.");
     }
+    
+    // Check if this is a categories request
+    if (isset($_GET['categories']) && $_GET['categories'] === 'true') {
+        error_log("[DEBUG] Fetching product categories");
+        
+        // Query to get all product categories
+        $query = "SELECT category_id, category_name FROM productcategories ORDER BY category_name";
+        
+        $stmt = $conn->prepare($query);
+        if (!$stmt) {
+            error_log("[ERROR] Categories query preparation failed: " . $conn->error);
+            sendErrorResponse("Failed to prepare categories query. Check server logs.");
+        }
+        
+        if (!$stmt->execute()) {
+            error_log("[ERROR] Categories query execution failed: " . $stmt->error);
+            sendErrorResponse("Failed to execute categories query. Check server logs.");
+        }
+        
+        $result = $stmt->get_result();
+        
+        $categories = [];
+        while ($row = $result->fetch_assoc()) {
+            $categories[] = [
+                'category_id' => (int)$row['category_id'],
+                'category_name' => $row['category_name']
+            ];
+        }
+        
+        // Return categories
+        echo json_encode([
+            'success' => true,
+            'message' => 'Categories retrieved successfully',
+            'categories' => $categories
+        ]);
+        
+        ob_end_flush();
+        exit();
+    }
 
+    // Rest of the existing code for products...
     // Get query parameters
     $category = isset($_GET['category']) ? $_GET['category'] : null;
     $search = isset($_GET['search']) ? $_GET['search'] : null;
@@ -65,19 +105,22 @@ try {
               ", search: " . ($search ?? "null") . 
               ", limit: $limit, offset: $offset");
     
-    // Update the query to include category filtering
-    $query = "SELECT p.*, 
+    // Update the query to include category filtering and prevent duplicates
+    $query = "SELECT DISTINCT p.*, 
                      fd.farm_name, 
                      u.first_name, 
                      u.last_name, 
-                     u.contact_number, 
-                     pc.category_name AS category
+                     u.contact_number,
+                     GROUP_CONCAT(DISTINCT pc.category_name SEPARATOR ', ') AS category
               FROM products p
               LEFT JOIN users u ON p.farmer_id = u.user_id
               LEFT JOIN farmer_details fd ON u.user_id = fd.user_id
               LEFT JOIN productcategorymapping pcm ON p.product_id = pcm.product_id
               LEFT JOIN productcategories pc ON pcm.category_id = pc.category_id
               WHERE 1=1";
+    
+    // Always use GROUP BY to prevent duplicates
+    $useGroupBy = true;
     
     $params = [];
     $types = "";
@@ -91,6 +134,7 @@ try {
         $query .= " AND pc.category_name = ?";
         $params[] = $category;
         $types .= "s";
+        $useGroupBy = true;
     }
     
     // Add search filter if provided
@@ -100,6 +144,11 @@ try {
         $params[] = $searchTerm;
         $params[] = $searchTerm;
         $types .= "ss";
+    }
+    
+    // Add GROUP BY if filtering by category to prevent duplicates
+    if ($useGroupBy) {
+        $query .= " GROUP BY p.product_id";
     }
     
     // Add ordering and pagination - note: we need to handle if the created_at column exists
@@ -156,11 +205,11 @@ try {
         $farmerName = trim("$firstName $lastName") ?: 'Unknown Farmer';
         $contact = isset($row['contact_number']) ? $row['contact_number'] : 'No contact provided';
         
-        // Get actual column for stock quantity
+        // Get stock quantity from the stock column
         $quantity = isset($row['stock']) ? (int)$row['stock'] : 0;
         
-        // Get unit or provide default
-        $unit = isset($row['unit']) ? $row['unit'] : 'item';
+        // Get unit from unit_type column (renamed from unit in the database)
+        $unit = isset($row['unit_type']) ? $row['unit_type'] : 'piece';
         
         // Handle image URL with dynamic base URL
         $imageUrl = null;
@@ -172,6 +221,9 @@ try {
             // Normalize the image path
             if (strpos($image, 'uploads/') === 0) {
                 // Image path already starts with uploads/
+                $imagePath = $image;
+            } elseif (strpos($image, 'products/') === 0 || strpos($image, 'uploads/products/') === 0) {
+                // Handle paths like uploads/products/... or products/...
                 $imagePath = $image;
             } elseif (strpos($image, '/') === false) {
                 // Image is just a filename, prefix with uploads/
@@ -217,8 +269,13 @@ try {
     }
     
     // Get total count for pagination
-    $countQuery = preg_replace('/SELECT p\.\*, fd\.farm_name, u\.first_name, u\.last_name, u\.contact_number, pc\.category_name AS category/i', 'SELECT COUNT(*) as total', $query);
+    $countQuery = preg_replace('/SELECT p\.\*, fd\.farm_name, u\.first_name, u\.last_name, u\.contact_number, pc\.category_name AS category/i', 'SELECT COUNT(DISTINCT p.product_id) as total', $query);
     $countQuery = preg_replace('/ORDER BY.*$/i', '', $countQuery);
+    
+    // If we're using GROUP BY, modify the count query appropriately
+    if ($useGroupBy) {
+        $countQuery = preg_replace('/GROUP BY p\.product_id/i', '', $countQuery);
+    }
     
     error_log("[DEBUG] Count query: $countQuery");
     

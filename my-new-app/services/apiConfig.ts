@@ -1,163 +1,168 @@
-import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
+import { Platform } from "react-native";
+import {
+  API_BASE_URL as DEFAULT_API_URL,
+  LOCAL_IP_ADDRESS,
+} from "@/constants/IPConfig";
 
-// Storage keys
-const NGROK_URL_STORAGE_KEY = "@FarmersMarket:ngrokUrl";
-const LOCAL_IP_STORAGE_KEY = "@FarmersMarket:localIpAddress";
+// Debug variable to enable verbose API URL logging
+const DEBUG_API_URLS = true;
 
-// Default values
-const DEFAULT_LOCAL_IP = "192.168.1.11"; // Default local IP address
+// Storage key for API base URL
+const API_URL_STORAGE_KEY = "@farmers_market_api_url";
 
-// Function to set the ngrok URL
-export const setNgrokUrl = async (url: string) => {
-  if (!url.trim()) return false;
+// Default API base URLs
+let API_BASE_URL = ""; // This will be set during initialization
+
+/**
+ * Initialize the API URL with platform-aware settings
+ */
+const initializeApiUrl = async () => {
   try {
-    await AsyncStorage.setItem(NGROK_URL_STORAGE_KEY, url);
-    console.log(`Ngrok URL set to: ${url}`);
-    return true;
-  } catch (error) {
-    console.error("Failed to save ngrok URL:", error);
-    return false;
-  }
-};
+    // Check if we have a stored URL first
+    const storedUrl = await AsyncStorage.getItem(API_URL_STORAGE_KEY);
 
-// Function to get the stored ngrok URL
-export const getNgrokUrl = async (): Promise<string | null> => {
-  try {
-    return await AsyncStorage.getItem(NGROK_URL_STORAGE_KEY);
-  } catch (error) {
-    console.error("Failed to get ngrok URL:", error);
-    return null;
-  }
-};
-
-// New function to set local IP address
-export const setLocalIpAddress = async (ipAddress: string) => {
-  if (!ipAddress.trim()) return false;
-  try {
-    await AsyncStorage.setItem(LOCAL_IP_STORAGE_KEY, ipAddress);
-    console.log(`Local IP address set to: ${ipAddress}`);
-    return true;
-  } catch (error) {
-    console.error("Failed to save local IP address:", error);
-    return false;
-  }
-};
-
-// New function to get the stored local IP address
-export const getLocalIpAddress = async (): Promise<string> => {
-  try {
-    const storedIp = await AsyncStorage.getItem(LOCAL_IP_STORAGE_KEY);
-    return storedIp || DEFAULT_LOCAL_IP;
-  } catch (error) {
-    console.error("Failed to get local IP address:", error);
-    return DEFAULT_LOCAL_IP;
-  }
-};
-
-// Check if a URL is accessible (for ngrok health check)
-export const isUrlAccessible = async (
-  url: string,
-  timeout = 3000
-): Promise<boolean> => {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-    const response = await fetch(url, {
-      method: "HEAD",
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-    return response.ok;
-  } catch (error) {
-    console.log(`URL accessibility check failed for ${url}:`, error);
-    return false;
-  }
-};
-
-// Modified API base URL function to prioritize local IP by default
-export const getApiBaseUrlSync = () => {
-  if (Platform.OS === "web") {
-    return "http://localhost/capstone/my-new-app/api";
-  } else {
-    // For mobile devices using Expo
-    const localIp = global.localIpAddress || DEFAULT_LOCAL_IP;
-
-    // Path configurations
-    const localPath = "/capstone/my-new-app/api"; // Path for local IP
-    const ngrokPath = "/capstone/my-new-app/api"; // Full path for ngrok
-
-    // CHANGED: Prioritize local IP by default
-    // Only use ngrok if explicitly requested by setting useNgrok to true
-    const useNgrok = global.useNgrok === true && global.ngrokUrl;
-
-    if (useNgrok) {
-      console.log(`Using ngrok URL: ${global.ngrokUrl}${ngrokPath}`);
-      return `${global.ngrokUrl}${ngrokPath}`;
+    if (storedUrl) {
+      API_BASE_URL = storedUrl;
+      logDebug("[Config] Using stored API URL:", API_BASE_URL);
+      return;
     }
 
-    console.log(`Using local IP: http://${localIp}${localPath}`);
-    return `http://${localIp}${localPath}`;
-  }
-};
-
-// Async version with modified priorities
-export const getApiBaseUrl = async () => {
-  if (Platform.OS === "web") {
-    return "http://localhost/capstone/my-new-app/api";
-  } else {
-    const apiPath = "/capstone/my-new-app/api";
-
-    // Get stored values
-    const ngrokUrl = await getNgrokUrl();
-    const localIp = await getLocalIpAddress();
-    const useNgrok =
-      (await AsyncStorage.getItem("@FarmersMarket:useNgrok")) === "true";
-
-    // Set global values for sync access
-    global.localIpAddress = localIp;
-    global.ngrokUrl = ngrokUrl;
-    global.useNgrok = useNgrok;
-
-    // Use ngrok only if explicitly enabled and available
-    if (useNgrok && ngrokUrl) {
-      // Test if ngrok is accessible
-      const testUrl = `${ngrokUrl}/ping.php`;
-      try {
-        const isNgrokAccessible = await isUrlAccessible(testUrl);
-        if (isNgrokAccessible) {
-          console.log(`Ngrok URL is accessible: ${ngrokUrl}`);
-          return `${ngrokUrl}${apiPath}`;
-        } else {
-          console.log(
-            `Ngrok URL is not accessible, falling back to local IP: ${localIp}`
-          );
-        }
-      } catch (error) {
-        console.log("Error checking ngrok accessibility:", error);
+    // No stored URL, determine based on platform
+    if (Platform.OS === "web") {
+      // Web can use localhost
+      API_BASE_URL = "http://localhost/capstone/my-new-app/api";
+      logDebug("[Config] Web platform detected, using localhost");
+    } else if (Platform.OS === "ios") {
+      // iOS simulator can sometimes use localhost, but real devices need IP
+      const netInfo = await NetInfo.fetch();
+      // Check if running in iOS simulator
+      if (
+        __DEV__ &&
+        Platform.OS === "ios" &&
+        !Platform.isPad &&
+        !Platform.isTV &&
+        Platform.constants.systemName.toLowerCase().includes("simulator")
+      ) {
+        API_BASE_URL = "http://localhost/capstone/my-new-app/api";
+        logDebug("[Config] iOS simulator detected, using localhost");
+      } else {
+        API_BASE_URL = `http://${LOCAL_IP_ADDRESS}/capstone/my-new-app/api`;
+        logDebug(
+          "[Config] iOS device detected, using IP address:",
+          LOCAL_IP_ADDRESS
+        );
       }
+    } else {
+      // Android always needs the real IP address
+      API_BASE_URL = `http://${LOCAL_IP_ADDRESS}/capstone/my-new-app/api`;
+      logDebug(
+        "[Config] Android detected, using IP address:",
+        LOCAL_IP_ADDRESS
+      );
     }
+  } catch (error) {
+    console.error("[Config] Error initializing API URL:", error);
+    // Fallback to the default from IPConfig.js
+    API_BASE_URL = DEFAULT_API_URL;
+    logDebug("[Config] Using fallback API URL:", API_BASE_URL);
+  }
 
-    // Default to local IP
-    console.log(`Using local IP: http://${localIp}${apiPath}`);
-    return `http://${localIp}${apiPath}`;
+  // Double-check that API_BASE_URL actually has a value
+  if (!API_BASE_URL) {
+    logDebug("[Config] API_BASE_URL is empty, using default from IPConfig");
+    API_BASE_URL = DEFAULT_API_URL;
+  }
+
+  // Log the final selected URL - always show this message
+  console.log("[API Config] Final API URL:", API_BASE_URL);
+};
+
+// Helper function for conditional debug logging
+function logDebug(message: string, ...args: any[]) {
+  if (DEBUG_API_URLS) {
+    console.log(message, ...args);
+  }
+}
+
+// Initialize URL when this module is imported
+initializeApiUrl();
+
+/**
+ * Get the API base URL synchronously
+ * @returns {string} Current API base URL
+ */
+export const getApiBaseUrlSync = (): string => {
+  // Extra safety check to prevent empty URLs
+  if (!API_BASE_URL) {
+    if (Platform.OS === "web") {
+      return "http://localhost/capstone/my-new-app/api";
+    } else {
+      return `http://${LOCAL_IP_ADDRESS}/capstone/my-new-app/api`;
+    }
+  }
+  return API_BASE_URL;
+};
+
+/**
+ * Get the API base URL asynchronously from storage
+ * @returns {Promise<string>} API base URL from storage or default
+ */
+export const getApiBaseUrl = async (): Promise<string> => {
+  try {
+    const storedUrl = await AsyncStorage.getItem(API_URL_STORAGE_KEY);
+    if (storedUrl) {
+      API_BASE_URL = storedUrl;
+    }
+    return API_BASE_URL;
+  } catch (error) {
+    console.error("[API Config] Error retrieving API URL:", error);
+    return API_BASE_URL;
   }
 };
 
-// New function to set whether to use ngrok
-export const setUseNgrok = async (use: boolean) => {
-  try {
-    global.useNgrok = use;
-    await AsyncStorage.setItem(
-      "@FarmersMarket:useNgrok",
-      use ? "true" : "false"
-    );
-    console.log(`Use ngrok set to: ${use}`);
-    return true;
-  } catch (error) {
-    console.error("Failed to save ngrok preference:", error);
-    return false;
+/**
+ * Set the API base URL and store it in AsyncStorage
+ * @param {string} url - New API base URL to set
+ * @returns {Promise<void>}
+ */
+export const setApiBaseUrl = async (url: string): Promise<void> => {
+  if (!url) {
+    throw new Error("API URL cannot be empty");
   }
+
+  try {
+    API_BASE_URL = url;
+    await AsyncStorage.setItem(API_URL_STORAGE_KEY, url);
+    console.log("[API Config] API URL set to:", url);
+  } catch (error) {
+    console.error("[API Config] Error storing API URL:", error);
+    throw error;
+  }
+};
+
+/**
+ * Clear the stored API URL from AsyncStorage and reset to default
+ * @returns {Promise<string>} The new default API base URL
+ */
+export const resetApiUrl = async (): Promise<string> => {
+  try {
+    console.log("[API Config] Resetting API URL to default");
+    await AsyncStorage.removeItem(API_URL_STORAGE_KEY);
+    // Set to the current local IP (updated in this file)
+    API_BASE_URL = `http://${LOCAL_IP_ADDRESS}/capstone/my-new-app/api`;
+    console.log("[API Config] API URL reset to:", API_BASE_URL);
+    return API_BASE_URL;
+  } catch (error) {
+    console.error("[API Config] Error resetting API URL:", error);
+    throw error;
+  }
+};
+
+export default {
+  getApiBaseUrl,
+  setApiBaseUrl,
+  getApiBaseUrlSync,
+  resetApiUrl,
 };

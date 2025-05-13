@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  BackHandler,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
@@ -17,13 +18,43 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { COLORS } from "@/constants/Colors";
+import { useAuth } from "@/contexts/AuthContext";
 
 const { width, height } = Dimensions.get("window");
 
 export default function AuthScreen() {
   const router = useRouter();
+  const { user, isLoading } = useAuth();
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(50);
+
+  // Check if user is already authenticated and skip auth screen
+  useEffect(() => {
+    if (!isLoading && user) {
+      console.log(
+        "[Navigation] User already logged in, redirecting from auth screen to main"
+      );
+      // Replace navigation to eliminate this screen from history
+      router.replace("/(tabs)/main");
+    }
+  }, [user, isLoading, router]);
+
+  // Handle back button press to prevent going back to intro screens when logged in
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        if (user) {
+          // If user is logged in, navigate to main screen instead of going back
+          router.replace("/(tabs)/main");
+          return true; // Prevents default back behavior
+        }
+        return false; // Allow default back behavior for guests
+      }
+    );
+
+    return () => backHandler.remove();
+  }, [user, router]);
 
   useEffect(() => {
     opacity.value = withTiming(1, { duration: 1000 });
@@ -44,6 +75,11 @@ export default function AuthScreen() {
   const handleRegister = () => {
     router.push("/(auth)/register");
   };
+
+  // If still loading auth state, don't render anything yet
+  if (isLoading) {
+    return null;
+  }
 
   return (
     <LinearGradient

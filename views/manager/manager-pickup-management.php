@@ -150,6 +150,16 @@ $assignedQuery = "SELECT COUNT(*) FROM pickups WHERE pickup_status = 'assigned'"
 $assignedStmt = $conn->query($assignedQuery);
 $assignedPickups = $assignedStmt->fetchColumn();
 
+// Get card header colors for different pickup statuses with gradients
+$statusColors = [
+    'pending' => 'linear-gradient(135deg, #fff3cd 0%, #ffffff 100%)',    // Light yellow to white gradient
+    'scheduled' => 'linear-gradient(135deg, #d1ecf1 0%, #ffffff 100%)',  // Light blue to white gradient
+    'completed' => 'linear-gradient(135deg, #d4edda 0%, #ffffff 100%)',  // Light green to white gradient
+    'cancelled' => 'linear-gradient(135deg, #f8d7da 0%, #ffffff 100%)',  // Light red to white gradient
+    'assigned' => 'linear-gradient(135deg, #e2e3e5 0%, #ffffff 100%)',   // Light gray to white gradient
+    'default' => 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)'     // Default light gradient
+];
+
 // Fetch Pickups Query with Filtering
 $query = "SELECT p.*, o.order_id, o.order_date, c.username AS consumer_name
           FROM pickups p
@@ -221,15 +231,23 @@ if (isset($_POST['logout'])) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="../../public/style/admin.css">
     <link rel="stylesheet" href="../../public/style/admin-sidebar.css">
-    <link rel="stylesheet" href="../../public/style/pickup-management.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f8f9fa;
+            color: #343a40;
+        }
+
         .manager-header {
             background: linear-gradient(135deg, #1a8754 0%, #34c38f 100%);
             color: white;
-            padding: 10px 0;
+            padding: 15px 0;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
+        
         .manager-badge {
             background-color: #157347;
             color: white;
@@ -245,6 +263,27 @@ if (isset($_POST['logout'])) {
             align-items: center;
             margin-bottom: 1.5rem;
             padding: 0.5rem 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .breadcrumb {
+            background-color: transparent;
+            padding: 0.75rem 0;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .breadcrumb-item a {
+            color: #28a745;
+            text-decoration: none;
+        }
+        
+        .breadcrumb-item a:hover {
+            text-decoration: underline;
+        }
+        
+        .breadcrumb-item.active {
+            color: #6c757d;
         }
         
         /* Card styling fixes */
@@ -252,42 +291,54 @@ if (isset($_POST['logout'])) {
             background: white;
             border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            transition: transform 0.3s ease;
+            transition: all 0.3s ease;
             height: 100%;
+            border-left: 4px solid #28a745;
         }
 
         .stats-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
         }
         
         .stats-card .icon {
-            font-size: 2rem;
+            font-size: 2.2rem;
             color: #28a745;
+            opacity: 0.8;
+            transition: all 0.3s ease;
+        }
+        
+        .stats-card:hover .icon {
+            opacity: 1;
+            transform: scale(1.1);
         }
     
         .stats-card .count {
-            font-size: 1.8rem;
-            font-weight: bold;
+            font-size: 2rem;
+            font-weight: 700;
             margin: 0;
+            color: #343a40;
         }
         
         .stats-card .title {
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             color: #6c757d;
             margin: 0;
+            font-weight: 500;
         }
         
         /* Status label styling */
         .status-label {
-            padding: 5px 10px;
-            border-radius: 20px;
+            padding: 5px 12px;
+            border-radius: 25px;
             font-size: 0.8rem;
-            font-weight: 500;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
         
         .status-pending {
@@ -312,150 +363,772 @@ if (isset($_POST['logout'])) {
         
         /* Pickup card improvements */
         .pickup-card {
-            transition: transform 0.2s;
+            transition: all 0.3s ease;
             border: none;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin-bottom: 24px;
             overflow: hidden;
         }
         
         .pickup-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            box-shadow: 0 8px 18px rgba(0,0,0,0.12);
         }
         
         .pickup-card .card-header {
             background-color: #f8f9fa;
             border-bottom: 1px solid #e9ecef;
-            padding: 12px 15px;
+            padding: 15px 18px;
+            font-weight: 600;
         }
         
         .pickup-card .card-body {
-            padding: 15px;
+            padding: 18px;
         }
         
         .pickup-card .card-body p {
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
+            font-size: 0.95rem;
         }
         
         .pickup-card .card-body p i {
-            width: 20px;
-            margin-right: 8px;
-            color: #6c757d;
+            width: 24px;
+            margin-right: 10px;
+            color: #28a745;
+        }
+        
+        .pickup-card .card-footer {
+            background-color: transparent;
+            padding: 12px 18px 18px;
+            border-top: none;
+        }
+        
+        .pickup-card .btn-group .btn {
+            border-radius: 8px;
+            margin-right: 6px;
+            padding: 8px 16px;
+            transition: all 0.2s;
         }
         
         .pickup-notes {
             background-color: #f8f9fa;
-            border-radius: 8px;
-            padding: 10px;
-            font-size: 0.9rem;
-            margin-top: 10px;
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 0.92rem;
+            margin-top: 12px;
+            border-left: 3px solid #dee2e6;
         }
         
         /* Filter card styling */
         .filter-card {
             border: none;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
             overflow: hidden;
+            margin-bottom: 25px;
         }
         
         .filter-card .card-header {
+            background-color: #f8f9fa;
             border-bottom: 1px solid rgba(0,0,0,0.05);
+            padding: 15px 20px;
         }
         
         .filter-card label {
             font-weight: 500;
             letter-spacing: 0.5px;
+            color: #495057;
+            margin-bottom: 6px;
         }
         
         .filter-card .form-control {
             border: 1px solid #e9ecef;
+            border-radius: 8px;
             transition: all 0.2s;
+            padding: 10px 15px;
         }
         
         .filter-card .form-control:focus {
             border-color: #28a745;
-            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.2);
         }
         
         .active-filters {
             border-top: 1px solid #e9ecef;
+            padding-top: 10px;
         }
         
         .badge-info {
             background-color: #17a2b8;
+            padding: 6px 10px;
+            border-radius: 25px;
         }
         
         /* Export section styling */
-        .export-section {
-            border: 1px solid #28a745;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        
-        .export-btn {
-            background-color: #28a745;
-            border-color: #28a745;
-            color: white;
-        }
-        
-        /* Improved Export section styling */
         .export-card {
             border: none;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
             overflow: hidden;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             background-color: #f8fff9;
-            border-left: 4px solid #28a745;
+            border-left: 5px solid #28a745;
         }
         
         .export-card .card-header {
             background-color: transparent;
             border-bottom: 1px solid rgba(0,0,0,0.05);
-            padding: 12px 15px;
+            padding: 15px 20px;
         }
         
         .export-btn {
             background-color: #28a745;
             border-color: #28a745;
             color: white;
-            padding: 8px 16px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
         }
         
         .export-btn:hover {
             background-color: #218838;
             border-color: #1e7e34;
             color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
         
         /* Improved section headings */
         .section-heading {
-            margin-bottom: 15px;
-            border-bottom: 2px solid #f0f0f0;
-            padding-bottom: 8px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+            font-weight: 600;
+            color: #343a40;
         }
         
         .section-heading i {
             color: #28a745;
-        }
-        
-        .filter-card {
-            /* ...existing filter-card styles... */
-            margin-bottom: 20px;
+            margin-right: 8px;
         }
         
         /* Improved statistics card design */
         .stats-row {
-            margin-bottom: 25px;
+            margin-bottom: 30px;
+        }
+
+        /* Modal styling */
+        .modal-content {
+            border: none;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
         
-        /* ...existing styles... */
+        .modal-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            padding: 15px 20px;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .modal-footer {
+            border-top: 1px solid rgba(0,0,0,0.05);
+            padding: 15px 20px;
+        }
+        
+        /* Form controls in modals */
+        .pickup-form .form-group label {
+            font-weight: 500;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+        
+        .pickup-form .form-control {
+            border-radius: 8px;
+            padding: 12px 15px;
+            border: 1px solid #ced4da;
+            transition: all 0.3s ease;
+        }
+        
+        .pickup-form .form-control:focus {
+            border-color: #28a745;
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+        }
+        
+        /* Buttons */
+        .btn {
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+        
+        .btn-primary:hover {
+            background-color: #0069d9;
+            border-color: #0062cc;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .btn-success {
+            background-color: #28a745;
+            border-color: #28a745;
+        }
+        
+        .btn-success:hover {
+            background-color: #218838;
+            border-color: #1e7e34;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+        
+        .btn-danger:hover {
+            background-color: #c82333;
+            border-color: #bd2130;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* Pagination */
+        .pagination-container {
+            margin-top: 30px;
+        }
+        
+        .pagination .page-link {
+            border-radius: 8px;
+            margin: 0 3px;
+            border: none;
+            color: #343a40;
+            transition: all 0.2s;
+        }
+        
+        .pagination .page-link:hover {
+            background-color: #e9ecef;
+            color: #28a745;
+        }
+        
+        .pagination .page-item.active .page-link {
+            background-color: #28a745;
+            border-color: #28a745;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 50px 0;
+            color: #6c757d;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: #dee2e6;
+        }
+        
+        .empty-state h4 {
+            margin-bottom: 15px;
+            color: #343a40;
+        }
+        
+        .empty-state p {
+            margin-bottom: 20px;
+            color: #6c757d;
+        }
+        
+        /* Alerts */
+        .alert {
+            border-radius: 10px;
+            border: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            padding: 15px 20px;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Avatar circle for customer display */
+        .avatar-circle {
+            width: 40px;
+            height: 40px;
+            background-color: #e9ecef;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* Pickup date badge */
+        .pickup-date-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .pickup-date-badge i {
+            margin-right: 6px;
+            color: #28a745;
+        }
+
+        /* Notes truncation */
+        .notes-text {
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* ...existing code... */
+        
+        :root {
+          --primary-color: #28a745;
+          --primary-light: #e8f5e9;
+          --secondary-color: #007bff;
+          --warning-color: #ffc107;
+          --danger-color: #dc3545;
+          --info-color: #17a2b8;
+          --dark-color: #343a40;
+          --light-color: #f8f9fa;
+          --border-radius: 10px;
+          --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          --transition: all 0.3s ease;
+        }
+
+        /* Breadcrumb styling - added to match order-oversight */
+        .breadcrumb {
+          background-color: transparent;
+          padding: 0.75rem 0;
+          margin-bottom: 1.5rem;
+        }
+
+        .breadcrumb-item a {
+          color: var(--primary-color);
+          text-decoration: none;
+          transition: var(--transition);
+        }
+
+        .breadcrumb-item a:hover {
+          color: #2980b9;
+          text-decoration: underline;
+        }
+
+        /* Action row with gradient - added to match order-oversight style */
+        .action-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 1.5rem;
+          padding-bottom: 1rem;
+          position: relative;
+        }
+
+        .action-row:after {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          height: 1px;
+          background: linear-gradient(90deg, #28a745, transparent);
+        }
+
+        .action-row h1 {
+          background: linear-gradient(45deg, var(--dark-color), #28a745);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          text-fill-color: transparent;
+          font-weight: 600;
+          letter-spacing: -0.5px;
+        }
+
+        /* Table styling - added to match order-oversight */
+        .table-container {
+          border-radius: var(--border-radius);
+          box-shadow: var(--box-shadow);
+          overflow: hidden;
+        }
+
+        .table thead th {
+          background: #28a745;
+          border-bottom: 2px solid #219a3a;
+          color: white;
+          font-weight: 600;
+          padding: 12px 15px;
+          text-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+          position: sticky;
+          top: 0;
+          z-index: 10;
+        }
+
+        /* Pickup Modal Improvements */
+        .pickup-modal .modal-content {
+          border: none;
+          border-radius: var(--border-radius);
+          box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        }
+
+        .pickup-modal .modal-header {
+          background: linear-gradient(145deg, var(--secondary-color), #27ae60);
+          color: white;
+          border-bottom: none;
+          padding: 1.5rem;
+        }
+
+        .pickup-modal .modal-title {
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .pickup-modal .modal-body {
+          padding: 2rem;
+        }
+
+        /* Form Styling - Enhanced for better dropdown visibility */
+        .pickup-form .form-group {
+          margin-bottom: 1.5rem;
+        }
+
+        .pickup-form label {
+          font-weight: 500;
+          color: var(--dark-color);
+          margin-bottom: 0.5rem;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        /* Improved select and input styling for better visibility */
+        .pickup-form .form-control,
+        .pickup-modal select.form-control,
+        .pickup-modal input.form-control,
+        .pickup-form select.form-control {
+          border-radius: var(--border-radius);
+          padding: 0.75rem 1rem;
+          border: 2px solid #e9ecef;
+          transition: var(--transition);
+          color: #000000; /* Darker text color for better visibility */
+          background-color: white;
+          height: auto; /* Ensure proper height */
+          min-height: 42px; /* Minimum height to avoid sizing issues */
+          width: 100%; /* Full width within container */
+          font-size: 14px; /* Explicit font size */
+          -webkit-appearance: none; /* Fix for Safari issues */
+          -moz-appearance: none; /* Fix for Firefox issues */
+          appearance: none; /* Standardized appearance */
+        }
+
+        .pickup-form .form-control:focus,
+        .pickup-modal select.form-control:focus,
+        .pickup-modal input.form-control:focus {
+          border-color: var(--secondary-color);
+          box-shadow: 0 0 0 0.2rem rgba(46, 204, 113, 0.25);
+          outline: none; /* Remove default outline */
+        }
+
+        /* Dropdown option text visibility fix */
+        .pickup-form select.form-control option,
+        .pickup-modal select.form-control option {
+          color: #000000; /* Darker text for options */
+          background-color: white;
+          padding: 10px 15px; /* Match input padding */
+          font-size: 14px; /* Match font size */
+          min-height: 30px; /* Ensure options are tall enough */
+          line-height: 1.5; /* Add line height for better readability */
+        }
+
+        /* Filter dropdown arrow styling */
+        .pickup-form select.form-control,
+        .pickup-modal select.form-control {
+          background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+          background-repeat: no-repeat;
+          background-position: right 0.75rem center;
+          background-size: 16px 12px;
+          padding-right: 2.5rem; /* Make room for the arrow */
+        }
+
+        /* Fix for Firefox styling */
+        @-moz-document url-prefix() {
+          .pickup-form select.form-control,
+          .pickup-modal select.form-control {
+            text-indent: 0.01px;
+            text-overflow: "";
+          }
+        }
+
+        /* Resize textarea to be taller */
+        .pickup-form textarea.form-control {
+          min-height: 100px;
+          resize: vertical;
+        }
+
+        /* Status Indicators */
+        .pickup-status {
+          padding: 0.5rem 1rem;
+          border-radius: 50px;
+          font-size: 0.875rem;
+          font-weight: 500;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .pickup-status.pending {
+          background-color: var(--warning-light);
+          color: var(--warning-color);
+        }
+
+        .pickup-status.in-progress {
+          background-color: var(--info-light);
+          color: var(--info-color);
+        }
+
+        .pickup-status.completed {
+          background-color: var(--secondary-light);
+          color: var(--secondary-color);
+        }
+
+        /* Action Buttons */
+        .pickup-actions {
+          display: flex;
+          gap: 0.5rem;
+          justify-content: flex-end;
+          margin-top: 2rem;
+        }
+
+        .pickup-actions .btn {
+          padding: 0.625rem 1.25rem;
+          font-weight: 500;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          border-radius: var(--border-radius);
+          transition: var(--transition);
+        }
+
+        .pickup-actions .btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Timeline Display */
+        .pickup-timeline {
+          position: relative;
+          padding: 1.5rem 0;
+        }
+
+        .timeline-item {
+          position: relative;
+          padding-left: 2.5rem;
+          padding-bottom: 1.5rem;
+        }
+
+        .timeline-item::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 2px;
+          background: #e9ecef;
+        }
+
+        .timeline-item::after {
+          content: "";
+          position: absolute;
+          left: -4px;
+          top: 0;
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: var(--secondary-color);
+          border: 2px solid white;
+        }
+
+        .timeline-content {
+          background: white;
+          padding: 1rem;
+          border-radius: var(--border-radius);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Map Container */
+        .pickup-location-map {
+          height: 200px;
+          border-radius: var(--border-radius);
+          margin-top: 1rem;
+          overflow: hidden;
+          box-shadow: var(--box-shadow);
+        }
+
+        /* Pickup Management Page Styles */
+        .pickup-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1.5rem;
+          padding-bottom: 1rem;
+          position: relative;
+        }
+
+        .pickup-header:after {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          height: 1px;
+          background: linear-gradient(90deg, #28a745, transparent);
+        }
+
+        .pickup-header h1 {
+          background: linear-gradient(45deg, var(--dark-color), #28a745);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          text-fill-color: transparent;
+          font-weight: 600;
+          letter-spacing: -0.5px;
+          margin-bottom: 5px;
+        }
+
+        .pickup-header .text-muted {
+          font-size: 1rem;
+        }
+
+        .search-container {
+          background-color: white;
+          border-radius: var(--border-radius);
+          padding: 20px;
+          margin-bottom: 25px;
+          box-shadow: var(--box-shadow);
+        }
+
+        .pickup-card {
+          border: none;
+          border-radius: var(--border-radius);
+          box-shadow: var(--box-shadow);
+          transition: var(--transition);
+          overflow: hidden;
+        }
+
+        .pickup-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .pickup-card .card-header {
+          background-color: var(--primary-light);
+          border-bottom: 2px solid var(--primary-color);
+          font-weight: 600;
+          color: var(--primary-color);
+        }
+
+        .pickup-card .card-body {
+          padding: 20px;
+        }
+
+        .pickup-card .card-footer {
+          background-color: white;
+          border-top: 1px solid #f0f0f0;
+          padding: 15px 20px;
+        }
+
+        .status-label {
+          padding: 6px 12px;
+          border-radius: 20px;
+          font-size: 0.85rem;
+          font-weight: 500;
+        }
+
+        .status-pending {
+          background-color: #fff3cd;
+          color: #856404;
+        }
+
+        .status-scheduled {
+          background-color: #d1ecf1;
+          color: #0c5460;
+        }
+
+        .status-ready {
+          background-color: #d1ecf1;
+          color: #0c5460;
+        }
+
+        .status-in-transit {
+          background-color: #cce5ff;
+          color: #004085;
+        }
+
+        .status-completed {
+          background-color: #d4edda;
+          color: #155724;
+        }
+
+        .status-canceled {
+          background-color: #f8d7da;
+          color: #721c24;
+        }
+
+        .pickup-notes {
+          max-height: 80px;
+          overflow-y: auto;
+          margin-top: 10px;
+          padding: 10px;
+          background-color: #f8f9fa;
+          border-radius: 5px;
+          font-size: 0.9rem;
+        }
+
+        .empty-state {
+          text-align: center;
+          padding: 60px 0;
+          background-color: white;
+          border-radius: var(--border-radius);
+          box-shadow: var(--box-shadow);
+          margin-bottom: 25px;
+        }
+
+        .empty-state i {
+          font-size: 3rem;
+          color: #adb5bd;
+          margin-bottom: 15px;
+          display: block;
+        }
     </style>
 </head>
 <body>
@@ -503,9 +1176,9 @@ if (isset($_POST['logout'])) {
                     <?php unset($_SESSION['message']); ?>
                 <?php endif; ?>
                 
-                <!-- Statistics Cards -->
+                <!-- Statistics Cards - Updated with modern clean design -->
                 <div class="row stats-row">
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-3 mb-4">
                         <div class="stats-card">
                             <div>
                                 <p class="title">Total Pickups</p>
@@ -516,7 +1189,7 @@ if (isset($_POST['logout'])) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-3 mb-4">
                         <div class="stats-card">
                             <div>
                                 <p class="title">Pending Pickups</p>
@@ -527,7 +1200,7 @@ if (isset($_POST['logout'])) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-3 mb-4">
                         <div class="stats-card">
                             <div>
                                 <p class="title">Today's Pickups</p>
@@ -538,7 +1211,7 @@ if (isset($_POST['logout'])) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-3 mb-4">
                         <div class="stats-card">
                             <div>
                                 <p class="title">Scheduled Pickups</p>
@@ -551,8 +1224,21 @@ if (isset($_POST['logout'])) {
                     </div>
                 </div>
                 
-                <!-- Management Tools Section -->
-                <h4 class="section-heading"><i class="bi bi-gear"></i> Management Tools</h4>
+                <!-- Management Tools Section with improved heading -->
+                <div class="d-flex align-items-center mb-3">
+                    <h4 class="mb-0"><i class="bi bi-gear text-success"></i> Management Tools</h4>
+                    <div class="dropdown ml-auto">
+                        <button class="btn btn-outline-success btn-sm dropdown-toggle" type="button" id="quickActionsDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <i class="bi bi-lightning-charge"></i> Quick Actions
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="quickActionsDropdown">
+                            <a class="dropdown-item" href="#" id="bulkExport"><i class="bi bi-file-earmark-excel"></i> Export All Pickups</a>
+                            <a class="dropdown-item" href="#" id="todaysPickups"><i class="bi bi-calendar-day"></i> View Today's Pickups</a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="manager-dashboard.php"><i class="bi bi-speedometer2"></i> Go to Dashboard</a>
+                        </div>
+                    </div>
+                </div>
                 
                 <!-- Export Functionality - Moved Above -->
                 <div class="card export-card mb-4">
@@ -690,47 +1376,107 @@ if (isset($_POST['logout'])) {
                 <!-- Pickups Content -->
                 <?php if (count($pickups) > 0): ?>
                     <div class="row">
-                        <?php foreach ($pickups as $pickup): ?>
+                        <?php foreach ($pickups as $pickup): 
+                            // Determine appropriate status colors and icons
+                            $statusClass = 'secondary';
+                            $statusIcon = 'question-circle';
+                            
+                            switch(strtolower($pickup['pickup_status'])) {
+                                case 'pending':
+                                    $statusClass = 'warning';
+                                    $statusIcon = 'hourglass-split';
+                                    break;
+                                case 'scheduled':
+                                    $statusClass = 'info';
+                                    $statusIcon = 'calendar-check';
+                                    break;
+                                case 'completed':
+                                    $statusClass = 'success';
+                                    $statusIcon = 'check-circle';
+                                    break;
+                                case 'cancelled':
+                                    $statusClass = 'danger';
+                                    $statusIcon = 'x-circle';
+                                    break;
+                            }
+                            
+                            // Format dates
+                            $pickupDate = new DateTime($pickup['pickup_date']);
+                            $now = new DateTime();
+                            $isToday = $pickupDate->format('Y-m-d') === $now->format('Y-m-d');
+                            $isPast = $pickupDate < $now && !$isToday;
+                            $dateClass = $isToday ? 'text-success font-weight-bold' : ($isPast ? 'text-danger' : '');
+                        ?>
                             <div class="col-md-6 col-lg-4">
                                 <div class="card pickup-card">
-                                    <div class="card-header d-flex justify-content-between align-items-center">
-                                        <span class="font-weight-bold">
-                                            <i class="bi bi-box"></i> Pickup #<?= htmlspecialchars($pickup['pickup_id']) ?>
+                                    <div class="card-header d-flex justify-content-between align-items-center" style="background-color: <?= $statusColors[$pickup['pickup_status']] ?? $statusColors['default'] ?>;">
+                                        <span>
+                                            <span class="badge badge-pill badge-light mr-2">#<?= htmlspecialchars($pickup['pickup_id']) ?></span>
+                                            Order #<?= htmlspecialchars($pickup['order_id']) ?>
                                         </span>
-                                        <span class="status-label status-<?= strtolower($pickup['pickup_status']) ?>">
-                                            <?= ucfirst(htmlspecialchars($pickup['pickup_status'])) ?>
+                                        <span class="badge badge-pill badge-<?= $statusClass ?>">
+                                            <i class="bi bi-<?= $statusIcon ?>"></i> <?= ucfirst(htmlspecialchars($pickup['pickup_status'])) ?>
                                         </span>
                                     </div>
                                     <div class="card-body">
-                                        <p><i class="bi bi-receipt"></i> <strong>Order:</strong> <?= htmlspecialchars($pickup['order_id']) ?></p>
-                                        <p><i class="bi bi-person"></i> <strong>Customer:</strong> <?= htmlspecialchars($pickup['consumer_name']) ?></p>
-                                        <p><i class="bi bi-calendar-event"></i> <strong>Date:</strong> <?= htmlspecialchars(date("F j, Y, g:i A", strtotime($pickup['pickup_date']))) ?></p>
-                                        <p><i class="bi bi-geo-alt"></i> <strong>Location:</strong> Municipal Agriculture Office</p>
-                                        <p><i class="bi bi-person-badge"></i> <strong>Contact:</strong> <?= htmlspecialchars($pickup['contact_person'] ?? 'Not specified') ?></p>
-                                        <div class="pickup-notes">
-                                            <i class="bi bi-card-text"></i> <strong>Notes:</strong><br>
-                                            <?= nl2br(htmlspecialchars($pickup['pickup_notes'] ?: 'No notes available')) ?>
+                                        <div class="media mb-3">
+                                            <div class="mr-3">
+                                                <div class="avatar-circle">
+                                                    <span class="avatar-text"><?= strtoupper(substr($pickup['consumer_name'], 0, 1)) ?></span>
+                                                </div>
+                                            </div>
+                                            <div class="media-body">
+                                                <h6 class="mt-0 mb-1"><?= htmlspecialchars($pickup['consumer_name']) ?></h6>
+                                                <small class="text-muted">
+                                                    <i class="bi bi-person-badge"></i> 
+                                                    <?= htmlspecialchars($pickup['contact_person'] ?? 'Not specified') ?>
+                                                </small>
+                                            </div>
                                         </div>
+                                        
+                                        <div class="pickup-info">
+                                            <div class="pickup-date-badge <?= $dateClass ?>">
+                                                <i class="bi bi-calendar-event"></i>
+                                                <?= $isToday ? 'Today' : htmlspecialchars($pickupDate->format("M j, Y")) ?>
+                                                at <?= htmlspecialchars($pickupDate->format("g:i A")) ?>
+                                                <?= $isPast ? '<span class="badge badge-danger ml-1">Overdue</span>' : '' ?>
+                                            </div>
+                                            
+                                            <div class="pickup-location mt-2">
+                                                <i class="bi bi-geo-alt"></i>
+                                                <span class="text-muted">Municipal Agriculture Office</span>
+                                            </div>
+                                        </div>
+
+                                        <?php if(!empty($pickup['pickup_notes'])): ?>
+                                        <div class="pickup-notes mt-3">
+                                            <i class="bi bi-journal-text"></i> <strong>Notes:</strong>
+                                            <p class="mb-0 text-truncate notes-text" title="<?= htmlspecialchars($pickup['pickup_notes']) ?>">
+                                                <?= htmlspecialchars($pickup['pickup_notes']) ?>
+                                            </p>
+                                            <button class="btn btn-link btn-sm p-0 view-notes" data-notes="<?= htmlspecialchars($pickup['pickup_notes']) ?>">
+                                                View all
+                                            </button>
+                                        </div>
+                                        <?php endif; ?>
                                     </div>
-                                    <div class="card-footer bg-white border-top-0 d-flex justify-content-start">
-                                        <div class="btn-group">
-                                            <button class="btn btn-sm btn-primary edit-pickup-btn" 
-                                                    data-toggle="modal" 
-                                                    data-target="#editPickupModal" 
-                                                    data-pickup-id="<?= htmlspecialchars($pickup['pickup_id']) ?>"
-                                                    data-pickup-status="<?= htmlspecialchars($pickup['pickup_status']) ?>"
-                                                    data-pickup-date="<?= htmlspecialchars($pickup['pickup_date']) ?>"
-                                                    data-pickup-notes="<?= htmlspecialchars($pickup['pickup_notes']) ?>"
-                                                    data-contact-person="<?= htmlspecialchars($pickup['contact_person'] ?? '') ?>">
-                                                <i class="bi bi-pencil"></i> Edit
-                                            </button>
-                                            <button class="btn btn-sm btn-info view-order-btn"
-                                                    data-toggle="modal"
-                                                    data-target="#viewOrderModal"
-                                                    data-order-id="<?= htmlspecialchars($pickup['order_id']) ?>">
-                                                <i class="bi bi-eye"></i> View Order
-                                            </button>
-                                        </div>
+                                    <div class="card-footer bg-white d-flex justify-content-between">
+                                        <button class="btn btn-sm btn-primary edit-pickup-btn" 
+                                                data-toggle="modal" 
+                                                data-target="#editPickupModal" 
+                                                data-pickup-id="<?= htmlspecialchars($pickup['pickup_id']) ?>"
+                                                data-pickup-status="<?= htmlspecialchars($pickup['pickup_status']) ?>"
+                                                data-pickup-date="<?= htmlspecialchars($pickup['pickup_date']) ?>"
+                                                data-pickup-notes="<?= htmlspecialchars($pickup['pickup_notes']) ?>"
+                                                data-contact-person="<?= htmlspecialchars($pickup['contact_person'] ?? '') ?>">
+                                            <i class="bi bi-pencil"></i> Edit
+                                        </button>
+                                        <button class="btn btn-sm btn-info view-order-btn"
+                                                data-toggle="modal"
+                                                data-target="#viewOrderModal"
+                                                data-order-id="<?= htmlspecialchars($pickup['order_id']) ?>">
+                                            <i class="bi bi-eye-fill"></i> View Order
+                                        </button>
                                     </div>
                                 </div>
                             </div>

@@ -14,6 +14,8 @@ require_once '../../models/Log.php';
 require_once '../../models/Dashboard.php';
 require_once '../../models/Database.php';
 require_once '../../models/Pickup.php';
+require_once '../../models/Sales.php'; // Added Sales model for revenue analytics
+require_once '../../models/Product.php'; // Added Product model for inventory data
 
 // Initialize classes
 $database = new Database();
@@ -22,6 +24,8 @@ $orderClass = new Order();
 $logClass = new Log();
 $dashboard = new Dashboard();
 $pickupClass = new Pickup();
+$salesClass = new Sales(); // Initialize Sales class
+$productClass = new Product(); // Initialize Product class
 
 // Get Organization Head User ID from Session
 $organization_head_user_id = $_SESSION['organization_head_user_id'] ?? null;
@@ -188,6 +192,105 @@ foreach ($pickupStatusData as $data) {
     $pickupStatusValues[] = (int)$data['total'];
 }
 
+// ======= ADDITIONAL DATA FOR NEW DASHBOARD FEATURES =======
+
+// Get Agricultural Analytics Data
+$farmersByBarangay = $dashboard->getFarmersPerBarangay();
+$cropsByBarangay = $dashboard->getCropsPerBarangay();
+$seasonalCrops = $dashboard->getSeasonalCropProduction();
+
+// Transform agricultural data for charts
+$barangayLabels = [];
+$farmerCounts = [];
+$cropCounts = [];
+
+foreach ($farmersByBarangay as $barangay) {
+    $barangayLabels[] = $barangay['barangay_name'];
+    $farmerCounts[] = (int)$barangay['farmer_count'];
+}
+
+// Process crop distribution by barangay data
+$barangayCropData = [];
+foreach ($cropsByBarangay as $crop) {
+    $barangayName = $crop['barangay_name'];
+    if (!isset($barangayCropData[$barangayName])) {
+        $barangayCropData[$barangayName] = 0;
+    }
+    $barangayCropData[$barangayName]++;
+}
+
+// Convert associative array to indexed arrays for Chart.js
+$cropBarangayLabels = array_keys($barangayCropData);
+$cropCounts = array_values($barangayCropData);
+
+// Group crops by season for the seasonal crops chart
+$seasonLabels = [];
+$seasonProduction = [];
+$seasonData = [];
+
+foreach ($seasonalCrops as $crop) {
+    if (!isset($seasonData[$crop['season_name']])) {
+        $seasonData[$crop['season_name']] = 0;
+        $seasonLabels[] = $crop['season_name'];
+    }
+    $seasonData[$crop['season_name']] += (float)$crop['total_production'];
+}
+
+foreach ($seasonLabels as $season) {
+    $seasonProduction[] = $seasonData[$season];
+}
+
+// Get Sales Analytics Data
+$totalRevenue = $salesClass->getTotalRevenue() ?? 0;
+$weeklyRevenue = $salesClass->getWeeklySales() ?? 0;
+$averageOrderValue = $salesClass->getAverageOrderValue() ?? 0;
+$salesByCategory = $salesClass->getSalesByCategory() ?? [];
+$topProducts = $salesClass->getTopProducts(5) ?? [];
+$revenueData = $salesClass->getRevenueData() ?? [];
+
+// Determine top category
+$topCategory = !empty($salesByCategory) ? $salesByCategory[0]['category'] : 'N/A';
+
+// Format revenue data for chart
+$revenueDates = [];
+$revenueAmounts = [];
+
+foreach ($revenueData as $data) {
+    $revenueDates[] = date('M j', strtotime($data['date']));
+    $revenueAmounts[] = (float)$data['amount'];
+}
+
+// Format category data for chart
+$categoryLabels = [];
+$categoryValues = [];
+
+foreach ($salesByCategory as $category) {
+    $categoryLabels[] = $category['category'];
+    $categoryValues[] = (float)$category['total'];
+}
+
+// Get Farmer Management Data
+$allBarangays = $dashboard->getAllBarangaysWithMetrics();
+
+// Transform farmer data for charts
+$farmerDistBarangays = [];
+$farmerDistCounts = [];
+$farmSizeBarangays = [];
+$farmSizeValues = [];
+
+foreach ($allBarangays as $barangay) {
+    if ((int)$barangay['farmer_count'] > 0) {
+        $farmerDistBarangays[] = $barangay['barangay_name'];
+        $farmerDistCounts[] = (int)$barangay['farmer_count'];
+        
+        $farmSizeBarangays[] = $barangay['barangay_name'];
+        $farmSizeValues[] = (float)$barangay['total_farm_area'];
+    }
+}
+
+// Get Low Stock Products
+$lowStockProducts = $dashboard->getLowStockProducts(10) ?? [];
+
 // Helper functions
 function getStatusBadgeClass($status) {
     $status = strtolower($status);
@@ -252,7 +355,7 @@ function getPickupStatusColor($status) {
                 <!-- Breadcrumb -->
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="#">Home</a></li>
+                        <li class="breadcrumb-item"><a href="#"><i class="bi bi-house-door"></i> Home</a></li>
                         <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
                     </ol>
                 </nav>
@@ -265,7 +368,7 @@ function getPickupStatusColor($status) {
                     <div>
                         <form method="POST">
                             <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                            <button type="submit" name="logout" class="btn btn-danger">
+                            <button type="submit" name="logout" class="btn btn-outline-danger">
                                 <i class="bi bi-box-arrow-right"></i> Logout
                             </button>
                         </form>
@@ -413,6 +516,237 @@ function getPickupStatusColor($status) {
                                         <canvas id="pickupStatusChart"></canvas>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Agricultural Data Visualization Section (NEW) -->
+                <section id="agricultural-analytics" class="mb-4">
+                    <h5 class="section-title"><i class="bi bi-geo-alt text-success"></i> Agricultural Analytics</h5>
+                    <div class="row">
+                        <!-- Crop Distribution by Barangay -->
+                        <div class="col-md-6 mb-4">
+                            <div class="stat-card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-geo-fill text-primary"></i> Crop Distribution by Barangay</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="cropDistributionChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Seasonal Crop Production -->
+                        <div class="col-md-6 mb-4">
+                            <div class="stat-card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-calendar3 text-success"></i> Seasonal Crop Production</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="seasonalCropsChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Sales Analytics Section (NEW) -->
+                <section id="sales-analytics" class="mb-4">
+                    <h5 class="section-title"><i class="bi bi-graph-up text-danger"></i> Sales Analytics</h5>
+                    <div class="row">
+                        <!-- Revenue Trend -->
+                        <div class="col-md-8 mb-4">
+                            <div class="stat-card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-graph-up-arrow text-primary"></i> Revenue Trend</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="revenueTrendChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Sales by Category -->
+                        <div class="col-md-4 mb-4">
+                            <div class="stat-card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-pie-chart-fill text-success"></i> Sales by Category</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="categoryChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sales Metrics Cards -->
+                    <div class="row">
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="dashboard-stat-card">
+                                <i class="bi bi-cash-coin text-success stat-icon"></i>
+                                <div class="stat-title">Total Revenue</div>
+                                <div class="stat-value">₱<?= number_format($totalRevenue, 2) ?></div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="dashboard-stat-card">
+                                <i class="bi bi-cart-check text-primary stat-icon"></i>
+                                <div class="stat-title">Weekly Revenue</div>
+                                <div class="stat-value">₱<?= number_format($weeklyRevenue, 2) ?></div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="dashboard-stat-card">
+                                <i class="bi bi-truck text-info stat-icon"></i>
+                                <div class="stat-title">Average Order</div>
+                                <div class="stat-value">₱<?= number_format($averageOrderValue, 2) ?></div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="dashboard-stat-card">
+                                <i class="bi bi-bag-check text-warning stat-icon"></i>
+                                <div class="stat-title">Top Category</div>
+                                <div class="stat-value"><?= htmlspecialchars($topCategory) ?></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Top Products Section (NEW) -->
+                <section id="top-products" class="mb-4">
+                    <div class="card table-container">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-trophy text-warning"></i> Top Performing Products</h5>
+                            <a href="organization-head-sales-report.php" class="btn btn-sm btn-outline-success">View Full Report</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Product</th>
+                                            <th>Category</th>
+                                            <th class="text-right">Units Sold</th>
+                                            <th class="text-right">Revenue</th>
+                                            <th class="text-center">Trend</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (!empty($topProducts)): ?>
+                                            <?php foreach ($topProducts as $product): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($product['name']) ?></td>
+                                                    <td><?= htmlspecialchars($product['category'] ?? 'Uncategorized') ?></td>
+                                                    <td class="text-right"><?= $product['units_sold'] ?></td>
+                                                    <td class="text-right">₱<?= number_format($product['revenue'], 2) ?></td>
+                                                    <td class="text-center">
+                                                        <?php if ($product['trend'] > 0): ?>
+                                                            <span class="text-success"><i class="bi bi-arrow-up-circle-fill"></i></span>
+                                                        <?php else: ?>
+                                                            <span class="text-danger"><i class="bi bi-arrow-down-circle-fill"></i></span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <tr>
+                                                <td colspan="5" class="text-center">No product data available</td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Farmer Management Overview (NEW) -->
+                <section id="farmer-overview" class="mb-4">
+                    <h5 class="section-title"><i class="bi bi-people text-info"></i> Farmer Management</h5>
+                    <div class="row">
+                        <!-- Farmer Distribution Map -->
+                        <div class="col-md-6 mb-4">
+                            <div class="stat-card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-geo-alt text-primary"></i> Farmer Distribution</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="farmerDistributionChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Farm Size Distribution -->
+                        <div class="col-md-6 mb-4">
+                            <div class="stat-card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-grid text-success"></i> Farm Size Distribution</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="farmSizeChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Inventory Management (NEW) -->
+                <section id="inventory-management" class="mb-4">
+                    <div class="card table-container">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-exclamation-circle text-warning"></i> Low Stock Products</h5>
+                            <span class="badge badge-pill badge-warning"><?= count($lowStockProducts) ?> items</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Product</th>
+                                            <th class="text-center">Current Stock</th>
+                                            <th class="text-center">Reorder Point</th>
+                                            <th class="text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (!empty($lowStockProducts)): ?>
+                                            <?php foreach ($lowStockProducts as $product): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($product['name']) ?></td>
+                                                    <td class="text-center"><?= $product['stock'] ?></td>
+                                                    <td class="text-center"><?= $product['reorder_point'] ?></td>
+                                                    <td class="text-center">
+                                                        <?php if ($product['stock'] == 0): ?>
+                                                            <span class="badge badge-danger">Out of Stock</span>
+                                                        <?php else: ?>
+                                                            <span class="badge badge-warning">Low Stock</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <tr>
+                                                <td colspan="4" class="text-center">No low stock products</td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -886,6 +1220,359 @@ function getPickupStatusColor($status) {
                     $(pickupStatusCtx).parent().html('<div class="empty-chart-message"><i class="bi bi-exclamation-circle"></i><p>No pickup status data available</p></div>');
                 }
             }
+            
+            // Agricultural Distribution Chart
+            const cropDistributionCtx = document.getElementById('cropDistributionChart');
+            if (cropDistributionCtx && typeof Chart !== 'undefined') {
+                // Clear any existing chart instance
+                if (window.cropDistributionChart instanceof Chart) {
+                    window.cropDistributionChart.destroy();
+                }
+                
+                const cropDistData = {
+                    labels: <?= json_encode($cropBarangayLabels) ?>,
+                    datasets: [{
+                        label: 'Crop Distribution',
+                        data: <?= json_encode($cropCounts) ?>,
+                        backgroundColor: [
+                            '#4CAF50', '#2196F3', '#9C27B0', '#FF9800', '#F44336',
+                            '#3F51B5', '#009688', '#FF5722', '#607D8B', '#E91E63'
+                        ],
+                        borderWidth: 1
+                    }]
+                };
+                
+                if (validateChartData(cropDistData)) {
+                    window.cropDistributionChart = new Chart(cropDistributionCtx, {
+                        type: 'bar',
+                        data: cropDistData,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `Crops: ${context.raw}`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Number of Crops'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    $(cropDistributionCtx).parent().html('<div class="empty-chart-message"><i class="bi bi-exclamation-circle"></i><p>No crop distribution data available</p></div>');
+                }
+            }
+            
+            // Seasonal Crop Production Chart
+            const seasonalCropsCtx = document.getElementById('seasonalCropsChart');
+            if (seasonalCropsCtx && typeof Chart !== 'undefined') {
+                // Clear any existing chart instance
+                if (window.seasonalCropsChart instanceof Chart) {
+                    window.seasonalCropsChart.destroy();
+                }
+                
+                const seasonalCropsData = {
+                    labels: <?= json_encode($seasonLabels) ?>,
+                    datasets: [{
+                        label: 'Seasonal Production',
+                        data: <?= json_encode($seasonProduction) ?>,
+                        backgroundColor: [
+                            '#8BC34A', '#00BCD4', '#FFEB3B', '#9E9E9E', '#FFC107'
+                        ],
+                        borderWidth: 1
+                    }]
+                };
+                
+                if (validateChartData(seasonalCropsData)) {
+                    window.seasonalCropsChart = new Chart(seasonalCropsCtx, {
+                        type: 'doughnut',
+                        data: seasonalCropsData,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 20,
+                                        usePointStyle: true
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const value = context.raw;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const percentage = Math.round((value / total) * 100);
+                                            return `${context.label}: ${value} (${percentage}%)`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    $(seasonalCropsCtx).parent().html('<div class="empty-chart-message"><i class="bi bi-exclamation-circle"></i><p>No seasonal crop data available</p></div>');
+                }
+            }
+            
+            // Revenue Trend Chart
+            const revenueTrendCtx = document.getElementById('revenueTrendChart');
+            if (revenueTrendCtx && typeof Chart !== 'undefined') {
+                // Clear any existing chart instance
+                if (window.revenueTrendChart instanceof Chart) {
+                    window.revenueTrendChart.destroy();
+                }
+                
+                const revenueTrendData = {
+                    labels: <?= json_encode($revenueDates) ?>,
+                    datasets: [{
+                        label: 'Revenue',
+                        data: <?= json_encode($revenueAmounts) ?>,
+                        backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                        borderColor: 'rgba(40, 167, 69, 1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                };
+                
+                if (validateChartData(revenueTrendData)) {
+                    window.revenueTrendChart = new Chart(revenueTrendCtx, {
+                        type: 'line',
+                        data: revenueTrendData,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `₱${context.raw.toLocaleString()}`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: function(value) {
+                                            return '₱' + value.toLocaleString();
+                                        }
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: 'Revenue (PHP)'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    $(revenueTrendCtx).parent().html('<div class="empty-chart-message"><i class="bi bi-exclamation-circle"></i><p>No revenue trend data available</p></div>');
+                }
+            }
+            
+            // Sales by Category Chart
+            const categoryCtx = document.getElementById('categoryChart');
+            if (categoryCtx && typeof Chart !== 'undefined') {
+                // Clear any existing chart instance
+                if (window.categoryChart instanceof Chart) {
+                    window.categoryChart.destroy();
+                }
+                
+                const categoryData = {
+                    labels: <?= json_encode($categoryLabels) ?>,
+                    datasets: [{
+                        label: 'Sales by Category',
+                        data: <?= json_encode($categoryValues) ?>,
+                        backgroundColor: [
+                            '#28a745', '#17a2b8', '#ffc107', '#dc3545', '#6f42c1',
+                            '#fd7e14', '#20c997', '#6c757d', '#007bff', '#6610f2'
+                        ],
+                        borderWidth: 1
+                    }]
+                };
+                
+                if (validateChartData(categoryData)) {
+                    window.categoryChart = new Chart(categoryCtx, {
+                        type: 'pie',
+                        data: categoryData,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 10,
+                                        usePointStyle: true,
+                                        font: {
+                                            size: 10
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const value = context.raw;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const percentage = Math.round((value / total) * 100);
+                                            return `${context.label}: ₱${value.toLocaleString()} (${percentage}%)`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    $(categoryCtx).parent().html('<div class="empty-chart-message"><i class="bi bi-exclamation-circle"></i><p>No category sales data available</p></div>');
+                }
+            }
+            
+            // Farmer Distribution Chart
+            const farmerDistributionCtx = document.getElementById('farmerDistributionChart');
+            if (farmerDistributionCtx && typeof Chart !== 'undefined') {
+                // Clear any existing chart instance
+                if (window.farmerDistributionChart instanceof Chart) {
+                    window.farmerDistributionChart.destroy();
+                }
+                
+                const farmerDistData = {
+                    labels: <?= json_encode($farmerDistBarangays) ?>,
+                    datasets: [{
+                        data: <?= json_encode($farmerDistCounts) ?>,
+                        backgroundColor: [
+                            '#007bff', '#28a745', '#ffc107', '#dc3545', '#17a2b8', 
+                            '#6c757d', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c'
+                        ],
+                        borderWidth: 1
+                    }]
+                };
+                
+                if (validateChartData(farmerDistData)) {
+                    window.farmerDistributionChart = new Chart(farmerDistributionCtx, {
+                        type: 'bar',
+                        data: farmerDistData,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            indexAxis: 'y',
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Number of Farmers'
+                                    }
+                                },
+                                y: {
+                                    ticks: {
+                                        autoSkip: false,
+                                        font: {
+                                            size: 10
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    $(farmerDistributionCtx).parent().html('<div class="empty-chart-message"><i class="bi bi-exclamation-circle"></i><p>No farmer distribution data available</p></div>');
+                }
+            }
+            
+            // Farm Size Distribution Chart
+            const farmSizeCtx = document.getElementById('farmSizeChart');
+            if (farmSizeCtx && typeof Chart !== 'undefined') {
+                // Clear any existing chart instance
+                if (window.farmSizeChart instanceof Chart) {
+                    window.farmSizeChart.destroy();
+                }
+                
+                const farmSizeData = {
+                    labels: <?= json_encode($farmSizeBarangays) ?>,
+                    datasets: [{
+                        label: 'Farm Size (hectares)',
+                        data: <?= json_encode($farmSizeValues) ?>,
+                        backgroundColor: 'rgba(40, 167, 69, 0.5)',
+                        borderColor: 'rgba(40, 167, 69, 1)',
+                        borderWidth: 1
+                    }]
+                };
+                
+                if (validateChartData(farmSizeData)) {
+                    window.farmSizeChart = new Chart(farmSizeCtx, {
+                        type: 'polarArea',
+                        data: farmSizeData,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 10,
+                                        usePointStyle: true,
+                                        font: {
+                                            size: 9
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `${context.label}: ${context.raw.toFixed(2)} hectares`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                r: {
+                                    ticks: {
+                                        display: false
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    $(farmSizeCtx).parent().html('<div class="empty-chart-message"><i class="bi bi-exclamation-circle"></i><p>No farm size data available</p></div>');
+                }
+            }
+            
+            // Update charts on window resize
+            $(window).resize(function() {
+                if (window.cropDistributionChart) window.cropDistributionChart.update();
+                if (window.seasonalCropsChart) window.seasonalCropsChart.update();
+                if (window.revenueTrendChart) window.revenueTrendChart.update();
+                if (window.categoryChart) window.categoryChart.update();
+                if (window.farmerDistributionChart) window.farmerDistributionChart.update();
+                if (window.farmSizeChart) window.farmSizeChart.update();
+            });
         }
     </script>
 </body>

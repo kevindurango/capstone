@@ -41,6 +41,9 @@ class User
     public function addUser($username, $email, $password, $role_id, $first_name, $last_name, $contact_number = null, $address = null)
     {
         try {
+            // Begin transaction to ensure all operations succeed or fail together
+            $this->conn->beginTransaction();
+            
             // Insert user into the users table with personal information
             $query = "INSERT INTO users (username, email, password, role_id, first_name, last_name, contact_number, address, created_at, updated_at) 
                       VALUES (:username, :email, :password, :role_id, :first_name, :last_name, :contact_number, :address, NOW(), NOW())";
@@ -56,10 +59,29 @@ class User
             $stmt->bindParam(':last_name', $last_name);
             $stmt->bindParam(':contact_number', $contact_number);
             $stmt->bindParam(':address', $address);
-
-            return $stmt->execute();
+            
+            $result = $stmt->execute();
+            
+            if ($result) {
+                // Get the last inserted user ID
+                $user_id = $this->conn->lastInsertId();
+                
+                // If this is a farmer, add farmer details
+                if ($this->isFarmerRole($role_id)) {
+                    $this->addFarmerDetails($user_id);
+                }
+                
+                $this->conn->commit();
+                return true;
+            } else {
+                $this->conn->rollBack();
+                return false;
+            }
         } catch (PDOException $e) {
-            echo "Error adding user: " . $e->getMessage();
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            error_log("Error adding user: " . $e->getMessage());
             return false;
         }
     }
@@ -68,6 +90,9 @@ class User
     public function updateUser($user_id, $username, $email, $password, $role_id, $first_name, $last_name, $contact_number = null, $address = null)
     {
         try {
+            // Begin transaction
+            $this->conn->beginTransaction();
+            
             $query = "UPDATE users SET username = :username, email = :email, role_id = :role_id, first_name = :first_name, 
                       last_name = :last_name, contact_number = :contact_number, address = :address, updated_at = NOW()";
 
@@ -95,9 +120,152 @@ class User
                 $stmt->bindParam(':password', $hashedPassword);
             }
 
+            $result = $stmt->execute();
+            
+            if ($result) {
+                // Handle farmer details updates
+                $oldRoleId = $this->getUserRole($user_id);
+                $isFarmerNow = $this->isFarmerRole($role_id);
+                $wasFarmerBefore = $this->isFarmerRole($oldRoleId);
+                
+                // User is now a farmer, but wasn't before
+                if ($isFarmerNow && !$wasFarmerBefore) {
+                    $this->addFarmerDetails($user_id);
+                }
+                // User is a farmer (now and was before) - update their details
+                else if ($isFarmerNow && $wasFarmerBefore) {
+                    $this->updateFarmerDetails($user_id);
+                }
+                // User was a farmer but isn't anymore - could optionally remove or mark as inactive
+                // We're preserving the data currently
+                
+                $this->conn->commit();
+                return true;
+            } else {
+                $this->conn->rollBack();
+                return false;
+            }
+        } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            error_log("Error updating user: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    // Helper function to check if a role ID is for a Farmer
+    private function isFarmerRole($role_id) {
+        try {
+            $query = "SELECT role_name FROM roles WHERE role_id = :role_id LIMIT 1";
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':role_id', $role_id);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            return ($result && $result['role_name'] === 'Farmer');
+        } catch (PDOException $e) {
+            error_log("Error checking farmer role: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    // Add farmer details to farmer_details table
+    private function addFarmerDetails($user_id) {
+        try {
+            // First check if farmer details already exist
+            $query = "SELECT COUNT(*) as count FROM farmer_details WHERE user_id = :user_id";
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':user_id', $user_id);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            // If details already exist, update instead of inserting
+            if ($result['count'] > 0) {
+                return $this->updateFarmerDetails($user_id);
+            }
+            
+            // Get farmer details from POST data if available
+            $farm_name = isset($_POST['farm_name']) ? $_POST['farm_name'] : null;
+            $farm_type = isset($_POST['farm_type']) ? $_POST['farm_type'] : null;
+            $farm_size = isset($_POST['farm_size']) ? $_POST['farm_size'] : null;
+            $farm_location = isset($_POST['farm_location']) ? $_POST['farm_location'] : null;
+            $barangay_id = isset($_POST['barangay_id']) ? $_POST['barangay_id'] : null;
+            $certifications = isset($_POST['certifications']) ? $_POST['certifications'] : null;
+            
+            // Insert farmer details
+            $query = "INSERT INTO farmer_details (user_id, farm_name, farm_type, certifications, farm_size, farm_location, barangay_id) 
+                      VALUES (:user_id, :farm_name, :farm_type, :certifications, :farm_size, :farm_location, :barangay_id)";
+            $stmt = $this->conn->prepare($query);
+            
+            $stmt->bindParam(':user_id', $user_id);
+            $stmt->bindParam(':farm_name', $farm_name);
+            $stmt->bindParam(':farm_type', $farm_type);
+            $stmt->bindParam(':certifications', $certifications);
+            $stmt->bindParam(':farm_size', $farm_size);
+            $stmt->bindParam(':farm_location', $farm_location);
+            $stmt->bindParam(':barangay_id', $barangay_id);
+            
             return $stmt->execute();
         } catch (PDOException $e) {
-            echo "Error updating user: " . $e->getMessage();
+            error_log("Error adding farmer details: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    // Update existing farmer details
+    private function updateFarmerDetails($user_id) {
+        try {
+            // Get farmer details from POST data
+            $farm_name = isset($_POST['farm_name']) ? $_POST['farm_name'] : null;
+            $farm_type = isset($_POST['farm_type']) ? $_POST['farm_type'] : null;
+            $farm_size = isset($_POST['farm_size']) ? $_POST['farm_size'] : null;
+            $farm_location = isset($_POST['farm_location']) ? $_POST['farm_location'] : null;
+            $barangay_id = isset($_POST['barangay_id']) ? $_POST['barangay_id'] : null;
+            $certifications = isset($_POST['certifications']) ? $_POST['certifications'] : null;
+            
+            // Update query
+            $query = "UPDATE farmer_details SET 
+                      farm_name = :farm_name, 
+                      farm_type = :farm_type, 
+                      certifications = :certifications, 
+                      farm_size = :farm_size, 
+                      farm_location = :farm_location, 
+                      barangay_id = :barangay_id 
+                      WHERE user_id = :user_id";
+                      
+            $stmt = $this->conn->prepare($query);
+            
+            $stmt->bindParam(':user_id', $user_id);
+            $stmt->bindParam(':farm_name', $farm_name);
+            $stmt->bindParam(':farm_type', $farm_type);
+            $stmt->bindParam(':certifications', $certifications);
+            $stmt->bindParam(':farm_size', $farm_size);
+            $stmt->bindParam(':farm_location', $farm_location);
+            $stmt->bindParam(':barangay_id', $barangay_id);
+            
+            return $stmt->execute();
+        } catch (PDOException $e) {
+            error_log("Error updating farmer details: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    // Get farmer details by user ID
+    public function getFarmerDetails($user_id) {
+        try {
+            $query = "SELECT fd.*, b.barangay_name 
+                      FROM farmer_details fd 
+                      LEFT JOIN barangays b ON fd.barangay_id = b.barangay_id 
+                      WHERE fd.user_id = :user_id";
+                      
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':user_id', $user_id);
+            $stmt->execute();
+            
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error fetching farmer details: " . $e->getMessage());
             return false;
         }
     }

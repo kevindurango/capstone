@@ -1,8 +1,6 @@
 <?php
 // Check if the Database class is already defined before including
-if (!class_exists('Database')) {
-    require_once __DIR__ . '/../config/Database.php';
-}
+require_once 'Database.php';
 
 class Sales {
     private $conn;
@@ -26,15 +24,14 @@ class Sales {
         $username = "root";
         $password = "";
         
-        // Create connection
-        $conn = new mysqli($host, $username, $password, $db_name);
-        
-        // Check connection
-        if ($conn->connect_error) {
-            die("Connection failed: " . $conn->connect_error);
+        try {
+            // Create PDO connection
+            $conn = new PDO("mysql:host=$host;dbname=$db_name", $username, $password);
+            $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            return $conn;
+        } catch(PDOException $e) {
+            die("Connection failed: " . $e->getMessage());
         }
-        
-        return $conn;
     }
 
     public function getDailySales() {
@@ -42,15 +39,19 @@ class Sales {
         $query = "SELECT SUM(oi.price * oi.quantity) AS total 
                  FROM orderitems oi 
                  JOIN orders o ON oi.order_id = o.order_id 
-                 WHERE DATE(o.order_date) = ?";
+                 WHERE DATE(o.order_date) = :today";
         
-        $stmt = $this->conn->prepare($query);
-        $stmt->bind_param("s", $today);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        
-        return $row['total'] ? $row['total'] : 0;
+        try {
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':today', $today);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            return $result['total'] ? $result['total'] : 0;
+        } catch(PDOException $e) {
+            error_log("Error getting daily sales: " . $e->getMessage());
+            return 0;
+        }
     }
 
     public function getWeeklySales() {
@@ -59,12 +60,16 @@ class Sales {
                  JOIN orders o ON oi.order_id = o.order_id 
                  WHERE o.order_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)";
         
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        
-        return $row['total'] ? $row['total'] : 0;
+        try {
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            return $result['total'] ? $result['total'] : 0;
+        } catch(PDOException $e) {
+            error_log("Error getting weekly sales: " . $e->getMessage());
+            return 0;
+        }
     }
 
     public function getMonthlySales() {
@@ -73,24 +78,32 @@ class Sales {
                  JOIN orders o ON oi.order_id = o.order_id 
                  WHERE o.order_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)";
         
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        
-        return $row['total'] ? $row['total'] : 0;
+        try {
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            return $result['total'] ? $result['total'] : 0;
+        } catch(PDOException $e) {
+            error_log("Error getting monthly sales: " . $e->getMessage());
+            return 0;
+        }
     }
 
     public function getTotalRevenue() {
         $query = "SELECT SUM(oi.price * oi.quantity) AS total 
                  FROM orderitems oi";
         
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        
-        return $row['total'] ? $row['total'] : 0;
+        try {
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            return $result['total'] ? $result['total'] : 0;
+        } catch(PDOException $e) {
+            error_log("Error getting total revenue: " . $e->getMessage());
+            return 0;
+        }
     }
 
     public function getAverageOrderValue() {
@@ -102,12 +115,16 @@ class Sales {
                      GROUP BY o.order_id
                  ) as order_totals";
         
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        
-        return $row['avg_order'] ? $row['avg_order'] : 0;
+        try {
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            return $result['avg_order'] ? $result['avg_order'] : 0;
+        } catch(PDOException $e) {
+            error_log("Error getting average order value: " . $e->getMessage());
+            return 0;
+        }
     }
 
     public function getSalesByCategory() {
@@ -119,16 +136,16 @@ class Sales {
                  GROUP BY pc.category_name
                  ORDER BY total DESC";
         
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        $categories = [];
-        while ($row = $result->fetch_assoc()) {
-            $categories[] = $row;
+        try {
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute();
+            $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return $categories;
+        } catch(PDOException $e) {
+            error_log("Error getting sales by category: " . $e->getMessage());
+            return [];
         }
-        
-        return $categories;
     }
 
     public function getTopProducts($limit = 5) {
@@ -150,19 +167,19 @@ class Sales {
                  LEFT JOIN productcategories pc ON pcm.category_id = pc.category_id
                  GROUP BY p.product_id, p.name, pc.category_name
                  ORDER BY revenue DESC
-                 LIMIT ?";
+                 LIMIT :limit";
         
-        $stmt = $this->conn->prepare($query);
-        $stmt->bind_param("i", $limit);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        $products = [];
-        while ($row = $result->fetch_assoc()) {
-            $products[] = $row;
+        try {
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return $products;
+        } catch(PDOException $e) {
+            error_log("Error getting top products: " . $e->getMessage());
+            return [];
         }
-        
-        return $products;
     }
 
     public function getRevenueData($startDate = null, $endDate = null) {
@@ -174,21 +191,22 @@ class Sales {
                  SUM(oi.price * oi.quantity) as amount
                  FROM orders o
                  JOIN orderitems oi ON o.order_id = oi.order_id
-                 WHERE o.order_date BETWEEN ? AND ?
+                 WHERE o.order_date BETWEEN :start_date AND :end_date
                  GROUP BY DATE(o.order_date)
                  ORDER BY date ASC";
         
-        $stmt = $this->conn->prepare($query);
-        $stmt->bind_param("ss", $startDate, $endDate);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        $revenue = [];
-        while ($row = $result->fetch_assoc()) {
-            $revenue[] = $row;
+        try {
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':start_date', $startDate);
+            $stmt->bindParam(':end_date', $endDate);
+            $stmt->execute();
+            $revenue = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return $revenue;
+        } catch(PDOException $e) {
+            error_log("Error getting revenue data: " . $e->getMessage());
+            return [];
         }
-        
-        return $revenue;
     }
 
     public function getFilteredSalesData($startDate, $endDate) {

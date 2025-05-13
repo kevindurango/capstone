@@ -17,8 +17,15 @@ $orderCountPending = $dashboard->getOrderCountByStatus('pending');
 $orderCountCompleted = $dashboard->getOrderCountByStatus('completed');
 $orderCountCanceled = $dashboard->getOrderCountByStatus('canceled');
 $pickupCountPending  = $dashboard->getPickupCountByStatus('pending');
-$pickupCountShipped  = $dashboard->getPickupCountByStatus('shipped');
-$pickupCountDelivered = $dashboard->getPickupCountByStatus('delivered');
+$pickupCountInTransit  = $dashboard->getPickupCountByStatus('in_transit');
+$pickupCountCompleted = $dashboard->getPickupCountByStatus('completed');
+
+// Fetch agricultural analytics data
+$farmersPerBarangay = $dashboard->getFarmersPerBarangay();
+$cropsPerBarangay = $dashboard->getCropsPerBarangay();
+$seasonalCrops = $dashboard->getSeasonalCropProduction();
+$currentSeasons = $dashboard->getCurrentCropSeasons();
+$allBarangays = $dashboard->getAllBarangays();
 
 // Fetch revenue data (with fallbacks in case methods don't exist yet)
 $totalRevenue = method_exists($dashboard, 'getTotalRevenue') ? $dashboard->getTotalRevenue() : 15820.75;
@@ -36,23 +43,8 @@ if (method_exists($dashboard, 'getRecentActivity')) {
             'type' => 'order',
             'icon' => 'cart-check',
             'color' => 'info',
-            'title' => 'New order #1234 was placed',
-            'status' => 'pending',
+            'title' => "New order #123 by John Doe",
             'date' => date('Y-m-d H:i:s', strtotime('-10 minutes'))
-        ],
-        [
-            'type' => 'user',
-            'icon' => 'person-plus',
-            'color' => 'success',
-            'title' => 'New user registered',
-            'date' => date('Y-m-d H:i:s', strtotime('-2 hours'))
-        ],
-        [
-            'type' => 'product',
-            'icon' => 'exclamation-circle',
-            'color' => 'warning',
-            'title' => 'Inventory low for Product X',
-            'date' => date('Y-m-d H:i:s', strtotime('-1 day'))
         ]
     ];
 }
@@ -371,6 +363,46 @@ function timeAgo($datetime) {
             </div>
           </div>
         </section>
+
+        <!-- Agricultural Analytics Section -->
+        <section id="agricultural-analytics">
+          <div class="row">
+            <div class="col-md-6 mb-4">
+              <div class="stat-card">
+                <h5 class="chart-title">Farmers per Barangay</h5>
+                <div class="chart-container">
+                  <canvas id="farmersPerBarangayChart"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6 mb-4">
+              <div class="stat-card">
+                <h5 class="chart-title">Crop Production per Barangay</h5>
+                <div class="chart-container">
+                  <canvas id="cropsPerBarangayChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-4">
+              <div class="stat-card">
+                <h5 class="chart-title">Seasonal Crop Production</h5>
+                <div class="chart-container">
+                  <canvas id="seasonalCropsChart"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6 mb-4">
+              <div class="stat-card">
+                <h5 class="chart-title">Current Crop Seasons</h5>
+                <div class="chart-container">
+                  <canvas id="currentSeasonsChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -397,8 +429,13 @@ function timeAgo($datetime) {
   <input type="hidden" id="order-completed-count" value="<?= $orderCountCompleted ?>">
   <input type="hidden" id="order-canceled-count" value="<?= $orderCountCanceled ?>">
   <input type="hidden" id="pickup-pending-count" value="<?= $pickupCountPending ?>">
-  <input type="hidden" id="pickup-shipped-count" value="<?= $pickupCountShipped ?>">
-  <input type="hidden" id="pickup-delivered-count" value="<?= $pickupCountDelivered ?>">
+  <input type="hidden" id="pickup-shipped-count" value="<?= $pickupCountInTransit ?>">
+  <input type="hidden" id="pickup-delivered-count" value="<?= $pickupCountCompleted ?>">
+  <input type="hidden" id="farmers-per-barangay" value='<?= json_encode($farmersPerBarangay) ?>'>
+  <input type="hidden" id="crops-per-barangay" value='<?= json_encode($cropsPerBarangay) ?>'>
+  <input type="hidden" id="seasonal-crops" value='<?= json_encode($seasonalCrops) ?>'>
+  <input type="hidden" id="current-seasons" value='<?= json_encode($currentSeasons) ?>'>
+  <input type="hidden" id="all-barangays" value='<?= json_encode($allBarangays) ?>'>
   
   <!-- Scripts -->
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>

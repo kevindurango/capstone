@@ -31,6 +31,12 @@ class Dashboard {
     // Get count of shipping info by status - Fixed to use pickups table instead of shippinginfo
     public function getPickupCountByStatus($status) {
         try {
+            // Updated to use consistent status values across the application
+            $validStatuses = ['pending', 'scheduled', 'in_transit', 'picked_up', 'completed', 'cancelled'];
+            if (!in_array($status, $validStatuses)) {
+                error_log("Warning: Invalid pickup status requested: $status");
+            }
+            
             $stmt = $this->db->prepare("SELECT COUNT(*) FROM pickups WHERE pickup_status = ?");
             $stmt->execute([$status]);
             return $stmt->fetchColumn();
@@ -400,6 +406,307 @@ class Dashboard {
         } catch (PDOException $e) {
             error_log("Error getting total sales amount: " . $e->getMessage());
             return 0;
+        }
+    }
+
+    /**
+     * Get farmers per barangay using view_farmers_per_barangay view
+     * @return array Array of barangays with farmer counts
+     */
+    public function getFarmersPerBarangay() {
+        try {
+            $stmt = $this->db->query("SELECT * FROM view_farmers_per_barangay ORDER BY farmer_count DESC");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting farmers per barangay: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get crops per barangay using view_crops_per_barangay view
+     * @return array Array of crops by barangay
+     */
+    public function getCropsPerBarangay() {
+        try {
+            $stmt = $this->db->query("SELECT * FROM view_crops_per_barangay ORDER BY barangay_name, product_name");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting crops per barangay: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get seasonal crop production data using view_seasonal_crops view
+     * @return array Array of seasonal crop data
+     */
+    public function getSeasonalCropProduction() {
+        try {
+            $stmt = $this->db->query("SELECT * FROM view_seasonal_crops ORDER BY season_name, product_name");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting seasonal crop production: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get top crops in a specific barangay
+     * @param int $barangay_id Barangay ID to analyze
+     * @param int $limit Number of top crops to return
+     * @return array Top crops by production volume
+     */
+    public function getTopCropsByBarangay($barangay_id, $limit = 5) {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT p.name as product_name, 
+                       SUM(bp.estimated_production) as total_production,
+                       bp.production_unit
+                FROM barangay_products bp
+                JOIN products p ON bp.product_id = p.product_id
+                WHERE bp.barangay_id = :barangay_id
+                GROUP BY p.name, bp.production_unit
+                ORDER BY total_production DESC
+                LIMIT :limit
+            ");
+            $stmt->bindParam(':barangay_id', $barangay_id, PDO::PARAM_INT);
+            $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting top crops by barangay: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get crop production by season
+     * @param int $season_id Optional season ID to filter by
+     * @return array Crop production data by season
+     */
+    public function getCropProductionBySeason($season_id = null) {
+        try {
+            $query = "
+                SELECT cs.season_name, 
+                       p.name as product_name,
+                       SUM(bp.estimated_production) as total_production,
+                       bp.production_unit
+                FROM barangay_products bp
+                JOIN products p ON bp.product_id = p.product_id
+                JOIN crop_seasons cs ON bp.season_id = cs.season_id
+                WHERE 1=1
+            ";
+            
+            if ($season_id) {
+                $query .= " AND bp.season_id = :season_id";
+            }
+            
+            $query .= " GROUP BY cs.season_name, p.name, bp.production_unit
+                        ORDER BY cs.season_name, total_production DESC";
+            
+            $stmt = $this->db->prepare($query);
+            
+            if ($season_id) {
+                $stmt->bindParam(':season_id', $season_id, PDO::PARAM_INT);
+            }
+            
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting crop production by season: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get all barangays with their details
+     * @return array All barangays in the system
+     */
+    public function getAllBarangays() {
+        try {
+            $stmt = $this->db->query("SELECT * FROM barangays ORDER BY barangay_name");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting all barangays: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get all crop seasons
+     * @return array All defined crop seasons
+     */
+    public function getAllCropSeasons() {
+        try {
+            $stmt = $this->db->query("SELECT * FROM crop_seasons ORDER BY start_month");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting all crop seasons: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get current active crop season(s) based on current month
+     * @return array Active crop seasons
+     */
+    public function getCurrentCropSeasons() {
+        try {
+            $currentMonth = date('n'); // Current month number (1-12)
+            
+            $stmt = $this->db->prepare("
+                SELECT * FROM crop_seasons
+                WHERE (:current_month BETWEEN start_month AND end_month)
+                   OR (start_month > end_month AND 
+                      (:current_month >= start_month OR :current_month <= end_month))
+                ORDER BY season_name
+            ");
+            $stmt->bindParam(':current_month', $currentMonth, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting current crop seasons: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get production statistics by barangay
+     * @return array Production statistics grouped by barangay
+     */
+    public function getProductionStatsByBarangay() {
+        try {
+            $stmt = $this->db->query("
+                SELECT b.barangay_id,
+                       b.barangay_name,
+                       COUNT(DISTINCT bp.product_id) as unique_crops,
+                       SUM(bp.estimated_production) as total_production,
+                       MAX(bp.production_unit) as unit
+                FROM barangays b
+                LEFT JOIN barangay_products bp ON b.barangay_id = bp.barangay_id
+                GROUP BY b.barangay_id, b.barangay_name
+                ORDER BY unique_crops DESC, total_production DESC
+            ");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting production stats by barangay: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get summary of farmers and farm area by barangay
+     * @return array Summary data of farmers and area by barangay
+     */
+    public function getFarmingSummaryByBarangay() {
+        try {
+            // Call the get_farmer_count_by_barangay function for each barangay
+            $stmt = $this->db->query("
+                SELECT b.barangay_id, 
+                       b.barangay_name,
+                       get_farmer_count_by_barangay(b.barangay_id) as farmer_count,
+                       get_top_crop_by_barangay(b.barangay_id) as top_crop
+                FROM barangays b
+                ORDER BY farmer_count DESC
+            ");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting farming summary by barangay: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get crops with area metrics per barangay - new method for area analysis
+     * @return array Array of crops with production and area metrics by barangay
+     */
+    public function getCropsWithAreaMetrics() {
+        try {
+            $stmt = $this->db->query("
+                SELECT 
+                    b.barangay_name,
+                    p.name as product_name,
+                    SUM(bp.estimated_production) as total_production,
+                    MAX(bp.production_unit) as production_unit,
+                    SUM(bp.planted_area) as total_planted_area,
+                    MAX(bp.area_unit) as area_unit,
+                    CASE 
+                        WHEN SUM(bp.planted_area) > 0 
+                        THEN SUM(bp.estimated_production) / SUM(bp.planted_area) 
+                        ELSE 0 
+                    END as yield_per_area
+                FROM barangay_products bp
+                JOIN barangays b ON bp.barangay_id = b.barangay_id
+                JOIN products p ON bp.product_id = p.product_id
+                GROUP BY b.barangay_name, p.name
+                ORDER BY b.barangay_name, total_production DESC
+            ");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting crop metrics with area: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get barangay agricultural efficiency metrics
+     * @return array Array of barangays with yield efficiency metrics
+     */
+    public function getBarangayEfficiencyMetrics() {
+        try {
+            $stmt = $this->db->query("
+                SELECT 
+                    b.barangay_id,
+                    b.barangay_name,
+                    SUM(bp.planted_area) as total_area_planted,
+                    MAX(bp.area_unit) as area_unit,
+                    SUM(bp.estimated_production) as total_production,
+                    MAX(bp.production_unit) as production_unit,
+                    CASE 
+                        WHEN SUM(bp.planted_area) > 0 
+                        THEN SUM(bp.estimated_production) / SUM(bp.planted_area) 
+                        ELSE 0 
+                    END as average_yield
+                FROM barangays b
+                LEFT JOIN barangay_products bp ON b.barangay_id = bp.barangay_id
+                GROUP BY b.barangay_id, b.barangay_name
+                ORDER BY average_yield DESC
+            ");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting barangay efficiency metrics: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get barangay overview with agricultural metrics (crops & farmers)
+     * Shows all barangays including those without crop data
+     * @return array All barangays with available metrics
+     */
+    public function getAllBarangaysWithMetrics() {
+        try {
+            $stmt = $this->db->query("
+                SELECT 
+                    b.barangay_id,
+                    b.barangay_name,
+                    b.municipality,
+                    b.province,
+                    COALESCE(COUNT(DISTINCT bp.product_id), 0) as crop_count,
+                    COALESCE(COUNT(DISTINCT fd.user_id), 0) as farmer_count,
+                    COALESCE(SUM(fd.farm_size), 0) as total_farm_area,
+                    COALESCE(SUM(bp.planted_area), 0) as total_planted_area
+                FROM barangays b
+                LEFT JOIN barangay_products bp ON b.barangay_id = bp.barangay_id
+                LEFT JOIN farmer_details fd ON b.barangay_id = fd.barangay_id
+                GROUP BY b.barangay_id, b.barangay_name, b.municipality, b.province
+                ORDER BY b.barangay_name
+            ");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting all barangay metrics: " . $e->getMessage());
+            return [];
         }
     }
 }

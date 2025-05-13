@@ -45,6 +45,21 @@ if (isset($_GET['loadMore'])) {
 $categories = $productController->getCategoriesOptimized();
 $farmers = $productController->getAllFarmers();
 
+// Get all barangays for geographic filtering
+try {
+    // Initialize database connection
+    require_once '../../models/Database.php';
+    $database = new Database();
+    $conn = $database->connect();
+    
+    $barangayQuery = "SELECT barangay_id, barangay_name FROM barangays ORDER BY barangay_name";
+    $barangayStmt = $conn->query($barangayQuery);
+    $barangays = $barangayStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Error fetching barangays for product management: " . $e->getMessage());
+    $barangays = [];
+}
+
 // Handle status updates
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['update_status'])) {
@@ -371,7 +386,7 @@ function exportProductsToCSV($products) {
                                 <input type="text" id="searchProduct" class="form-control" placeholder="Product name, farmer...">
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="form-group">
                                 <label><i class="bi bi-funnel"></i> Filter Status</label>
                                 <select id="statusFilter" class="form-control">
@@ -382,7 +397,7 @@ function exportProductsToCSV($products) {
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="form-group">
                                 <label><i class="bi bi-tag"></i> Filter Category</label>
                                 <select id="categoryFilter" class="form-control">
@@ -390,6 +405,19 @@ function exportProductsToCSV($products) {
                                     <?php foreach ($categories as $category): ?>
                                         <option value="<?= $category['category_id'] ?>">
                                             <?= htmlspecialchars($category['category_name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label><i class="bi bi-geo-alt"></i> Barangay</label>
+                                <select id="barangayFilter" class="form-control">
+                                    <option value="">All Barangays</option>
+                                    <?php foreach ($barangays as $barangay): ?>
+                                        <option value="<?= $barangay['barangay_id'] ?>">
+                                            <?= htmlspecialchars($barangay['barangay_name']) ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -492,6 +520,12 @@ function exportProductsToCSV($products) {
                                                         data-status="<?= htmlspecialchars($product['status'] ?? 'pending') ?>"
                                                         title="Update Status">
                                                     <i class="bi bi-arrow-up-circle"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-primary manage-planted-area" 
+                                                        data-id="<?= $product['product_id'] ?>"
+                                                        data-name="<?= htmlspecialchars($product['name']) ?>"
+                                                        title="Manage Planted Area">
+                                                    <i class="bi bi-geo-alt"></i>
                                                 </button>
                                             </div>
                                         </td>
@@ -641,6 +675,99 @@ function exportProductsToCSV($products) {
                 <div class="modal-footer">
                     <button type="button" class="btn btn-success" data-dismiss="modal">OK</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Planted Area Management Modal -->
+    <div class="modal fade" id="plantedAreaModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-geo-alt"></i> Manage Planted Area</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="plantedAreaAlert" class="alert" style="display: none;"></div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <h5 id="productNameHeader"></h5>
+                            <p class="text-muted">Update planted area across different barangays</p>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover" id="plantedAreaTable">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Barangay</th>
+                                    <th>Season</th>
+                                    <th>Estimated Production</th>
+                                    <th>Unit</th>
+                                    <th>Planted Area (hectares)</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="plantedAreaTableBody">
+                                <!-- Data will be loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Planted Area Modal -->
+    <div class="modal fade" id="editPlantedAreaModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Planted Area</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <form id="editPlantedAreaForm">
+                    <div class="modal-body">
+                        <input type="hidden" id="edit_record_id" name="record_id">
+                        <input type="hidden" id="edit_product_id" name="product_id">
+                        
+                        <div class="form-group">
+                            <label for="edit_barangay">Barangay</label>
+                            <input type="text" id="edit_barangay" class="form-control" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="edit_season">Season</label>
+                            <input type="text" id="edit_season" class="form-control" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="edit_production">Estimated Production</label>
+                            <div class="input-group">
+                                <input type="number" id="edit_production" name="estimated_production" class="form-control" step="0.01" min="0">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="edit_production_unit"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="edit_planted_area">Planted Area</label>
+                            <div class="input-group">
+                                <input type="number" id="edit_planted_area" name="planted_area" class="form-control" step="0.01" min="0" required>
+                                <div class="input-group-append">
+                                    <span class="input-group-text">hectares</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -866,6 +993,213 @@ function exportProductsToCSV($products) {
                         button.find('.loading-spinner').hide();
                     }
                 });
+            });
+
+            // Manage Planted Area button handler
+            $(document).on('click', '.manage-planted-area', function() {
+                const productId = $(this).data('id');
+                const productName = $(this).data('name');
+                
+                // Set product name in the modal header
+                $('#productNameHeader').text(productName);
+                
+                // Clear previous data
+                $('#plantedAreaTableBody').empty();
+                $('#plantedAreaAlert').hide();
+                
+                // Show loading state
+                $('#plantedAreaTableBody').html('<tr><td colspan="6" class="text-center"><div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></td></tr>');
+                
+                console.log("Fetching planted area data for product ID:", productId);
+                
+                // Fetch planted area data via AJAX
+                $.ajax({
+                    url: '../../ajax/get-planted-area.php',
+                    type: 'GET',
+                    data: { product_id: productId },
+                    dataType: 'json',
+                    success: function(response) {
+                        $('#plantedAreaTableBody').empty();
+                        
+                        // Debug: Log the response from the server
+                        console.log("AJAX Response:", response);
+
+                        if (response.success) {
+                            if (response.data && response.data.length > 0) {
+                                // Debug: Log the first row of data
+                                console.log("First row of data:", response.data[0]);
+
+                                // Populate the table with the data
+                                $.each(response.data, function(index, item) {
+                                    // Parse numeric strings to actual numbers
+                                    const estimatedProduction = parseFloat(item.estimated_production);
+                                    const plantedArea = parseFloat(item.planted_area);
+
+                                    // Ensure valid numeric values or default to 0.00
+                                    const validEstimatedProduction = isNaN(estimatedProduction) ? '0.00' : estimatedProduction.toFixed(2);
+                                    const validPlantedArea = isNaN(plantedArea) ? '0.00' : plantedArea.toFixed(2);
+
+                                    console.log(`Row ${index} parsed values:`, {
+                                        estimatedProduction: validEstimatedProduction,
+                                        plantedArea: validPlantedArea
+                                    });
+
+                                    let row = `
+                                        <tr>
+                                            <td>${item.barangay_name || 'N/A'}</td>
+                                            <td>${item.season_name || 'N/A'}</td>
+                                            <td>${validEstimatedProduction}</td>
+                                            <td>${item.production_unit || 'kilogram'}</td>
+                                            <td>${validPlantedArea}</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-primary edit-planted-area" 
+                                                        data-id="${item.id}"
+                                                        data-product-id="${productId}"
+                                                        data-barangay="${item.barangay_name || ''}"
+                                                        data-season="${item.season_name || ''}"
+                                                        data-production="${validEstimatedProduction}"
+                                                        data-unit="${item.production_unit || 'kilogram'}"
+                                                        data-area="${validPlantedArea}">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `;
+                                    $('#plantedAreaTableBody').append(row);
+                                });
+                            } else {
+                                // No data found
+                                $('#plantedAreaTableBody').html('<tr><td colspan="6" class="text-center">No planted area data found for this product.</td></tr>');
+                                $('#plantedAreaAlert').removeClass('alert-danger').addClass('alert-info')
+                                    .html('<strong>Info:</strong> No planted area data exists for this product yet. Click Edit to create new entries.')
+                                    .show();
+                            }
+                        } else {
+                            // Error message
+                            $('#plantedAreaAlert').removeClass('alert-success').addClass('alert-danger')
+                                .html('<strong>Error:</strong> ' + (response.message || 'Failed to load planted area data.'))
+                                .show();
+                            $('#plantedAreaTableBody').html('<tr><td colspan="6" class="text-center">Failed to fetch planted area data.</td></tr>');
+                        }
+                        
+                        // Show the modal
+                        $('#plantedAreaModal').modal('show');
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("AJAX Error:", status, error);
+                        console.log("Response:", xhr.responseText);
+                        
+                        $('#plantedAreaAlert').removeClass('alert-success').addClass('alert-danger')
+                            .html('<strong>Error:</strong> Failed to load planted area data. Please check the console for details.')
+                            .show();
+                        $('#plantedAreaTableBody').html('<tr><td colspan="6" class="text-center">Error loading data. Please try again later.</td></tr>');
+                        $('#plantedAreaModal').modal('show');
+                    }
+                });
+            });
+
+            // Edit planted area button click handler
+            $(document).on('click', '.edit-planted-area', function() {
+                const recordId = $(this).data('id');
+                const productId = $(this).data('product-id');
+                const barangay = $(this).data('barangay');
+                const season = $(this).data('season');
+                const production = $(this).data('production');
+                const unit = $(this).data('unit');
+                const area = $(this).data('area');
+                
+                // Set values in the edit form
+                $('#edit_record_id').val(recordId);
+                $('#edit_product_id').val(productId);
+                $('#edit_barangay').val(barangay);
+                $('#edit_season').val(season);
+                $('#edit_production').val(production);
+                $('#edit_production_unit').text(unit);
+                $('#edit_planted_area').val(area);
+                
+                // Show the edit modal
+                $('#plantedAreaModal').modal('hide');
+                $('#editPlantedAreaModal').modal('show');
+            });
+
+            // Handle edit planted area form submission
+            $('#editPlantedAreaForm').on('submit', function(e) {
+                e.preventDefault();
+                const formData = $(this).serialize();
+                
+                $.ajax({
+                    url: '../../ajax/update-planted-area.php',
+                    type: 'POST',
+                    data: formData,
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            // Close the edit modal
+                            $('#editPlantedAreaModal').modal('hide');
+                            
+                            // Show success message
+                            $('#plantedAreaAlert').removeClass('alert-danger').addClass('alert-success').text(response.message).show();
+                            
+                            // Re-fetch the planted area data to refresh the table
+                            const productId = $('#edit_product_id').val();
+                            
+                            // Fetch updated data
+                            $.ajax({
+                                url: '../../ajax/get-planted-area.php',
+                                type: 'GET',
+                                data: { product_id: productId },
+                                dataType: 'json',
+                                success: function(dataResponse) {
+                                    $('#plantedAreaTableBody').empty();
+                                    
+                                    if (dataResponse.success && dataResponse.data.length > 0) {
+                                        // Populate the table with the updated data
+                                        $.each(dataResponse.data, function(index, item) {
+                                            let row = `
+                                                <tr>
+                                                    <td>${item.barangay_name}</td>
+                                                    <td>${item.season_name}</td>
+                                                    <td>${item.estimated_production}</td>
+                                                    <td>${item.production_unit}</td>
+                                                    <td>${item.planted_area}</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-primary edit-planted-area" 
+                                                                data-id="${item.id}"
+                                                                data-product-id="${productId}"
+                                                                data-barangay="${item.barangay_name}"
+                                                                data-season="${item.season_name}"
+                                                                data-production="${item.estimated_production}"
+                                                                data-unit="${item.production_unit}"
+                                                                data-area="${item.planted_area}">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            `;
+                                            $('#plantedAreaTableBody').append(row);
+                                        });
+                                    } else {
+                                        $('#plantedAreaTableBody').html('<tr><td colspan="6" class="text-center">No planted area data found for this product.</td></tr>');
+                                    }
+                                    
+                                    // Show the planted area modal again
+                                    $('#plantedAreaModal').modal('show');
+                                }
+                            });
+                        } else {
+                            // Show error message
+                            alert(response.message);
+                        }
+                    },
+                    error: function() {
+                        alert('Failed to update planted area. Please try again.');
+                    }
+                });
+            });
+            
+            // When edit modal is closed, show the main planted area modal again
+            $('#editPlantedAreaModal').on('hidden.bs.modal', function () {
+                $('#plantedAreaModal').modal('show');
             });
         });
     </script>

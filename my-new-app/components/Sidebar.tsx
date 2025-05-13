@@ -124,12 +124,12 @@ export default function Sidebar({
             // Force immediate navigation to login
             console.log("[Sidebar] Navigating to login screen");
             setTimeout(() => {
-              navigationRouter.replace("/(tabs)/login");
+              navigationRouter.replace("/(auth)/login");
             }, 100);
           } catch (error) {
             console.error("[Sidebar] Logout error:", error);
             // If logout fails, still try to navigate to login
-            navigationRouter.replace("/(tabs)/login");
+            navigationRouter.replace("/(auth)/login");
           }
         },
       },

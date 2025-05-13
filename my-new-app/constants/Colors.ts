@@ -35,6 +35,9 @@ export const COLORS = {
   muted: "#78909C",
   gradient: ["#2E7D32", "#1B5E20", "#0D3010"] as const,
   shadow: "#000000",
+  success: "#4CAF50",  // Added success color
+  warning: "#FFC107",  // Added warning color (same as secondary)
+  danger: "#F44336",   // Added danger color
 } as const;
 
 export type ColorKeys = keyof typeof COLORS;

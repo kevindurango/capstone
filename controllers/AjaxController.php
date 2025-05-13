@@ -658,7 +658,7 @@ function getPickupDetails() {
             $html .= '</div></div></div>';
         }
         
-        // Products section
+
         $html .= '<div class="card">
             <div class="card-header bg-light">
                 <h5 class="mb-0"><i class="bi bi-box"></i> Order Products</h5>
@@ -680,7 +680,7 @@ function getPickupDetails() {
         if (!empty($products)) {
             foreach ($products as $product) {
                 $productTotal = $product['quantity'] * $product['unit_price'];
-                $productName = !empty($product['product_name']) ? $product['product_name'] : 'Product #' . $product['product_id'];
+                $productName = !empty($product['product_name']) ? $product['product_name'] : 'Unknown Product';
                 $html .= '<tr>
                     <td>' . htmlspecialchars($productName) . '</td>
                     <td>' . htmlspecialchars(substr($product['description'] ?? '', 0, 50)) . (strlen($product['description'] ?? '') > 50 ? '...' : '') . '</td>

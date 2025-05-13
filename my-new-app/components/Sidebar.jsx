@@ -47,7 +47,7 @@ const Sidebar = ({ isVisible, onClose, router, colors, onLogout }) => {
     {
       icon: "home-outline",
       label: "Home",
-      onPress: () => router.push("/(tabs)/home"),
+      onPress: () => router.push("/(tabs)/main"),
     },
     {
       icon: "information-circle-outline",

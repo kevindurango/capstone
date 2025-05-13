@@ -230,33 +230,47 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
             overflow: hidden;
         }
         .table thead th {
-            background-color: #198754;
+            background-color: #198754; /* Solid green color instead of gradient */
             color: white;
-            border-bottom: 0;
-            white-space: nowrap;
+            font-weight: 600;
+            border-bottom: none;
+            padding: 12px 15px;
+            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
         }
         .table-hover tbody tr:hover {
             background-color: #f8f9fa;
             cursor: pointer;
         }
-        .card-stats {
+        .dashboard-card {
             transition: transform 0.3s ease;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow: hidden;
+            padding: 20px;
+            background-color: #fff;
             height: 100%;
+            min-height: 160px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
         }
-        .card-stats:hover {
+        .dashboard-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.15);
         }
-        .card-stats .card-header {
-            background: linear-gradient(135deg, #198754 0%, #20c997 100%);
-            color: white;
-            font-weight: 600;
+        .card-icon {
+            font-size: 2rem;
+            margin-bottom: 15px;
         }
-        .card-stats .card-body {
-            padding: 1.5rem;
+        .dashboard-card h3 {
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .dashboard-card p {
+            color: #6c757d;
+            margin-bottom: 0;
         }
         .stats-icon {
             font-size: 1.5rem;
@@ -332,20 +346,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
         /* Improved action buttons styling */
         .action-btn-group {
             display: flex;
+                flex-direction: row;
             justify-content: center;
-            gap: 8px;
+            gap: 5px;
+            flex-wrap: nowrap;
+            width: 100%;
         }
         
         .btn-action {
-            border-radius: 6px;
-            padding: 6px 12px;
+            border-radius: 4px;
+            padding: 5px 10px;
             font-size: 0.85rem;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             transition: all 0.2s ease;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            min-width: 80px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            white-space: nowrap;
+            margin: 0;
+        }
+        
+        .action-btn-group .btn {
+            flex: 1;
+            min-width: auto;
+            white-space: nowrap;
         }
         
         .btn-action:hover {
@@ -355,7 +379,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
         
         .btn-action i {
             margin-right: 4px;
-            font-size: 1rem;
+            font-size: 0.9rem;
         }
         
         .btn-view {
@@ -381,12 +405,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
             border-color: #0062cc;
             color: white;
         }
+        
+        /* Fix for table button groups */
+        .btn-group {
+            display: flex;
+            flex-direction: row;
+            gap: 5px;
+        }
+        
+        .btn-group .btn {
+            flex: 0 0 auto;
+            white-space: nowrap;
+            margin: 0;
+        }
     </style>
 </head>
 <body class="bg-light">
     <!-- Organization Header -->
     <div class="organization-header text-center">
-        <h2><i class="bi bi-building"></i> ORGANIZATION MANAGEMENT SYSTEM
+        <h2><i class="bi bi-people-fill"></i> FARMER MANAGEMENT SYSTEM
             <span class="organization-badge">Organization Head Access</span>
         </h2>
     </div>
@@ -398,14 +435,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
 
             <!-- Main Content -->
             <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2 text-success"><i class="bi bi-people-fill"></i> Farmers Management</h1>
-                    <form method="POST" class="ml-3" onsubmit="return confirm('Are you sure you want to logout?');">
-                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                        <button type="submit" name="logout" class="btn btn-danger">
-                            <i class="bi bi-box-arrow-right"></i> Logout
+                <!-- Add Breadcrumb -->
+                <nav aria-label="breadcrumb" class="mt-3">
+                    <ol class="breadcrumb bg-white custom-card">
+                        <li class="breadcrumb-item"><a href="organization-head-dashboard.php">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Farmer Management</li>
+                    </ol>
+                </nav>
+
+                <!-- Enhanced Page Header -->
+                <div class="page-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h2 mb-1">Farmer Management</h1>
+                        <p class="text-muted mb-0">View, edit, and manage farmer information</p>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-success mr-2" id="exportCSV">
+                            <i class="bi bi-file-earmark-text"></i> Export Report
                         </button>
-                    </form>
+                        <form method="POST" class="mb-0" onsubmit="return confirm('Are you sure you want to logout?');">
+                            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                            <button type="submit" name="logout" class="btn btn-danger">
+                                <i class="bi bi-box-arrow-right"></i> Logout
+                            </button>
+                        </form>
+                    </div>
                 </div>
 
                 <!-- Alert Messages -->
@@ -426,183 +480,234 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
                 <div class="data-filter-card">
                     <div class="row">
                         <div class="col-md-8">
-                            <form method="GET" action="" class="form-inline">
+                            <form method="GET" action="" class="form-inline mb-2">
                                 <div class="form-group mr-3">
                                     <label for="search" class="sr-only">Search</label>
-                                    <input type="text" id="search" name="search" class="form-control" 
-                                           placeholder="Search farmers..." value="<?= htmlspecialchars($search) ?>">
+                                    <div class="input-group">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                        </div>
+                                        <input type="text" id="search" name="search" class="form-control" 
+                                               placeholder="Search farmers..." value="<?= htmlspecialchars($search) ?>">
+                                    </div>
                                 </div>
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="bi bi-search"></i> Search
+                                <button type="submit" class="btn btn-primary mr-2">
+                                    Search
                                 </button>
-                                <a href="organization-head-farmers.php" class="btn btn-outline-secondary ml-2">
+                                <a href="organization-head-farmers.php" class="btn btn-outline-secondary">
                                     <i class="bi bi-arrow-counterclockwise"></i> Reset
                                 </a>
                             </form>
+                            
+                            <div class="row mt-2">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="farmTypeFilter"><i class="bi bi-funnel"></i> Farm Type</label>
+                                        <select id="farmTypeFilter" class="form-control form-control-sm">
+                                            <option value="">All Types</option>
+                                            <option value="Vegetable Farm">Vegetable Farm</option>
+                                            <option value="Fruit Orchard">Fruit Orchard</option>
+                                            <option value="Rice Farm">Rice Farm</option>
+                                            <option value="Mixed Crop">Mixed Crop</option>
+                                            <option value="Livestock">Livestock</option>
+                                            <option value="Poultry">Poultry</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="certificationFilter"><i class="bi bi-patch-check"></i> Certification</label>
+                                        <select id="certificationFilter" class="form-control form-control-sm">
+                                            <option value="">All</option>
+                                            <option value="yes">With Certification</option>
+                                            <option value="no">No Certification</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="sortBy"><i class="bi bi-sort-alpha-down"></i> Sort By</label>
+                                        <select id="sortBy" class="form-control form-control-sm">
+                                            <option value="name">Name (A-Z)</option>
+                                            <option value="farm_size_desc">Farm Size (Largest)</option>
+                                            <option value="farm_size_asc">Farm Size (Smallest)</option>
+                                            <option value="farm_name">Farm Name</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-md-4 text-right">
-                            <button id="exportCSV" class="btn btn-export">
+                            <button id="exportCSV" class="btn btn-export mb-2 btn-lg btn-block">
                                 <i class="bi bi-download"></i> Export Farmers List
+                            </button>
+                            <button id="exportDetailedReport" class="btn btn-outline-success btn-block">
+                                <i class="bi bi-file-earmark-spreadsheet"></i> Detailed Farm Report
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Stats Overview -->
+                <!-- Enhanced User Stats Cards -->
                 <div class="row mb-4">
                     <div class="col-md-3">
-                        <div class="card card-stats">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0"><i class="bi bi-person-badge stats-icon"></i> Total Farmers</h5>
+                        <div class="dashboard-card">
+                            <div class="card-icon text-success">
+                                <i class="bi bi-person-lines-fill"></i>
                             </div>
-                            <div class="card-body text-center">
-                                <div class="stats-number"><?= $totalFarmersCount ?></div>
-                                <div class="stats-label">Registered farmers</div>
-                            </div>
+                            <h3 class="mb-3"><?= $totalFarmersCount ?></h3>
+                            <p class="text-muted mb-0">Total Farmers</p>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card card-stats">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0"><i class="bi bi-rulers stats-icon"></i> Avg. Farm Size</h5>
+                        <div class="dashboard-card">
+                            <div class="card-icon text-primary">
+                                <i class="bi bi-rulers"></i>
                             </div>
-                            <div class="card-body text-center">
-                                <div class="stats-number"><?= number_format($avgFarmSize, 2) ?> ha</div>
-                                <div class="stats-label">Average farm area</div>
-                            </div>
+                            <h3 class="mb-3"><?= number_format($avgFarmSize, 2) ?> ha</h3>
+                            <p class="text-muted mb-0">Average Farm Size</p>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card card-stats">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0"><i class="bi bi-map stats-icon"></i> Total Area</h5>
+                        <div class="dashboard-card">
+                            <div class="card-icon text-info">
+                                <i class="bi bi-map"></i>
                             </div>
-                            <div class="card-body text-center">
-                                <div class="stats-number"><?= number_format($totalFarmArea, 2) ?> ha</div>
-                                <div class="stats-label">Total farm area</div>
-                            </div>
+                            <h3 class="mb-3"><?= number_format($totalFarmArea, 2) ?> ha</h3>
+                            <p class="text-muted mb-0">Total Farm Area</p>
                         </div>
                     </div>
-                    <div class="col-md=3">
-                        <div class="card card-stats">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0"><i class="bi bi-award stats-icon"></i> Certified</h5>
+                    <div class="col-md-3">
+                        <div class="dashboard-card">
+                            <div class="card-icon text-warning">
+                                <i class="bi bi-award"></i>
                             </div>
-                            <div class="card-body text-center">
-                                <div class="stats-number"><?= $certifiedFarmers ?></div>
-                                <div class="stats-label">Farmers with certifications</div>
-                            </div>
+                            <h3 class="mb-3"><?= $certifiedFarmers ?></h3>
+                            <p class="text-muted mb-0">Certified Farmers</p>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Farmers List -->
-                <div class="row">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-success text-white">
-                                <h5 class="mb-0"><i class="bi bi-list-ul"></i> Farmers Directory</h5>
-                            </div>
-                            <div class="card-body">
-                                <?php if (empty($farmers)): ?>
-                                    <div class="alert alert-info">
-                                        No farmers found. <?= !empty($search) ? 'Try a different search term.' : '' ?>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="table-responsive">
-                                        <table class="table table-hover" id="farmersTable">
-                                            <thead>
-                                                <tr>
-                                                    <th>Name</th>
-                                                    <th>Farm Name</th>
-                                                    <th>Location</th>
-                                                    <th>Contact</th>
-                                                    <th>Farm Size</th>
-                                                    <th>Farm Type</th>
-                                                    <th>Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($farmers as $farmer): ?>
-                                                    <tr>
-                                                        <td><?= htmlspecialchars($farmer['first_name'] . ' ' . $farmer['last_name']) ?></td>
-                                                        <td><?= htmlspecialchars($farmer['farm_name'] ?? 'Not specified') ?></td>
-                                                        <td><?= htmlspecialchars($farmer['farm_location'] ?? $farmer['address'] ?? 'Not specified') ?></td>
-                                                        <td>
-                                                            <?= htmlspecialchars($farmer['contact_number'] ?? 'N/A') ?><br>
-                                                            <small><?= htmlspecialchars($farmer['email']) ?></small>
-                                                        </td>
-                                                        <td><?= ($farmer['farm_size'] ?? 0) > 0 ? number_format($farmer['farm_size'], 2) . ' ha' : 'N/A' ?></td>
-                                                        <td><?= htmlspecialchars($farmer['farm_type'] ?? 'Not specified') ?></td>
-                                                        <td>
-                                                            <div class="action-btn-group">
-                                                                <button class="btn btn-action btn-view view-farmer" 
-                                                                        data-farmer-id="<?= $farmer['user_id'] ?>"
-                                                                        data-toggle="modal" 
-                                                                        data-target="#farmerDetailsModal"
-                                                                        data-toggle="tooltip"
-                                                                        title="View farmer details">
-                                                                    <i class="bi bi-eye-fill"></i> View
-                                                                </button>
-                                                                
-                                                                <button class="btn btn-action btn-edit edit-farmer" 
-                                                                        data-farmer-id="<?= $farmer['user_id'] ?>"
-                                                                        data-first-name="<?= htmlspecialchars($farmer['first_name']) ?>"
-                                                                        data-last-name="<?= htmlspecialchars($farmer['last_name']) ?>"
-                                                                        data-email="<?= htmlspecialchars($farmer['email']) ?>"
-                                                                        data-contact="<?= htmlspecialchars($farmer['contact_number'] ?? '') ?>"
-                                                                        data-address="<?= htmlspecialchars($farmer['address'] ?? '') ?>"
-                                                                        data-farm-name="<?= htmlspecialchars($farmer['farm_name'] ?? '') ?>"
-                                                                        data-farm-type="<?= htmlspecialchars($farmer['farm_type'] ?? '') ?>"
-                                                                        data-farm-size="<?= htmlspecialchars($farmer['farm_size'] ?? '') ?>"
-                                                                        data-farm-location="<?= htmlspecialchars($farmer['farm_location'] ?? '') ?>"
-                                                                        data-certifications="<?= htmlspecialchars($farmer['certifications'] ?? '') ?>"
-                                                                        data-toggle="modal" 
-                                                                        data-target="#editFarmerModal"
-                                                                        data-toggle="tooltip"
-                                                                        title="Edit farmer information">
-                                                                    <i class="bi bi-pencil-fill"></i> Edit
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    
-                                    <!-- Pagination -->
-                                    <nav>
-                                        <ul class="pagination justify-content-center mt-4">
-                                            <?php if ($page > 1): ?>
-                                                <li class="page-item">
-                                                    <a class="page-link" href="?page=1&search=<?= urlencode($search) ?>">First</a>
-                                                </li>
-                                                <li class="page-item">
-                                                    <a class="page-link" href="?page=<?= $page - 1 ?>&search=<?= urlencode($search) ?>">Previous</a>
-                                                </li>
-                                            <?php endif; ?>
-
-                                            <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
-                                                <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
-                                                    <a class="page-link" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>"><?= $i ?></a>
-                                                </li>
-                                            <?php endfor; ?>
-
-                                            <?php if ($page < $totalPages): ?>
-                                                <li class="page-item">
-                                                    <a class="page-link" href="?page=<?= $page + 1 ?>&search=<?= urlencode($search) ?>">Next</a>
-                                                </li>
-                                                <li class="page-item">
-                                                    <a class="page-link" href="?page=<?= $totalPages ?>&search=<?= urlencode($search) ?>">Last</a>
-                                                </li>
-                                            <?php endif; ?>
-                                        </ul>
-                                        <p class="text-center">Page <?= $page ?> of <?= $totalPages ?></p>
-                                    </nav>
-                                <?php endif; ?>
-                            </div>
+                <!-- Enhanced Farmers Table -->
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="farmersTable">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Farmer Info</th>
+                                        <th>Farm</th>
+                                        <th>Contact</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($farmers as $farmer): ?>
+                                        <tr>
+                                            <td><?= $farmer['user_id'] ?></td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="user-avatar mr-3">
+                                                        <i class="bi bi-person-circle"></i>
+                                                    </div>
+                                                    <div>
+                                                        <h6 class="mb-0"><?= htmlspecialchars($farmer['first_name'] . ' ' . $farmer['last_name']) ?></h6>
+                                                        <small class="text-muted"><?= htmlspecialchars($farmer['email']) ?></small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    <strong><?= htmlspecialchars($farmer['farm_name'] ?? 'Farm Name Not Set') ?></strong>
+                                                </div>
+                                                <small class="text-muted">Type: <?= htmlspecialchars($farmer['farm_type'] ?? 'Not specified') ?></small>
+                                                <?php if (!empty($farmer['farm_size'])): ?>
+                                                    <br><small class="text-muted">Size: <?= number_format($farmer['farm_size'], 2) ?> ha</small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    <i class="bi bi-telephone"></i> <?= htmlspecialchars($farmer['contact_number'] ?? 'N/A') ?>
+                                                </div>
+                                                <small class="text-muted">
+                                                    <i class="bi bi-geo-alt"></i> <?= htmlspecialchars($farmer['farm_location'] ?? $farmer['address'] ?? 'Not specified') ?>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                    <?php if (!empty($farmer['certifications'])): ?>
+                                                    <span class="badge badge-success">Active</span>
+                                                <?php else: ?>
+                                                    <span class="badge badge-secondary">Inactive</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <div class="action-btn-group">
+                                                    <button class="btn btn-sm btn-primary edit-farmer" 
+                                                            data-toggle="modal"
+                                                            data-target="#editFarmerModal"
+                                                            data-farmer-id="<?= $farmer['user_id'] ?>"
+                                                            data-first-name="<?= htmlspecialchars($farmer['first_name']) ?>"
+                                                            data-last-name="<?= htmlspecialchars($farmer['last_name']) ?>"
+                                                            data-email="<?= htmlspecialchars($farmer['email']) ?>"
+                                                            data-contact="<?= htmlspecialchars($farmer['contact_number'] ?? '') ?>"
+                                                            data-address="<?= htmlspecialchars($farmer['address'] ?? '') ?>"
+                                                            data-farm-name="<?= htmlspecialchars($farmer['farm_name'] ?? '') ?>"
+                                                            data-farm-type="<?= htmlspecialchars($farmer['farm_type'] ?? '') ?>"
+                                                            data-farm-size="<?= htmlspecialchars($farmer['farm_size'] ?? '') ?>"
+                                                            data-farm-location="<?= htmlspecialchars($farmer['farm_location'] ?? '') ?>"
+                                                            data-certifications="<?= htmlspecialchars($farmer['certifications'] ?? '') ?>">
+                                                        <i class="bi bi-pencil-square"></i> Edit
+                                                    </button>
+                                                    <a href="organization-head-farmer-fields.php?farmer_id=<?= $farmer['user_id'] ?>" class="btn btn-sm btn-info">
+                                                        <i class="bi bi-geo-alt"></i> Fields
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         </div>
+                        
+                        <?php if (empty($farmers)): ?>
+                            <div class="alert alert-info">
+                                No farmers found. <?= !empty($search) ? 'Try a different search term.' : '' ?>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <!-- Pagination -->
+                        <?php if (!empty($farmers)): ?>
+                            <nav>
+                                <ul class="pagination justify-content-center mt-4">
+                                    <?php if ($page > 1): ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=1&search=<?= urlencode($search) ?>">First</a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=<?= $page - 1 ?>&search=<?= urlencode($search) ?>">Previous</a>
+                                        </li>
+                                    <?php endif; ?>
+
+                                    <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                                        <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
+                                            <a class="page-link" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>"><?= $i ?></a>
+                                        </li>
+                                    <?php endfor; ?>
+
+                                    <?php if ($page < $totalPages): ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=<?= $page + 1 ?>&search=<?= urlencode($search) ?>">Next</a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=<?= $totalPages ?>&search=<?= urlencode($search) ?>">Last</a>
+                                        </li>
+                                    <?php endif; ?>
+                                </ul>
+                                <p class="text-center">Page <?= $page ?> of <?= $totalPages ?></p>
+                            </nav>
+                        <?php endif; ?>
                     </div>
                 </div>
             </main>
@@ -855,6 +960,69 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
                 $('#edit_certifications').val(certifications);
             });
             
+            // Client-side filtering functionality
+            function filterTable() {
+                const farmTypeFilter = $('#farmTypeFilter').val().toLowerCase();
+                const certificationFilter = $('#certificationFilter').val();
+                const sortBy = $('#sortBy').val();
+                
+                // Get all rows in the table body
+                const rows = $('#farmersTable tbody tr').get();
+                
+                // Filter rows based on selected criteria
+                $(rows).each(function(index, row) {
+                    const $row = $(row);
+                    const farmType = $row.find('td:nth-child(6)').text().toLowerCase();
+                    const certifications = $row.find('.edit-farmer').data('certifications') || '';
+                    
+                    // Farm Type filter
+                    const matchesFarmType = !farmTypeFilter || farmType.includes(farmTypeFilter);
+                    
+                    // Certification filter
+                    let matchesCertification = true;
+                    if (certificationFilter === 'yes') {
+                        matchesCertification = certifications.trim() !== '';
+                    } else if (certificationFilter === 'no') {
+                        matchesCertification = certifications.trim() === '';
+                    }
+                    
+                    // Show/hide the row based on filters
+                    $row.toggle(matchesFarmType && matchesCertification);
+                });
+                
+                // Sort the visible rows
+                rows.sort(function(a, b) {
+                    const $a = $(a);
+                    const $b = $(b);
+                    
+                    if (sortBy === 'name') {
+                        return $a.find('td:nth-child(1)').text().localeCompare($b.find('td:nth-child(1)').text());
+                    } else if (sortBy === 'farm_name') {
+                        return $a.find('td:nth-child(2)').text().localeCompare($b.find('td:nth-child(2)').text());
+                    } else if (sortBy === 'farm_size_desc') {
+                        // Extract numeric value from "X.XX ha" format
+                        const aSize = parseFloat($a.find('td:nth-child(5)').text()) || 0;
+                        const bSize = parseFloat($b.find('td:nth-child(5)').text()) || 0;
+                        return bSize - aSize; // Descending
+                    } else if (sortBy === 'farm_size_asc') {
+                        const aSize = parseFloat($a.find('td:nth-child(5)').text()) || 0;
+                        const bSize = parseFloat($b.find('td:nth-child(5)').text()) || 0;
+                        return aSize - bSize; // Ascending
+                    }
+                    
+                    return 0;
+                });
+                
+                // Re-append sorted rows to the table
+                const tbody = $('#farmersTable tbody');
+                $.each(rows, function(index, row) {
+                    tbody.append(row);
+                });
+            }
+            
+            // Attach event handlers to filter controls
+            $('#farmTypeFilter, #certificationFilter, #sortBy').change(filterTable);
+            
             // Export CSV
             document.getElementById('exportCSV').addEventListener('click', function() {
                 // Create CSV content from table
@@ -897,6 +1065,76 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
                 const downloadLink = document.createElement('a');
                 downloadLink.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvFile);
                 downloadLink.download = `farmers_directory_${new Date().toISOString().slice(0,10)}.csv`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            });
+
+            // Export detailed report
+            document.getElementById('exportDetailedReport').addEventListener('click', function() {
+                // For detailed report, we'll include additional data from data attributes
+                const table = document.getElementById('farmersTable');
+                let csv = [];
+                
+                // Create header row with additional columns
+                csv.push('"Name","Farm Name","Location","Contact","Email","Farm Size","Farm Type","Certifications"');
+                
+                // Get all rows that are currently visible
+                const rows = table.querySelectorAll('tbody tr:not([style*="display: none"])');
+                
+                // For each visible row, extract data including from data attributes
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
+                    const editBtn = row.querySelector('.edit-farmer');
+                    
+                    // Extract farmer data from visible cells and data attributes
+                    const name = row.cells[0].textContent.trim();
+                    const farmName = row.cells[1].textContent.trim();
+                    const location = row.cells[2].textContent.trim();
+                    const contactInfo = row.cells[3].textContent.trim().replace(/(\r\n|\n|\r)/gm, ' ');
+                    // Split contact info into phone and email
+                    const contactParts = contactInfo.split(' ');
+                    const phone = contactParts[0] || '';
+                    const email = editBtn.getAttribute('data-email') || '';
+                    const farmSize = row.cells[4].textContent.trim();
+                    const farmType = row.cells[5].textContent.trim();
+                    const certifications = editBtn.getAttribute('data-certifications') || '';
+                    
+                    // Format the data for CSV
+                    const csvRow = [
+                        `"${name.replace(/"/g, '""')}"`,
+                        `"${farmName.replace(/"/g, '""')}"`,
+                        `"${location.replace(/"/g, '""')}"`,
+                        `"${phone.replace(/"/g, '""')}"`,
+                        `"${email.replace(/"/g, '""')}"`,
+                        `"${farmSize.replace(/"/g, '""')}"`,
+                        `"${farmType.replace(/"/g, '""')}"`,
+                        `"${certifications.replace(/"/g, '""')}"`
+                    ];
+                    
+                    csv.push(csvRow.join(','));
+                }
+                
+                // Add report header with more details
+                const today = new Date();
+                const reportHeader = [
+                    `"Detailed Farm Report - Generated on ${today.toLocaleDateString()} at ${today.toLocaleTimeString()}"`,
+                    `"Organization: ${document.querySelector('.organization-badge').previousSibling.textContent.trim()}"`,
+                    `"Total Farmers: ${rows.length} (filtered from ${<?= $totalFarmersCount ?>})"`,
+                    `"Total Farm Area: ${<?= number_format($totalFarmArea, 2) ?>} hectares"`,
+                    `"Average Farm Size: ${<?= number_format($avgFarmSize, 2) ?>} hectares"`,
+                    `"Certified Farmers: ${<?= $certifiedFarmers ?>}"`,
+                    `"Report Filters: ${$('#farmTypeFilter').val() ? 'Farm Type: ' + $('#farmTypeFilter').val() : 'All Farm Types'}, ${$('#certificationFilter').val() === 'yes' ? 'With Certification Only' : $('#certificationFilter').val() === 'no' ? 'Without Certification Only' : 'All Certification Status'}"`,
+                    ''  // Empty line before the actual data
+                ];
+                
+                csv = reportHeader.concat(csv);
+                const csvFile = csv.join('\n');
+                
+                // Create download link
+                const downloadLink = document.createElement('a');
+                downloadLink.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvFile);
+                downloadLink.download = `detailed_farm_report_${today.toISOString().slice(0,10)}.csv`;
                 document.body.appendChild(downloadLink);
                 downloadLink.click();
                 document.body.removeChild(downloadLink);

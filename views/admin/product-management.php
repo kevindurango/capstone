@@ -1785,6 +1785,87 @@ function getStatusBadgeClass($status) {
         // Show loading state
         const $submitBtn = $(this).find('button[type="submit"]');
         const originalBtnText = $submitBtn.text();
+        $submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...');
+        
+        // Submit form
+        this.submit();
+    });
+    
+    // Handle confirmation modal actions
+    $('#confirmAction').on('click', function() {
+        const action = $(this).data('action');
+        const id = $(this).data('id');
+        
+        if (action === 'delete-product' && id) {
+            // Show loading state
+            $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...');
+            
+            // Make AJAX call to delete the product
+            $.ajax({
+                url: '../../ajax/product-actions.php',
+                type: 'POST',
+                data: {
+                    action: 'delete_product',
+                    product_id: id
+                },
+                dataType: 'json',
+                success: function(response) {
+                    $('#confirmModal').modal('hide');
+                    
+                    if (response.success) {
+                        // Try multiple selectors to find and remove the product row
+                        // This fixes compatibility with both data-id and data-product-id attributes
+                        const $row = $(`tr[data-product-id="${id}"]`).length ? 
+                                    $(`tr[data-product-id="${id}"]`) : 
+                                    $(`tr.product-row[data-id="${id}"]`);
+                        
+                        $row.fadeOut(400, function() {
+                            $(this).remove();
+                            // Update counts in dashboard
+                            updateProductCounts();
+                        });
+                        
+                        showToast('Success', 'Product deleted successfully', 'success');
+                    } else {
+                        showToast('Error', response.message || 'Failed to delete product', 'error');
+                    }
+                },
+                error: function() {
+                    $('#confirmModal').modal('hide');
+                    showToast('Error', 'Failed to connect to server', 'error');
+                },
+                complete: function() {
+                    $('#confirmAction').prop('disabled', false).text('Confirm');
+                }
+            });
+        }
+    });
+    
+    // Function to update product counts in dashboard
+    function updateProductCounts() {
+        // This can be expanded to make an AJAX call if needed
+        const totalCount = $('.product-row').length;
+        $('#totalProductCount').text(totalCount);
+        
+        // Update other counts if needed
+        const pendingCount = $('.product-row[data-status="pending"]').length;
+        $('#pendingCount').text(pendingCount);
+    }
+
+    // Handle rejection form submission
+    $('#rejectProductForm').submit(function(e) {
+        e.preventDefault();
+        
+        // Validate that notes are provided
+        const notes = $('#rejection_notes').val().trim();
+        if (!notes) {
+            showToast('Error', 'Please provide a reason for rejection', 'error');
+            return;
+        }
+        
+        // Show loading state
+        const $submitBtn = $(this).find('button[type="submit"]');
+        const originalBtnText = $submitBtn.text();
         $submitBtn.html('<i class="bi bi-hourglass"></i> Rejecting...').prop('disabled', true);
         
         // Submit the form

@@ -5,6 +5,25 @@ $dbname = "farmersmarketdb";
 $username = "root";
 $password = "";
 
+// Global function to get a database connection
+function getConnection() {
+    global $host, $username, $password, $dbname;
+    
+    // Create connection
+    $conn = new mysqli($host, $username, $password, $dbname);
+    
+    // Check connection
+    if ($conn->connect_error) {
+        error_log("Connection failed: " . $conn->connect_error);
+        return null;
+    }
+    
+    // Set charset to utf8mb4
+    $conn->set_charset("utf8mb4");
+    
+    return $conn;
+}
+
 try {
     // Create connection
     $conn = new mysqli($host, $username, $password, $dbname);
@@ -49,6 +68,23 @@ class Database {
         }
 
         return $this->conn;
+    }
+    
+    // Adding getConnection method for backward compatibility
+    public function getConnection() {
+        // Create a mysqli connection for compatibility with existing code
+        $conn = new mysqli($this->host, $this->username, $this->password, $this->dbname);
+        
+        // Check connection
+        if ($conn->connect_error) {
+            error_log("Connection Error: " . $conn->connect_error);
+            return null;
+        }
+        
+        // Set charset to utf8mb4
+        $conn->set_charset("utf8mb4");
+        
+        return $conn;
     }
 }
 ?>

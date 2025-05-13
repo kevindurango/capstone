@@ -244,9 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
         /* Improved header */
         .organization-header {
             background: linear-gradient(
-    135deg,
-    #212529 0%,
-    #1a8754 100%
+         #1a8754 100%
   );            color: white;
             padding: 15px 0;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
@@ -277,13 +275,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
         }
         
         .table thead th {
-            background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+            background-color: #198754; /* Solid green color instead of gradient */
             color: white;
-            border-bottom: 0;
-            white-space: nowrap;
-            letter-spacing: 0.5px;
-            padding: 12px 15px;
             font-weight: 600;
+            padding: 12px 15px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.1);
         }
         
         .table-hover tbody tr:hover {

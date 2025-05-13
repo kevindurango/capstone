@@ -2,8 +2,11 @@
 session_start();
 require_once '../controllers/ProductController.php';
 
-// Check if manager is logged in
-if (!isset($_SESSION['manager_logged_in']) || $_SESSION['manager_logged_in'] !== true || $_SESSION['role'] !== 'Manager') {
+// Check authorization - allow both Manager and Admin roles
+$isManager = isset($_SESSION['manager_logged_in']) && $_SESSION['manager_logged_in'] === true && $_SESSION['role'] === 'Manager';
+$isAdmin = isset($_SESSION['user_id']) && isset($_SESSION['role']) && $_SESSION['role'] === 'Admin';
+
+if (!$isManager && !$isAdmin) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit();
 }
@@ -112,9 +115,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = $productController->deleteProduct($product_id);
             
             if ($result) {
+                // Log activity based on user role
+                if (isset($_SESSION['user_id'])) {
+                    require_once '../models/Log.php';
+                    $logClass = new Log();
+                    $role = $isAdmin ? 'Admin' : 'Manager';
+                    $logClass->logActivity($_SESSION['user_id'], "$role deleted product ID: $product_id");
+                }
+                
                 echo json_encode(['success' => true, 'message' => 'Product deleted successfully']);
             } else {
-                echo json_encode(['success' => false, 'message' => 'Failed to delete product']);
+                echo json_encode(['success' => false, 'message' => 'Failed to delete product: ' . $productController->getLastError()]);
             }
             break;
             

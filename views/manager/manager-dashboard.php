@@ -446,6 +446,77 @@ function timeAgo($datetime) {
             </div>
         </div>
 
+        <!-- Fetch barangay metrics data -->
+        <?php
+        $barangayMetrics = [];
+        try {
+            // Use the new method to get data for all 26 barangays
+            if (method_exists($dashboard, 'getAllBarangaysWithMetrics')) {
+                $barangayMetrics = $dashboard->getAllBarangaysWithMetrics();
+            } else {
+                // Fallback to get basic barangay list
+                $barangayMetrics = $dashboard->getAllBarangays();
+            }
+        } catch (Exception $e) {
+            error_log("Error fetching barangay metrics: " . $e->getMessage());
+        }
+        ?>
+
+        <!-- Barangay Statistics Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="stat-card">
+                    <h3 class="chart-title">
+                        <i class="bi bi-geo-alt-fill text-success"></i> Valencia Barangay Agricultural Statistics
+                        <small class="text-muted">(All 26 Barangays)</small>
+                    </h3>
+                    
+                    <!-- Visualization Controls -->
+                    <div class="mb-3">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-success active" id="view-farmers">Farmers</button>
+                            <button type="button" class="btn btn-outline-primary" id="view-crops">Crop Types</button>
+                            <button type="button" class="btn btn-outline-info" id="view-land">Planted Area</button>
+                        </div>
+                    </div>
+
+                    <!-- Barangay Visualization Chart -->
+                    <div class="chart-container" style="position: relative; height: 400px;">
+                        <canvas id="barangayVisualizationChart"></canvas>
+                    </div>
+                    
+                    <!-- Statistics Table -->
+                    <div class="mt-4">
+                        <h5><i class="bi bi-table"></i> Barangay Details</h5>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Barangay</th>
+                                        <th class="text-center">Farmers</th>
+                                        <th class="text-center">Crop Types</th>
+                                        <th class="text-center">Farm Area</th>
+                                        <th class="text-center">Planted Area</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($barangayMetrics as $barangay): ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($barangay['barangay_name']) ?></td>
+                                            <td class="text-center"><?= $barangay['farmer_count'] ?? 0 ?></td>
+                                            <td class="text-center"><?= $barangay['crop_count'] ?? 0 ?></td>
+                                            <td class="text-center"><?= number_format($barangay['total_farm_area'] ?? 0, 2) ?> ha</td>
+                                            <td class="text-center"><?= number_format($barangay['total_planted_area'] ?? 0, 2) ?> ha</td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ...rest of existing code... -->
 
         </main>
@@ -624,6 +695,130 @@ function timeAgo($datetime) {
 
         // Initialize other features
         // ...existing chart initialization code...
+    });
+  </script>
+  <script>
+    // Barangay Visualization Chart
+    const barangayCtx = document.getElementById('barangayVisualizationChart').getContext('2d');
+    let barangayChart;
+    let currentView = 'farmers';
+
+    // Prepare data for the barangay chart
+    const barangayData = {
+        labels: [<?php echo implode(',', array_map(function($b) { 
+            return "'" . addslashes($b['barangay_name']) . "'"; 
+        }, $barangayMetrics)); ?>],
+        datasets: {
+            farmers: [<?php echo implode(',', array_map(function($b) { 
+                return isset($b['farmer_count']) ? $b['farmer_count'] : 0; 
+            }, $barangayMetrics)); ?>],
+            crops: [<?php echo implode(',', array_map(function($b) { 
+                return isset($b['crop_count']) ? $b['crop_count'] : 0; 
+            }, $barangayMetrics)); ?>],
+            land: [<?php echo implode(',', array_map(function($b) { 
+                return isset($b['total_planted_area']) ? $b['total_planted_area'] : 0; 
+            }, $barangayMetrics)); ?>]
+        }
+    };
+
+    function renderBarangayChart(view) {
+        currentView = view;
+        
+        // Set up the colors and labels based on view
+        let colors, label;
+        switch(view) {
+            case 'farmers':
+                colors = '#28a745'; // Green color for farmers
+                label = 'Farmers Count';
+                break;
+            case 'crops':
+                colors = '#007bff'; // Blue color for crop types
+                label = 'Crop Types';
+                break;
+            case 'land':
+                colors = '#17a2b8'; // Cyan color for planted area
+                label = 'Planted Area (hectares)';
+                break;
+        }
+        
+        // Destroy existing chart if it exists
+        if (barangayChart) {
+            barangayChart.destroy();
+        }
+        
+        // Create new chart
+        barangayChart = new Chart(barangayCtx, {
+            type: 'bar',
+            data: {
+                labels: barangayData.labels,
+                datasets: [{
+                    label: label,
+                    data: barangayData.datasets[view],
+                    backgroundColor: colors,
+                    borderColor: colors.replace(')', ', 0.8)').replace('rgb', 'rgba'),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: view === 'land' ? 2 : 0
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            autoSkip: false,
+                            maxRotation: 90,
+                            minRotation: 45
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            title: function(tooltipItems) {
+                                return tooltipItems[0].label; // Barangay name
+                            },
+                            label: function(context) {
+                                let value = context.raw;
+                                if (view === 'farmers') {
+                                    return `Farmer Count: ${value}`;
+                                } else if (view === 'crops') {
+                                    return `Crop Types: ${value}`;
+                                } else { // land
+                                    return `Planted Area: ${value.toFixed(2)} hectares`;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Initialize chart with farmers view
+    $(document).ready(function() {
+        renderBarangayChart('farmers');
+        
+        // Set up button click handlers for chart view changes
+        $('#view-farmers').on('click', function() {
+            $(this).addClass('active').siblings().removeClass('active');
+            renderBarangayChart('farmers');
+        });
+        
+        $('#view-crops').on('click', function() {
+            $(this).addClass('active').siblings().removeClass('active');
+            renderBarangayChart('crops');
+        });
+        
+        $('#view-land').on('click', function() {
+            $(this).addClass('active').siblings().removeClass('active');
+            renderBarangayChart('land');
+        });
     });
   </script>
 </body>

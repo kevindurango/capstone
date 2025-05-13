@@ -6,6 +6,8 @@ import {
   Dimensions,
   TouchableOpacity,
   ScrollView,
+  BackHandler,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
@@ -17,6 +19,8 @@ import Animated, {
   withTiming,
   interpolate,
 } from "react-native-reanimated";
+import { useAuth } from "@/contexts/AuthContext";
+import { authService } from "@/services/authService";
 
 const { width, height } = Dimensions.get("window");
 
@@ -54,8 +58,53 @@ const benefitCards = [
 
 export default function IntroScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(50);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // More reliable authentication check using authService directly
+  useEffect(() => {
+    const checkAuthentication = async () => {
+      try {
+        setIsLoading(true);
+        const isAuth = await authService.isAuthenticated();
+        console.log("[Intro] Auth check result:", isAuth);
+        setIsAuthenticated(isAuth);
+
+        // Only redirect if actually authenticated
+        if (isAuth) {
+          console.log("[Intro] User authenticated, redirecting to main");
+          router.replace("/(tabs)/main");
+        }
+      } catch (error) {
+        console.error("[Intro] Auth check error:", error);
+        setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuthentication();
+  }, [router]);
+
+  // Handle back button press
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        if (isAuthenticated) {
+          // If user is logged in, navigate to main screen instead of going back
+          router.replace("/(tabs)/main");
+          return true; // Prevents default back behavior
+        }
+        return false; // Allow default back behavior for guests
+      }
+    );
+
+    return () => backHandler.remove();
+  }, [isAuthenticated, router]);
 
   useEffect(() => {
     opacity.value = withTiming(1, { duration: 1000 });
@@ -70,8 +119,28 @@ export default function IntroScreen() {
   });
 
   const handleNext = () => {
-    router.push("/(auth)/auth-selection");
+    // Navigate based on authentication state
+    if (isAuthenticated) {
+      router.push("/(tabs)/main");
+    } else {
+      router.push("/(auth)/login");
+    }
   };
+
+  // Show loading indicator while checking auth
+  if (isLoading) {
+    return (
+      <LinearGradient
+        colors={COLORS.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.container, styles.loadingContainer]}
+      >
+        <ActivityIndicator size="large" color={COLORS.secondary} />
+        <ThemedText style={styles.loadingText}>Loading...</ThemedText>
+      </LinearGradient>
+    );
+  }
 
   return (
     <LinearGradient
@@ -302,5 +371,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     marginRight: 10,
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    color: COLORS.light,
+    fontSize: 16,
   },
 });

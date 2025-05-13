@@ -8,3 +8,9 @@
 [2025-04-16 13:19:05] Error: [2] Undefined array key "category_id" in C:\xampp\htdocs\capstone\views\admin\product-management.php on line 230
 [2025-04-16 13:19:08] Error: [2] Undefined array key "category_id" in C:\xampp\htdocs\capstone\views\admin\product-management.php on line 230
 [2025-04-16 13:19:20] Error: [2] Undefined array key "category_id" in C:\xampp\htdocs\capstone\views\admin\product-management.php on line 230
+[2025-05-03 06:55:15] Error: [2] Undefined variable $conn in C:\xampp\htdocs\capstone\views\manager\manager-product.php on line 51
+[2025-05-03 07:20:25] Error: [2] Undefined variable $conn in C:\xampp\htdocs\capstone\views\manager\manager-product.php on line 51
+[2025-05-03 07:20:26] Error: [2] Undefined variable $conn in C:\xampp\htdocs\capstone\views\manager\manager-product.php on line 51
+[2025-05-03 07:20:26] Error: [2] Undefined variable $conn in C:\xampp\htdocs\capstone\views\manager\manager-product.php on line 51
+[2025-05-06 06:44:50] Error: [2] Undefined array key "unit_type" in C:\xampp\htdocs\capstone\views\admin\product-management.php on line 277
+[2025-05-06 06:44:54] Error: [2] Undefined array key "unit_type" in C:\xampp\htdocs\capstone\views\admin\product-management.php on line 277

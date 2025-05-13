@@ -530,7 +530,7 @@ class Order {
     }
 
     function validatePickupStatus($status) {
-        $valid_statuses = ['pending', 'assigned', 'in_transit', 'completed', 'cancelled'];
+        $valid_statuses = ['pending', 'scheduled', 'in_transit', 'picked_up', 'completed', 'cancelled'];
         return in_array(strtolower($status), $valid_statuses);
     }
 

@@ -18,6 +18,86 @@ $log = new Log();
 
 $manager_user_id = $_SESSION['manager_user_id'] ?? null;
 
+// Create required database views if they don't exist
+try {
+    // Check if view_crops_per_barangay exists
+    $viewCheckQuery = "SELECT COUNT(*) FROM information_schema.views 
+                      WHERE table_schema = DATABASE() 
+                      AND table_name = 'view_crops_per_barangay'";
+    $viewExists = $conn->query($viewCheckQuery)->fetchColumn();
+    
+    if (!$viewExists) {
+        // Create view_crops_per_barangay
+        $createViewQuery = "CREATE VIEW view_crops_per_barangay AS
+                           SELECT b.barangay_id, b.barangay_name, 
+                                  p.product_id, p.name as product_name,
+                                  pc.category_name,
+                                  COUNT(distinct bp.id) AS production_instances,
+                                  SUM(bp.estimated_production) AS total_production,
+                                  bp.production_unit,
+                                  SUM(bp.planted_area) AS total_planted_area,
+                                  bp.area_unit
+                           FROM barangays b
+                           LEFT JOIN barangay_products bp ON b.barangay_id = bp.barangay_id
+                           LEFT JOIN products p ON bp.product_id = p.product_id
+                           LEFT JOIN productcategorymapping pcm ON p.product_id = pcm.product_id
+                           LEFT JOIN productcategories pc ON pcm.category_id = pc.category_id
+                           GROUP BY b.barangay_id, b.barangay_name, p.product_id, p.name, pc.category_name, bp.production_unit, bp.area_unit";
+        $conn->exec($createViewQuery);
+        error_log("Manager created view_crops_per_barangay");
+    }
+    
+    // Check if view_farmers_per_barangay exists
+    $viewCheckQuery = "SELECT COUNT(*) FROM information_schema.views 
+                      WHERE table_schema = DATABASE() 
+                      AND table_name = 'view_farmers_per_barangay'";
+    $viewExists = $conn->query($viewCheckQuery)->fetchColumn();
+    
+    if (!$viewExists) {
+        // Create view_farmers_per_barangay
+        $createViewQuery = "CREATE VIEW view_farmers_per_barangay AS
+                           SELECT b.barangay_id, b.barangay_name,
+                                  COUNT(fd.user_id) AS farmer_count,
+                                  SUM(fd.farm_size) AS total_farm_area
+                           FROM barangays b
+                           LEFT JOIN farmer_details fd ON b.barangay_id = fd.barangay_id
+                           LEFT JOIN users u ON fd.user_id = u.user_id AND u.role_id = 2
+                           GROUP BY b.barangay_id, b.barangay_name";
+        $conn->exec($createViewQuery);
+        error_log("Manager created view_farmers_per_barangay");
+    }
+    
+    // Check if view_seasonal_crops exists
+    $viewCheckQuery = "SELECT COUNT(*) FROM information_schema.views 
+                      WHERE table_schema = DATABASE() 
+                      AND table_name = 'view_seasonal_crops'";
+    $viewExists = $conn->query($viewCheckQuery)->fetchColumn();
+    
+    if (!$viewExists) {
+        // Create view_seasonal_crops
+        $createViewQuery = "CREATE VIEW view_seasonal_crops AS
+                           SELECT b.barangay_name, 
+                                  p.name AS product_name,
+                                  cs.season_name,
+                                  cs.start_month,
+                                  cs.end_month,
+                                  SUM(bp.estimated_production) AS total_production,
+                                  bp.production_unit,
+                                  SUM(bp.planted_area) AS total_planted_area,
+                                  bp.area_unit
+                           FROM barangay_products bp
+                           JOIN barangays b ON bp.barangay_id = b.barangay_id
+                           JOIN products p ON bp.product_id = p.product_id
+                           JOIN crop_seasons cs ON bp.season_id = cs.season_id
+                           GROUP BY b.barangay_name, p.name, cs.season_name, cs.start_month, cs.end_month, bp.production_unit, bp.area_unit
+                           ORDER BY b.barangay_name ASC, cs.start_month ASC";
+        $conn->exec($createViewQuery);
+        error_log("Manager created view_seasonal_crops");
+    }
+} catch (PDOException $e) {
+    error_log("Error creating database views in manager reports: " . $e->getMessage());
+}
+
 // Handle date range filtering
 $startDate = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-d', strtotime('-30 days'));
 $endDate = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d');
@@ -128,6 +208,53 @@ $recentOrdersQuery = "SELECT o.order_id, u.username AS consumer_name, o.order_st
                       LIMIT 10";
 $recentOrdersStmt = $conn->query($recentOrdersQuery);
 $recentOrders = $recentOrdersStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch agricultural data for reports
+try {
+    // Get crops per barangay data
+    $cropsPerBarangayQuery = "SELECT * FROM view_crops_per_barangay ORDER BY barangay_name, total_production DESC";
+    $cropsPerBarangayStmt = $conn->query($cropsPerBarangayQuery);
+    $cropsPerBarangay = $cropsPerBarangayStmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get farmers per barangay data
+    $farmersPerBarangayQuery = "SELECT * FROM view_farmers_per_barangay ORDER BY farmer_count DESC";
+    $farmersPerBarangayStmt = $conn->query($farmersPerBarangayQuery);
+    $farmersPerBarangay = $farmersPerBarangayStmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get seasonal crops data
+    $seasonalCropsQuery = "SELECT * FROM view_seasonal_crops ORDER BY season_name, total_production DESC";
+    $seasonalCropsStmt = $conn->query($seasonalCropsQuery);
+    $seasonalCrops = $seasonalCropsStmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get all barangays to ensure we display all 26 barangays in Valencia
+    $allBarangaysQuery = "SELECT * FROM barangays WHERE municipality = 'Valencia' ORDER BY barangay_name";
+    $allBarangaysStmt = $conn->query($allBarangaysQuery);
+    $allBarangays = $allBarangaysStmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get complete barangay data including those without crop production
+    $completeBarangayDataQuery = "
+        SELECT 
+            b.barangay_id,
+            b.barangay_name,
+            COALESCE(COUNT(DISTINCT bp.product_id), 0) as crop_count,
+            COALESCE(COUNT(DISTINCT fd.user_id), 0) as farmer_count,
+            COALESCE(SUM(fd.farm_size), 0) as total_farm_area,
+            COALESCE(SUM(bp.planted_area), 0) as total_planted_area
+        FROM barangays b
+        LEFT JOIN barangay_products bp ON b.barangay_id = bp.barangay_id
+        LEFT JOIN farmer_details fd ON b.barangay_id = fd.barangay_id
+        GROUP BY b.barangay_id, b.barangay_name
+        ORDER BY b.barangay_name";
+    $completeBarangayDataStmt = $conn->query($completeBarangayDataQuery);
+    $completeBarangayData = $completeBarangayDataStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Error fetching agricultural data for manager reports: " . $e->getMessage());
+    $cropsPerBarangay = [];
+    $farmersPerBarangay = [];
+    $seasonalCrops = [];
+    $allBarangays = [];
+    $completeBarangayData = [];
+}
 
 // Count pending orders for badge
 $pendingOrdersQuery = "SELECT COUNT(*) AS pending_count FROM orders WHERE order_status = 'pending'";
@@ -622,6 +749,181 @@ if (isset($_POST['logout'])) {
                         </div>
                     </div>
                 </div>
+
+                <!-- Agricultural Analytics Section -->
+                <div class="row mb-4">
+                    <!-- Crops per Barangay -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title d-flex align-items-center">
+                                    <i class="bi bi-bar-chart me-2 text-success"></i> Crops per Barangay
+                                </h5>
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead class="thead-light">
+                                            <tr>
+                                                <th>Barangay</th>
+                                                <th>Product</th>
+                                                <th>Category</th>
+                                                <th>Production</th>
+                                                <th>Unit</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php if (count($cropsPerBarangay) > 0): ?>
+                                                <?php foreach ($cropsPerBarangay as $crop): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($crop['barangay_name']) ?></td>
+                                                        <td><?= htmlspecialchars($crop['product_name']) ?></td>
+                                                        <td><?= htmlspecialchars($crop['category_name']) ?></td>
+                                                        <td><?= htmlspecialchars($crop['total_production']) ?></td>
+                                                        <td><?= htmlspecialchars($crop['production_unit']) ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            <?php else: ?>
+                                                <tr>
+                                                    <td colspan="5" class="text-center">No crop data found.</td>
+                                                </tr>
+                                            <?php endif; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Farmers per Barangay -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title d-flex align-items-center">
+                                    <i class="bi bi-people me-2 text-primary"></i> Farmers per Barangay
+                                </h5>
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead class="thead-light">
+                                            <tr>
+                                                <th>Barangay</th>
+                                                <th>Farmer Count</th>
+                                                <th>Total Farm Area</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php if (count($farmersPerBarangay) > 0): ?>
+                                                <?php foreach ($farmersPerBarangay as $farmer): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($farmer['barangay_name']) ?></td>
+                                                        <td><?= htmlspecialchars($farmer['farmer_count']) ?></td>
+                                                        <td><?= htmlspecialchars($farmer['total_farm_area']) ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            <?php else: ?>
+                                                <tr>
+                                                    <td colspan="3" class="text-center">No farmer data found.</td>
+                                                </tr>
+                                            <?php endif; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Seasonal Crops -->
+                <div class="row mb-4">
+                    <div class="col-md-12 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title d-flex align-items-center">
+                                    <i class="bi bi-calendar4-week me-2 text-warning"></i> Seasonal Crops
+                                </h5>
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead class="thead-light">
+                                            <tr>
+                                                <th>Barangay</th>
+                                                <th>Product</th>
+                                                <th>Season</th>
+                                                <th>Start Month</th>
+                                                <th>End Month</th>
+                                                <th>Production</th>
+                                                <th>Unit</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php if (count($seasonalCrops) > 0): ?>
+                                                <?php foreach ($seasonalCrops as $crop): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($crop['barangay_name']) ?></td>
+                                                        <td><?= htmlspecialchars($crop['product_name']) ?></td>
+                                                        <td><?= htmlspecialchars($crop['season_name']) ?></td>
+                                                        <td><?= htmlspecialchars($crop['start_month']) ?></td>
+                                                        <td><?= htmlspecialchars($crop['end_month']) ?></td>
+                                                        <td><?= htmlspecialchars($crop['total_production']) ?></td>
+                                                        <td><?= htmlspecialchars($crop['production_unit']) ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            <?php else: ?>
+                                                <tr>
+                                                    <td colspan="7" class="text-center">No seasonal crop data found.</td>
+                                                </tr>
+                                            <?php endif; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Crop Production Visualization -->
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title d-flex align-items-center mb-4">
+                                    <i class="bi bi-graph-up text-success me-2"></i> Crop Production Visualization
+                                </h5>
+                                
+                                <!-- Visualization type selector -->
+                                <div class="btn-group mb-3" role="group" aria-label="Data view options">
+                                    <button type="button" class="btn btn-outline-success active" data-chart-view="production">
+                                        <i class="bi bi-basket"></i> Production Volume
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary" data-chart-view="area">
+                                        <i class="bi bi-grid"></i> Planted Area
+                                    </button>
+                                    <button type="button" class="btn btn-outline-info" data-chart-view="yieldRate">
+                                        <i class="bi bi-arrow-up-right"></i> Yield Rate
+                                    </button>
+                                </div>
+                                
+                                <!-- Chart canvas -->
+                                <div style="height: 400px;">
+                                    <canvas id="cropProductionChart"></canvas>
+                                </div>
+                                
+                                <!-- Legend and explanation -->
+                                <div class="row mt-3">
+                                    <div class="col-md-12">
+                                        <div class="alert alert-light border">
+                                            <h6><i class="bi bi-info-circle"></i> About this visualization:</h6>
+                                            <p class="small mb-1">This chart displays agricultural data by barangay. Toggle between views:</p>
+                                            <ul class="small">
+                                                <li><strong>Production Volume:</strong> Total crop production per barangay</li>
+                                                <li><strong>Planted Area:</strong> Land area used for cultivation (in hectares)</li>
+                                                <li><strong>Yield Rate:</strong> Production efficiency (volume per hectare)</li>
+                                            </ul>
+                                            <p class="small mb-0">Hover over chart elements to see detailed information about crops grown in each barangay.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </main>
         </div>
     </div>
@@ -865,6 +1167,181 @@ if (isset($_POST['logout'])) {
                     document.getElementById('pickup-location').textContent = pickupLocation;
                     document.getElementById('contact-person').textContent = contactPerson;
                     document.getElementById('pickup-notes').textContent = pickupNotes;
+                });
+            });
+        });
+
+        // Crop Production Visualization Chart
+        const cropProductionCtx = document.getElementById('cropProductionChart').getContext('2d');
+        // Use complete barangay data to ensure all 26 barangays are displayed
+        let cropProductionData = <?= json_encode($cropsPerBarangay) ?>;
+        let completeBarangayData = <?= json_encode($completeBarangayData) ?>;
+        let allBarangays = <?= json_encode($allBarangays) ?>;
+        let cropProductionChart;
+        
+        function initCropProductionChart(viewType = 'production') {
+            // Process data for the chart
+            const barangayData = {};
+            
+            // Initialize all 26 barangays first (even those without crop data)
+            allBarangays.forEach(barangay => {
+                barangayData[barangay.barangay_name] = {
+                    barangay_id: barangay.barangay_id,
+                    production: 0,
+                    area: 0,
+                    yieldRate: 0,
+                    crops: []
+                };
+            });
+            
+            // Add complete barangay metrics
+            completeBarangayData.forEach(item => {
+                if (barangayData[item.barangay_name]) {
+                    barangayData[item.barangay_name].farmer_count = parseInt(item.farmer_count || 0);
+                    barangayData[item.barangay_name].crop_count = parseInt(item.crop_count || 0);
+                    barangayData[item.barangay_name].area = parseFloat(item.total_planted_area || 0);
+                    barangayData[item.barangay_name].farm_area = parseFloat(item.total_farm_area || 0);
+                }
+            });
+            
+            // Now add detailed crop production data
+            cropProductionData.forEach(item => {
+                if (barangayData[item.barangay_name]) {
+                    // Add production values
+                    barangayData[item.barangay_name].production += parseFloat(item.total_production || 0);
+                    
+                    // Store crop info for tooltip
+                    barangayData[item.barangay_name].crops.push({
+                        name: item.product_name,
+                        production: item.total_production,
+                        area: item.total_planted_area,
+                        unit: item.production_unit,
+                        areaUnit: item.area_unit
+                    });
+                }
+            });
+            
+            // Calculate yield rates
+            Object.keys(barangayData).forEach(barangay => {
+                if (barangayData[barangay].area > 0) {
+                    barangayData[barangay].yieldRate = 
+                        barangayData[barangay].production / barangayData[barangay].area;
+                }
+            });
+            
+            // Sort barangays by the selected view type, but ensure all barangays are included
+            const sortedBarangays = Object.keys(barangayData).sort((a, b) => {
+                return barangayData[b][viewType] - barangayData[a][viewType];
+            });
+            
+            // Prepare chart data based on view type
+            const chartData = {
+                labels: sortedBarangays,
+                datasets: [{
+                    label: viewType === 'production' ? 'Production Volume' : 
+                           viewType === 'area' ? 'Planted Area' : 'Yield Rate',
+                    data: sortedBarangays.map(b => barangayData[b][viewType]),
+                    backgroundColor: viewType === 'production' ? '#28a745' : 
+                                    viewType === 'area' ? '#007bff' : '#17a2b8',
+                    borderColor: viewType === 'production' ? '#1e7e34' : 
+                                viewType === 'area' ? '#0056b3' : '#117a8b',
+                    borderWidth: 1
+                }]
+            };
+            
+            // Destroy previous chart instance if it exists
+            if (cropProductionChart) {
+                cropProductionChart.destroy();
+            }
+            
+            // Create new chart
+            cropProductionChart = new Chart(cropProductionCtx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: viewType === 'production' ? 'Production Volume' : 
+                                    viewType === 'area' ? 'Planted Area (hectares)' : 'Yield Rate (production/area)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Barangays of Valencia, Negros Oriental (All 26)'
+                            },
+                            ticks: {
+                                autoSkip: false,
+                                maxRotation: 90,
+                                minRotation: 45
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                afterTitle: function(tooltipItems) {
+                                    const barangay = tooltipItems[0].label;
+                                    const barangayInfo = barangayData[barangay];
+                                    
+                                    return [
+                                        `Farmers: ${barangayInfo.farmer_count || 0}`,
+                                        `Crop Types: ${barangayInfo.crop_count || 0}`
+                                    ];
+                                },
+                                afterBody: function(tooltipItems) {
+                                    const barangay = tooltipItems[0].label;
+                                    
+                                    if (!barangayData[barangay].crops || barangayData[barangay].crops.length === 0) {
+                                        return ['No crop data available'];
+                                    }
+                                    
+                                    // Get top 3 crops by production for this barangay
+                                    const topCrops = barangayData[barangay].crops
+                                        .sort((a, b) => b.production - a.production)
+                                        .slice(0, 3);
+                                    
+                                    if (topCrops.length === 0) return ['No crops recorded'];
+                                    
+                                    return ['Top Crops:'].concat(topCrops.map(crop => 
+                                        `${crop.name}: ${crop.production} ${crop.unit}`));
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: viewType === 'production' ? 'Crop Production by Barangay' : 
+                                viewType === 'area' ? 'Planted Area by Barangay' : 'Agricultural Yield Rate by Barangay',
+                            font: {
+                                size: 16
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Initialize chart with production view by default
+        document.addEventListener('DOMContentLoaded', function() {
+            initCropProductionChart('production');
+            
+            // Handle view toggle buttons
+            document.querySelectorAll('[data-chart-view]').forEach(button => {
+                button.addEventListener('click', function() {
+                    const viewType = this.getAttribute('data-chart-view');
+                    
+                    // Update active button
+                    document.querySelectorAll('[data-chart-view]').forEach(btn => 
+                        btn.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Update chart
+                    initCropProductionChart(viewType);
                 });
             });
         });

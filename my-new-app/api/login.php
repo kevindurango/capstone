@@ -12,15 +12,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
+// Check if the request method is POST
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405); // Method Not Allowed
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Only POST requests are allowed'
+    ]);
+    exit();
+}
+
 // Include database connection file
 require_once 'config/database.php';
 
 error_log("[DEBUG] Starting login process");
 
 try {
+    // Get database connection
+    $conn = getConnection();
+    
+    // Check connection
+    if (!$conn) {
+        throw new Exception("Database connection failed: " . mysqli_connect_error());
+    }
+    
     // Get and parse input data
     $input = file_get_contents("php://input");
     error_log("[DEBUG] Raw input received: " . $input);
+    
+    // Check if input is empty
+    if (empty($input)) {
+        throw new Exception('No data provided. Please send email and password in JSON format');
+    }
     
     $data = json_decode($input);
     if (json_last_error() !== JSON_ERROR_NONE) {
@@ -98,5 +121,10 @@ try {
         'status' => 'error',
         'message' => $e->getMessage()
     ]);
+} finally {
+    // Close the connection if it exists
+    if (isset($conn) && $conn) {
+        $conn->close();
+    }
 }
 ?>

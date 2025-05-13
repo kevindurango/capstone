@@ -17,6 +17,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
+// Check if the request method is POST
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405); // Method Not Allowed
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Only POST requests are allowed'
+    ]);
+    exit();
+}
+
 // Ensure we catch all errors
 function handleError($errno, $errstr, $errfile, $errline) {
     http_response_code(500);
@@ -31,13 +41,13 @@ function handleError($errno, $errstr, $errfile, $errline) {
 set_error_handler('handleError');
 
 // Include database connection file
-require_once __DIR__ . '/../api/config/database.php'; // Ensure this file contains the correct credentials
+require_once __DIR__ . '/../api/config/database.php';
 
-// Create a new database connection
-$conn = new mysqli($host, $username, $password, $dbname);
+// Get database connection
+$conn = getConnection();
 
 // Check connection
-if ($conn->connect_error) {
+if (!$conn) {
     http_response_code(500);
     echo json_encode([
         'status' => 'error',
@@ -51,6 +61,16 @@ error_log("[DEBUG] Starting registration process");
 // Get raw POST data and log it
 $rawData = file_get_contents("php://input");
 error_log("Received raw data: " . $rawData);
+
+// Check if input is empty
+if (empty($rawData)) {
+    http_response_code(400);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'No data provided. Please send registration details in JSON format'
+    ]);
+    exit();
+}
 
 // Decode JSON data
 $data = json_decode($rawData, true);
@@ -86,6 +106,16 @@ try {
     $userType = $data['userType'];
     $contactNumber = $data['contact_number'] ?? '';
     $address = $data['address'] ?? '';
+    
+    // Validate email format
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new Exception("Invalid email format");
+    }
+    
+    // Validate password strength
+    if (strlen($password) < 8) {
+        throw new Exception("Password must be at least 8 characters long");
+    }
     
     // Split full name into first and last name
     $name_parts = explode(' ', $fullName, 2);
@@ -136,6 +166,8 @@ try {
     $roleId = 1; // Default to User (Consumer)
     if ($userType === 'farmer') {
         $roleId = 2; // Farmer role
+    } else if ($userType === 'admin') {
+        $roleId = 3; // Admin role
     }
     
     // Hash the password
