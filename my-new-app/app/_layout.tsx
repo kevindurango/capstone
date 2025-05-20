@@ -1,6 +1,6 @@
 import React from "react";
 import { useFonts } from "expo-font";
-import { Stack, SplashScreen, Slot } from "expo-router";
+import { Stack, SplashScreen } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { View, Text } from "react-native";
@@ -9,7 +9,7 @@ import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { CartProvider } from "@/components/market/CartContext";
+import { CartProvider } from "@/contexts/CartContext";
 import { resetApiUrl } from "@/services/apiConfig";
 
 // Enable screens for better navigation performance
@@ -56,11 +56,38 @@ export default function RootLayout() {
     );
   }
 
-  // Using Slot with no additional navigator components to avoid navigation conflicts
   return (
     <AuthProvider>
       <CartProvider>
-        <Slot />
+        <Stack
+          initialRouteName="index"
+          screenOptions={{
+            // Set global default screen options
+            headerShown: false, // Hide headers by default across the app
+          }}
+        >
+          <Stack.Screen name="index" />
+          <Stack.Screen
+            name="diagnostics/index"
+            options={{
+              headerShown: true, // Show header only for diagnostics
+              headerTitle: "Diagnostics",
+              headerStyle: {
+                backgroundColor: "#2196F3",
+              },
+              headerTintColor: "#fff",
+            }}
+          />
+          {/* Let each group handle its own screens */}
+          <Stack.Screen name="farmer" options={{ headerShown: false }} />
+          {/* Hide tab bar for (tabs) group - especially the intro screen */}
+          <Stack.Screen
+            name="(tabs)"
+            options={{
+              headerShown: false,
+            }}
+          />
+        </Stack>
         <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       </CartProvider>
     </AuthProvider>

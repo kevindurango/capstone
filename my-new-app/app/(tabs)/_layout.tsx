@@ -5,6 +5,7 @@ import { FontAwesome } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { authService } from "@/services/authService";
 
 /**
  * This is the layout for the main tab navigation
@@ -39,7 +40,7 @@ export default function TabLayout() {
       return;
     }
 
-    const redirectUser = () => {
+    const redirectUser = async () => {
       if (isAuthenticated) {
         console.log(
           "[TabLayout] User is authenticated, role:",
@@ -50,12 +51,15 @@ export default function TabLayout() {
         setNavigationAttempted(true);
 
         try {
+          // First verify user data to ensure we have current role information
+          const userData = await authService.getUserData();
+
           // Use a setTimeout to delay navigation until after render cycle
           setTimeout(() => {
-            if (isFarmer) {
+            if (userData && userData.role_id === 2) {
               console.log("[TabLayout] Redirecting to farmer dashboard");
               router.replace("/farmer/dashboard");
-            } else if (isConsumer) {
+            } else {
               console.log("[TabLayout] Redirecting to consumer dashboard");
               router.replace("/consumer/dashboard");
             }
@@ -91,14 +95,19 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      screenOptions={{
+      initialRouteName="index"
+      screenOptions={({ route }) => ({
         tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
+        // Base tab bar styling with conditional display
         tabBarStyle: {
           paddingBottom: 5,
           paddingTop: 5,
           height: 60,
+          // Hide the tab bar for intro and index screens
+          display:
+            route.name === "intro" || route.name === "index" ? "none" : "flex",
         },
-      }}
+      })}
     >
       <Tabs.Screen
         name="index"
@@ -106,6 +115,8 @@ export default function TabLayout() {
           title: "Home",
           tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
           headerShown: false,
+          // Hide this tab from the tab bar to match intro screen behavior
+          tabBarButton: () => null,
         }}
       />
 
@@ -117,6 +128,8 @@ export default function TabLayout() {
             <TabBarIcon name="info-circle" color={color} />
           ),
           headerShown: false,
+          // Hide this tab completely from the tab bar
+          tabBarButton: () => null,
         }}
       />
 

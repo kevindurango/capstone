@@ -229,13 +229,39 @@ class Product
             $updateOrderItemsQuery = "UPDATE orderitems SET product_id = NULL WHERE product_id = :id";
             $orderItemsStmt = $this->conn->prepare($updateOrderItemsQuery);
             $orderItemsStmt->bindParam(':id', $id, PDO::PARAM_INT);
-            $orderItemsStmt->execute();
-
-            // Delete from productcategorymapping
+            $orderItemsStmt->execute();            // Delete from productcategorymapping
             $deleteMappingQuery = "DELETE FROM productcategorymapping WHERE product_id = :id";
             $mappingStmt = $this->conn->prepare($deleteMappingQuery);
             $mappingStmt->bindParam(':id', $id, PDO::PARAM_INT);
             $mappingStmt->execute();
+            
+            // Delete from product_seasons table
+            $deleteProductSeasonsQuery = "DELETE FROM product_seasons WHERE product_id = :id";
+            $productSeasonsStmt = $this->conn->prepare($deleteProductSeasonsQuery);
+            $productSeasonsStmt->bindParam(':id', $id, PDO::PARAM_INT);
+            $productSeasonsStmt->execute();
+            
+            // Check for and delete from barangay_products if it exists
+            if ($this->tableExists('barangay_products')) {
+                $deleteBarangayProductsQuery = "DELETE FROM barangay_products WHERE product_id = :id";
+                $barangayProductsStmt = $this->conn->prepare($deleteBarangayProductsQuery);
+                $barangayProductsStmt->bindParam(':id', $id, PDO::PARAM_INT);
+                $barangayProductsStmt->execute();
+            }
+            
+            // Delete from product_seasons table
+            $deleteProductSeasonsQuery = "DELETE FROM product_seasons WHERE product_id = :id";
+            $productSeasonsStmt = $this->conn->prepare($deleteProductSeasonsQuery);
+            $productSeasonsStmt->bindParam(':id', $id, PDO::PARAM_INT);
+            $productSeasonsStmt->execute();
+            
+            // Check for and delete from barangay_products if it exists
+            if ($this->tableExists('barangay_products')) {
+                $deleteBarangayProductsQuery = "DELETE FROM barangay_products WHERE product_id = :id";
+                $barangayProductsStmt = $this->conn->prepare($deleteBarangayProductsQuery);
+                $barangayProductsStmt->bindParam(':id', $id, PDO::PARAM_INT);
+                $barangayProductsStmt->execute();
+            }
 
             // Delete the product
             $query = "DELETE FROM products WHERE product_id = :id";
@@ -248,6 +274,17 @@ class Product
         } catch (PDOException $e) {
             $this->conn->rollBack();
             error_log("Error in deleteProduct: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    // Helper method to check if a table exists
+    private function tableExists($table) {
+        try {
+            $result = $this->conn->query("SHOW TABLES LIKE '$table'");
+            return $result->rowCount() > 0;
+        } catch (PDOException $e) {
+            error_log("Error checking if table exists: " . $e->getMessage());
             return false;
         }
     }
@@ -320,18 +357,18 @@ class Product
             error_log("Error getting low stock products: " . $e->getMessage());
             return [];
         }
-    }
-
-    public function getAllProductsWithDetails()
+    }    public function getAllProductsWithDetails()
     {
         try {
-            // Modified query to use GROUP BY to prevent duplicate products
+            // Modified query to include barangay information and use GROUP BY to prevent duplicate products
             $query = "SELECT p.*, u.username as farmer_name, 
-                     pc.category_name as category, pcm.category_id 
+                     pc.category_name as category, pcm.category_id,
+                     GROUP_CONCAT(DISTINCT bp.barangay_id) as barangay_ids
                      FROM products p 
                      LEFT JOIN users u ON p.farmer_id = u.user_id 
                      LEFT JOIN productcategorymapping pcm ON p.product_id = pcm.product_id 
                      LEFT JOIN productcategories pc ON pcm.category_id = pc.category_id 
+                     LEFT JOIN barangay_products bp ON p.product_id = bp.product_id
                      GROUP BY p.product_id
                      ORDER BY p.product_id DESC";
 

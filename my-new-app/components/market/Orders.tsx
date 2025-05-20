@@ -168,6 +168,7 @@ interface Pickup {
   order_items?: OrderItem[];
   order_total?: number;
   item_count?: number;
+  payment_method?: string; // Add payment method property
 }
 
 // Interface for eligible orders for feedback
@@ -451,6 +452,28 @@ const OrdersScreen: React.FC<OrdersScreenProps> = ({ visible, onClose }) => {
     return date.toISOString().slice(0, 19).replace("T", " ");
   };
 
+  // Format payment method for display
+  const formatPaymentMethodName = (method?: string): string => {
+    if (!method) return "Not specified";
+
+    switch (method) {
+      case "credit_card":
+        return "Credit/Debit Card";
+      case "bank_transfer":
+        return "Bank Transfer";
+      case "cash_on_pickup":
+        return "Cash on Pickup";
+      case "gcash":
+        return "GCash";
+      case "paypal":
+        return "PayPal";
+      default:
+        return method
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (l) => l.toUpperCase());
+    }
+  };
+
   // Get color for different status values
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -464,7 +487,6 @@ const OrdersScreen: React.FC<OrdersScreenProps> = ({ visible, onClose }) => {
         return "#0288d1"; // Light blue
       case "completed":
         return "#388e3c"; // Dark green
-      case "cancelled":
       case "canceled":
         return "#d32f2f"; // Red
       default:
@@ -485,7 +507,6 @@ const OrdersScreen: React.FC<OrdersScreenProps> = ({ visible, onClose }) => {
         return "In Transit";
       case "completed":
         return "Completed";
-      case "cancelled":
       case "canceled":
         return "Canceled";
       default:
@@ -506,7 +527,6 @@ const OrdersScreen: React.FC<OrdersScreenProps> = ({ visible, onClose }) => {
         return "car-outline"; // Car icon
       case "completed":
         return "bag-check-outline"; // Bag with checkmark
-      case "cancelled":
       case "canceled":
         return "close-circle-outline"; // X icon
       default:
@@ -721,6 +741,14 @@ const OrdersScreen: React.FC<OrdersScreenProps> = ({ visible, onClose }) => {
             <Ionicons name="location" size={16} color={COLORS.primary} />
             <ThemedText style={pickupStyles.detailText}>
               {item.pickup_location}
+            </ThemedText>
+          </View>
+
+          {/* Payment method */}
+          <View style={pickupStyles.detailRow}>
+            <Ionicons name="wallet-outline" size={16} color={COLORS.primary} />
+            <ThemedText style={pickupStyles.detailText}>
+              Payment: {formatPaymentMethodName(item.payment_method)}
             </ThemedText>
           </View>
 

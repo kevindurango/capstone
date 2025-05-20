@@ -141,6 +141,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stock = filter_var($_POST['stock'], FILTER_SANITIZE_NUMBER_INT);
         $unit_type = validateUnitType(htmlspecialchars(trim($_POST['unit_type']), ENT_QUOTES, 'UTF-8'));
         
+        // Get barangay and field information if provided
+        $barangay_id = null;
+        $field_id = null;
+        
+        if (isset($_POST['barangay_id']) && !empty($_POST['barangay_id'])) {
+            $barangay_id = filter_var($_POST['barangay_id'], FILTER_SANITIZE_NUMBER_INT);
+            error_log("[ADD_PRODUCT] Received barangay_id: " . $barangay_id);
+        }
+        
+        if (isset($_POST['field_id'])) {
+            // Check if field_id is non-empty rather than just isset
+            if (!empty($_POST['field_id'])) {
+                $field_id = filter_var($_POST['field_id'], FILTER_SANITIZE_NUMBER_INT);
+                error_log("[ADD_PRODUCT] Received field_id: " . $field_id);
+                
+                // If field_id is provided, get its barangay_id to ensure consistency
+                if ($field_id) {
+                    $conn = getConnection();
+                    $stmt = $conn->prepare("SELECT barangay_id, field_name FROM farmer_fields WHERE field_id = ? AND farmer_id = ?");
+                    $stmt->bind_param("ii", $field_id, $user_id);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    
+                    if ($result->num_rows > 0) {
+                        $field_data = $result->fetch_assoc();
+                        $barangay_id = $field_data['barangay_id']; // Override barangay_id with field's barangay
+                        error_log("[ADD_PRODUCT] Updated barangay_id from field: " . $barangay_id . ", field name: " . $field_data['field_name']);
+                    } else {
+                        // Field doesn't exist or doesn't belong to farmer
+                        error_log("[ADD_PRODUCT] Field ID $field_id not found or doesn't belong to farmer $user_id");
+                        throw new Exception("Invalid field selected. Please choose a field that belongs to you.");
+                    }
+                }
+            } else {
+                // Explicitly set field_id to null when empty string is submitted
+                $field_id = null;
+                error_log("[ADD_PRODUCT] Field ID explicitly set to NULL");
+            }
+        }
+        
         // Check for custom upload directory
         $upload_dir = DEFAULT_UPLOAD_DIR;
         if (isset($_POST['upload_directory']) && !empty($_POST['upload_directory'])) {
@@ -392,6 +432,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception("No valid categories were provided");
         }
         
+        // Handle barangay product mapping if barangay_id is provided
+        if ($barangay_id) {
+            error_log("[ADD_PRODUCT] Adding barangay product mapping with barangay_id: $barangay_id, product_id: $product_id, field_id: " . ($field_id === null ? "NULL" : $field_id));
+            
+            // Default values for new entries
+            $estimated_production = 0;
+            $production_unit = $unit_type;
+            $year = date('Y');
+            $season_id = 1; // Default season
+            $planted_area = 0;
+            $area_unit = 'hectare';
+            
+            // Insert with different SQL based on whether field_id is null
+            if ($field_id === null) {
+                $stmt = $conn->prepare("INSERT INTO barangay_products (barangay_id, product_id, estimated_production, production_unit, year, season_id, planted_area, area_unit, field_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)");
+                $stmt->bind_param("iidsiiis", $barangay_id, $product_id, $estimated_production, $production_unit, $year, $season_id, $planted_area, $area_unit);
+            } else {
+                $stmt = $conn->prepare("INSERT INTO barangay_products (barangay_id, product_id, estimated_production, production_unit, year, season_id, planted_area, area_unit, field_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("iidsiiisi", $barangay_id, $product_id, $estimated_production, $production_unit, $year, $season_id, $planted_area, $area_unit, $field_id);
+            }
+            
+            if (!$stmt->execute()) {
+                error_log("[ADD_PRODUCT] Insert barangay product error: " . $stmt->error);
+                throw new Exception("Failed to create product barangay mapping: " . $stmt->error);
+            }
+            
+            error_log("[ADD_PRODUCT] Barangay product mapping created successfully with ID: " . $conn->insert_id);
+        }
+        
         // Add activity log entry
         $action = "Farmer ID: $user_id added new product: $name (ID: $product_id) with unit type: $unit_type";
         $stmt = $conn->prepare("INSERT INTO activitylogs (user_id, action, action_date) VALUES (?, ?, CURRENT_TIMESTAMP)");
@@ -409,7 +478,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'name' => $name,
             'created_at' => date('Y-m-d H:i:s'),
             'image_path' => $image_path,
-            'unit_type' => $unit_type
+            'unit_type' => $unit_type,
+            'barangay_id' => $barangay_id,
+            'field_id' => $field_id
         ];
         
     } catch (Exception $e) {

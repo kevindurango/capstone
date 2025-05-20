@@ -5,17 +5,10 @@ $(document).ready(function () {
     const pickupId = $(this).data("id");
     viewPickupDetails(pickupId);
   });
-
   $(document).on("click", ".btn-track", function (e) {
     e.preventDefault();
     const pickupId = $(this).data("id");
     trackPickup(pickupId);
-  });
-
-  $(document).on("click", ".btn-assign", function (e) {
-    e.preventDefault();
-    const pickupId = $(this).data("id");
-    assignPickup(pickupId);
   });
 
   $(document).on("click", ".update-status", function (e) {
@@ -24,36 +17,7 @@ $(document).ready(function () {
     $("#statusPickupId").val(pickupId);
     $("#updateStatusModal").modal("show");
   });
-
   // Form submissions
-  $("#assignPickupForm").submit(function (e) {
-    e.preventDefault();
-    const formData = $(this).serialize();
-
-    // Validate that a driver is selected
-    if (!$('select[name="driver_id"]').val()) {
-      alert("Please select a driver");
-      return;
-    }
-
-    $.ajax({
-      url: "../../ajax/pickup-actions.php",
-      type: "POST",
-      data: formData + "&action=assign_pickup",
-      dataType: "json",
-      success: function (response) {
-        if (response.success) {
-          $("#assignPickupModal").modal("hide");
-          location.reload();
-        } else {
-          alert(response.message || "Failed to assign pickup");
-        }
-      },
-      error: function () {
-        alert("Server error occurred");
-      },
-    });
-  });
 
   $("#updateStatusForm").submit(function (e) {
     e.preventDefault();
@@ -164,48 +128,6 @@ $(document).ready(function () {
     });
   };
 
-  // ===== Assign Pickup =====
-  window.assignPickup = function (pickupId) {
-    $("#assignPickupId").val(pickupId);
-
-    $.ajax({
-      url: "../../ajax/pickup-actions.php",
-      type: "GET",
-      data: {
-        action: "get_drivers",
-      },
-      success: function (response) {
-        try {
-          if (typeof response === "string") {
-            response = JSON.parse(response);
-          }
-
-          if (response.success && response.drivers) {
-            if (response.drivers.length === 0) {
-              alert("No drivers available. Please register drivers first.");
-              return;
-            }
-
-            let options = '<option value="">Select a driver</option>';
-            response.drivers.forEach((driver) => {
-              options += `<option value="${driver.user_id}">${driver.first_name} ${driver.last_name}</option>`;
-            });
-            $('select[name="driver_id"]').html(options);
-            $("#assignPickupModal").modal("show");
-          } else {
-            alert("Failed to load drivers. Please try again.");
-          }
-        } catch (e) {
-          console.error("Error processing drivers:", e);
-          alert("Error loading drivers. Please try again.");
-        }
-      },
-      error: function () {
-        alert("Failed to load drivers. Server error occurred.");
-      },
-    });
-  };
-
   // Update Status Button Click
   $(".update-status").click(function () {
     const pickupId = $(this).data("id");
@@ -310,13 +232,9 @@ function generatePickupDetailsHtml(pickup) {
                             </span>
                         </p>
                     </div>
-                </div>
-                <div class="col-md-6">
-                    <h6 class="font-weight-bold"><i class="bi bi-person-badge"></i> Assignment Details</h6>
+                </div>                <div class="col-md-6">
+                    <h6 class="font-weight-bold"><i class="bi bi-card-text"></i> Additional Details</h6>
                     <div class="info-group">
-                        <p><strong>Assigned Driver:</strong> ${
-                          pickup.driver_name || "Not assigned"
-                        }</p>
                         <p><strong>Notes:</strong> ${
                           pickup.pickup_notes || "No notes available"
                         }</p>
@@ -417,13 +335,11 @@ function getStatusClass(status) {
   switch (status) {
     case "pending":
       return "warning";
-    case "assigned":
-      return "info";
-    case "in_transit":
+    case "ready":
       return "primary";
     case "completed":
       return "success";
-    case "cancelled":
+    case "canceled":
       return "danger";
     default:
       return "secondary";
@@ -450,29 +366,6 @@ $(document).ready(function () {
 
     $("#statusOrderId").val(orderId);
     $("#statusSelect").val(currentStatus);
-  });
-
-  // Assign Driver Modal setup
-  $("#assignDriverModal").on("show.bs.modal", function (e) {
-    var button = $(e.relatedTarget);
-    var orderId = button.data("order-id");
-
-    $("#assignOrderId").val(orderId);
-
-    // Default the pickup date to today
-    var now = new Date();
-    var dateString =
-      now.getFullYear() +
-      "-" +
-      ("0" + (now.getMonth() + 1)).slice(-2) +
-      "-" +
-      ("0" + now.getDate()).slice(-2) +
-      "T" +
-      ("0" + now.getHours()).slice(-2) +
-      ":" +
-      ("0" + now.getMinutes()).slice(-2);
-
-    $('input[name="pickup_date"]').val(dateString);
   });
 
   // View Order Details
@@ -557,13 +450,11 @@ $(document).ready(function () {
         bVal = new Date($(b).find("td:nth-child(3)").text());
 
         return value === "newest" ? bVal - aVal : aVal - bVal;
-      }
-
-      // Priority sorting (pending first, then assigned, etc.)
+      } // Priority sorting (pending first, ready, etc.)
       if (value === "priority") {
         var priorityOrder = [
           "pending",
-          "assigned",
+          "ready",
           "in_transit",
           "completed",
           "cancelled",
@@ -608,11 +499,6 @@ function viewOrderDetails(orderId) {
     });
 }
 
-function assignDriver(orderId) {
-  $("#assignOrderId").val(orderId);
-  $("#assignDriverModal").modal("show");
-}
-
 function updateStatus(orderId, currentStatus) {
   $("#statusOrderId").val(orderId);
   $('#updateStatusModal select[name="pickup_status"]').val(currentStatus);
@@ -620,18 +506,6 @@ function updateStatus(orderId, currentStatus) {
 }
 
 // Form submissions
-$("#assignDriverForm").on("submit", function (e) {
-  e.preventDefault();
-  $.post("../../ajax/update-pickup.php", $(this).serialize())
-    .done(function (response) {
-      $("#assignDriverModal").modal("hide");
-      location.reload();
-    })
-    .fail(function () {
-      alert("Failed to assign driver");
-    });
-});
-
 $("#updateStatusForm").on("submit", function (e) {
   e.preventDefault();
   $.post("../../ajax/update-pickup.php", $(this).serialize())

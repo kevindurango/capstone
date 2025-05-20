@@ -28,11 +28,24 @@ interface Category {
   category_name: string;
 }
 
+// Add interfaces for barangay and field
+interface Barangay {
+  barangay_id: number;
+  barangay_name: string;
+}
+
+interface Field {
+  field_id: number;
+  field_name: string;
+  barangay_id: number;
+  farmer_id: number;
+}
+
 export default function AddProduct() {
   const { isAuthenticated, isFarmer, user } = useAuth();
   const router = useRouter();
 
-  // Form state
+  // Form state - add barangay_id and field_id
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -41,12 +54,17 @@ export default function AddProduct() {
     unit_type: "kilogram",
     selectedCategories: [] as number[],
     image: null as any,
+    barangay_id: null as number | null,
+    field_id: null as number | null,
   });
 
   // States
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [barangays, setBarangays] = useState<Barangay[]>([]);
+  const [fields, setFields] = useState<Field[]>([]);
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
+  const [isFieldModalVisible, setIsFieldModalVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
 
   // Units available for products
@@ -70,6 +88,8 @@ export default function AddProduct() {
   // Fetch categories on component mount
   useEffect(() => {
     fetchCategories();
+    fetchBarangays();
+    fetchFields();
   }, []);
 
   // Function to fetch categories
@@ -90,6 +110,58 @@ export default function AddProduct() {
       Alert.alert(
         "Error",
         "Failed to load product categories. Please try again."
+      );
+    }
+  };
+
+  // Function to fetch barangays
+  const fetchBarangays = async () => {
+    try {
+      const response = await fetch(`${IPConfig.API_BASE_URL}/barangays.php`);
+      const data = await response.json();
+
+      if (data.success) {
+        setBarangays(data.barangays || []);
+      } else {
+        console.error("Error fetching barangays:", data.message);
+      }
+    } catch (error) {
+      console.error("Error fetching barangays:", error);
+      // Fallback barangay data
+      setBarangays([
+        { barangay_id: 1, barangay_name: "Balayagmanok" },
+        { barangay_id: 2, barangay_name: "Balili" },
+        { barangay_id: 3, barangay_name: "Bongbong Central" },
+        { barangay_id: 4, barangay_name: "Cambucad" },
+        { barangay_id: 5, barangay_name: "Caidiocan" },
+      ]);
+    }
+  };
+
+  // Function to fetch fields
+  const fetchFields = async () => {
+    if (!user?.user_id) {
+      console.error("No user ID available");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${IPConfig.API_BASE_URL}/farmer/farmer_fields.php?farmer_id=${user.user_id}`
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        setFields(data.fields || []);
+      } else {
+        console.error("Error fetching fields:", data.message);
+        Alert.alert("Error", "Failed to fetch fields. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error fetching fields:", error);
+      Alert.alert(
+        "Error",
+        "Failed to fetch fields. Please check your connection."
       );
     }
   };
@@ -140,7 +212,30 @@ export default function AddProduct() {
     }
   };
 
-  // Submit product form
+  // Handle field selection
+  const selectField = (fieldId: number | null) => {
+    if (fieldId === null) {
+      setForm({
+        ...form,
+        field_id: null,
+        barangay_id: null,
+      });
+      return;
+    }
+
+    // Find the field to get its barangay_id
+    const selectedField = fields.find((field) => field.field_id === fieldId);
+
+    if (selectedField) {
+      setForm({
+        ...form,
+        field_id: fieldId,
+        barangay_id: selectedField.barangay_id,
+      });
+    }
+  };
+
+  // Submit product form - update to use FormData directly instead of ProductService
   const handleSubmit = async () => {
     // Basic validation
     if (!form.name.trim()) {
@@ -174,22 +269,82 @@ export default function AddProduct() {
     try {
       setIsLoading(true);
 
-      // Create product data for ProductService
-      const productData: ProductData = {
+      // Create FormData object directly instead of using ProductService
+      const formData = new FormData();
+      formData.append("user_id", user?.user_id?.toString() || "");
+      formData.append("name", form.name);
+      formData.append("description", form.description || "");
+      formData.append("price", form.price);
+      formData.append("stock", form.stock);
+      formData.append("unit_type", form.unit_type);
+
+      // Append categories as array
+      form.selectedCategories.forEach((categoryId) => {
+        formData.append("categories[]", categoryId.toString());
+      });
+
+      // Append field_id and barangay_id if they exist
+      if (form.field_id) {
+        formData.append("field_id", form.field_id.toString());
+      }
+      if (form.barangay_id) {
+        formData.append("barangay_id", form.barangay_id.toString());
+      }
+
+      // Handle image upload if present
+      if (selectedImageUri) {
+        const imageUri = selectedImageUri;
+        const imageName = imageUri.split("/").pop() || "image.jpg";
+
+        // Determine image type based on extension
+        const fileExtension = imageName.split(".").pop()?.toLowerCase() || "";
+        let imageType = "image/jpeg"; // Default
+
+        if (fileExtension === "png") {
+          imageType = "image/png";
+        } else if (fileExtension === "gif") {
+          imageType = "image/gif";
+        }
+
+        formData.append("image", {
+          uri: imageUri,
+          name: imageName,
+          type: imageType,
+        } as any);
+      }
+
+      // Log FormData for debugging
+      console.log(
+        "[ADD_PRODUCT] Sending form data:",
+        "Form data prepared for submission"
+      );
+
+      // For debugging purposes only
+      // We can log individual form values instead of accessing internal FormData properties
+      console.log({
         name: form.name,
         description: form.description,
-        price: parseFloat(form.price),
-        stock: parseInt(form.stock),
-        farmer_id: user?.user_id || 0,
-        category_id: form.selectedCategories[0], // For now using first category
-        unit_type: form.unit_type,
-      };
+        price: form.price,
+        stock: form.stock,
+        categories: form.selectedCategories,
+        field_id: form.field_id,
+        barangay_id: form.barangay_id,
+      });
 
-      // Use the ProductService to add the product
-      const result = await productService.addProduct(
-        productData,
-        selectedImageUri || undefined
+      // Make direct API call to add_product.php
+      const response = await fetch(
+        `${IPConfig.API_BASE_URL}/farmer/add_product.php`,
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            Accept: "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        }
       );
+
+      const result = await response.json();
 
       if (result.success) {
         Alert.alert("Success", "Product added successfully", [
@@ -205,11 +360,13 @@ export default function AddProduct() {
                 unit_type: "kilogram",
                 selectedCategories: [],
                 image: null,
+                barangay_id: null,
+                field_id: null,
               });
               setSelectedImageUri(null);
 
               // Navigate to products page
-              router.push("/farmer/products");
+              router.replace("/farmer/products");
             },
           },
         ]);
@@ -240,7 +397,7 @@ export default function AddProduct() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => router.replace("/farmer/dashboard")}
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.light} />
         </TouchableOpacity>
@@ -330,6 +487,57 @@ export default function AddProduct() {
             ))}
           </Picker>
         </View>
+
+        {/* Field Selection (new section) */}
+        <Text style={styles.formSectionHeader}>Product Location</Text>
+        <Text style={styles.locationHelpText}>
+          Assigning your product to a location helps buyers find local produce
+          from specific areas and helps agricultural officers track production.
+        </Text>
+
+        <Text style={styles.formLabel}>Field (Optional)</Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={form.field_id}
+            style={styles.picker}
+            onValueChange={(value) => selectField(value)}
+          >
+            <Picker.Item label="Select a field" value={null} />
+            {fields.map((field) => {
+              // Find the barangay name for this field to display in the picker
+              const fieldBarangay = barangays.find(
+                (b) => b.barangay_id === field.barangay_id
+              );
+
+              // Create a more informative label with both field name and barangay
+              const label = fieldBarangay
+                ? `${field.field_name} (${fieldBarangay.barangay_name})`
+                : field.field_name;
+
+              return (
+                <Picker.Item
+                  key={field.field_id}
+                  label={label}
+                  value={field.field_id}
+                />
+              );
+            })}
+          </Picker>
+        </View>
+
+        {/* Show auto-selected barangay info if field is selected */}
+        {form.field_id && form.barangay_id && (
+          <View style={styles.autoSelectedBarangay}>
+            <Ionicons
+              name="information-circle"
+              size={16}
+              color={COLORS.primary}
+            />
+            <Text style={styles.autoSelectedText}>
+              Barangay automatically set based on field selection
+            </Text>
+          </View>
+        )}
 
         {/* Categories */}
         <Text style={styles.formLabel}>Categories *</Text>
@@ -683,5 +891,35 @@ const styles = StyleSheet.create({
   loadingText: {
     color: "#666",
     fontSize: 14,
+  },
+  // New styles for location section
+  formSectionHeader: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginTop: 24,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    paddingBottom: 8,
+  },
+  locationHelpText: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  autoSelectedBarangay: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#e1f5fe",
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 16,
+  },
+  autoSelectedText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    marginLeft: 4,
   },
 });

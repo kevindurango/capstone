@@ -595,3 +595,349 @@ tr.child-row {
   background-color: #d1e6fa;
   color: #0a58ca;
 }
+
+/* Add admin header styling */
+.admin-header {
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  color: white;
+  padding: 10px 0;
+}
+.admin-badge {
+  background-color: #6a11cb;
+  color: white;
+  font-size: 0.8rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-left: 10px;
+}
+/* DataTables Custom Styling */
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter {
+  margin-bottom: 15px;
+}
+.table.dataTable {
+  border-collapse: collapse !important;
+}
+.dt-buttons {
+  margin-bottom: 15px;
+}
+.dt-button {
+  background-color: #28a745 !important;
+  border-color: #28a745 !important;
+  color: white !important;
+}
+.dt-button:hover {
+  background-color: #218838 !important;
+}
+.dataTables_info {
+  padding-top: 0.85em !important;
+}
+/* Highlight search results */
+table.dataTable tbody tr.selected {
+  background-color: #e8f5e9;
+}
+table.dataTable tbody tr:hover {
+  background-color: #f5f5f5;
+}
+
+/* Card Styling */
+.report-card {
+  background-color: #fff;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  margin-bottom: 1.5rem;
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: block !important;
+}
+
+.report-card .card-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  padding: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  color: #28a745;
+}
+
+.report-card .card-header i {
+  margin-right: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.report-card .card-body {
+  padding: 1.25rem;
+}
+
+/* Stats Styling */
+.summary-stats {
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+  color: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  margin-bottom: 1.5rem;
+  animation: slideIn 0.5s ease-out forwards;
+}
+
+.summary-stats .number {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: white;
+}
+
+.summary-stats .label {
+  font-size: 0.9rem;
+  opacity: 0.9;
+  margin: 0;
+}
+
+/* Status Badge Styling */
+.status-badge {
+  padding: 0.35rem 0.75rem;
+  border-radius: 50rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.status-badge.status-completed,
+.status-badge.status-paid {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-badge.status-pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.status-canceled,
+.status-badge.status-failed {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* Animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chart-container {
+  position: relative;
+  height: 250px;
+  margin-bottom: 1rem;
+}
+
+.list-group {
+  margin-top: 1rem;
+}
+
+.list-group-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  margin-bottom: -1px;
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+/* Report Card Visibility and Style */
+.report-card {
+  visibility: visible !important;
+  display: block !important;
+  opacity: 1 !important;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  border: 1px solid rgba(0, 0, 0, 0.125);
+  border-radius: 0.25rem;
+  margin-bottom: 1.5rem;
+  background-color: #fff;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.report-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.report-card .card-header {
+  background: linear-gradient(to right, #f8f9fa, #ffffff);
+  border-bottom: 1px solid #e9ecef;
+  padding: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  color: #28a745;
+}
+
+.report-card .card-header i {
+  margin-right: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.report-card .card-body {
+  padding: 1.25rem;
+}
+
+/* Stats Cards */
+.summary-stats {
+  background: linear-gradient(135deg, #28a745 0%, #34c38f 100%);
+  color: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  margin-bottom: 1.5rem;
+  animation: slideIn 0.5s ease-out forwards;
+  transition: transform 0.3s ease;
+}
+
+.summary-stats:hover {
+  transform: translateY(-3px);
+}
+
+.summary-stats .number {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: white;
+}
+
+.summary-stats .label {
+  font-size: 0.9rem;
+  opacity: 0.9;
+  margin: 0;
+}
+
+/* Animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Chart Container */
+.chart-container {
+  position: relative;
+  height: 250px;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 0.35rem 0.75rem;
+  border-radius: 50rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+.status-badge.status-completed,
+.status-badge.status-paid {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-badge.status-pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.status-canceled,
+.status-badge.status-failed {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* List Groups */
+.list-group {
+  margin-top: 1rem;
+}
+
+.list-group-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  margin-bottom: -1px;
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.125);
+  transition: background-color 0.2s ease;
+}
+
+.list-group-item:hover {
+  background-color: #f8f9fa;
+}
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px;
+}
+
+.stats-content {
+  width: 100%;
+  text-align: center;
+}
+
+.stats-content p {
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.stats-content .barangay {
+  color: #2c3e50;
+  font-weight: bold;
+}
+
+.stats-content .area,
+.stats-content .rate {
+  color: #3498db;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.card {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Highlighted row style */
+.highlight-row {
+  background-color: rgba(40, 167, 69, 0.15) !important;
+  transition: background-color 1s ease;
+  animation: pulse 1s 2;
+}
+
+@keyframes pulse {
+  0% {
+    background-color: rgba(40, 167, 69, 0.15);
+  }
+  50% {
+    background-color: rgba(40, 167, 69, 0.35);
+  }
+  100% {
+    background-color: rgba(40, 167, 69, 0.15);
+  }
+}

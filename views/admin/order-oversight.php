@@ -260,8 +260,155 @@ $todayCount = count($todayOrders);
             word-wrap: break-word;
             white-space: normal !important;
         }
+
+        /* Order Details Modal Enhanced Styling */
+        .order-details-container {
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .order-details-container .card {
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+            transition: transform 0.2s, box-shadow 0.2s;
+            overflow: hidden;
+        }
+        
+        .order-details-container .card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1) !important;
+        }
+        
+        .order-details-container .card-header {
+            padding: 12px 16px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        
+        .order-details-container .badge {
+            padding: 0.5em 0.85em;
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        
+        .order-details-container .table th {
+            border-top: none;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+        }
+        
+        .order-details-container .table td {
+            vertical-align: middle;
+        }
+        
+        .order-summary-box {
+            background: linear-gradient(to right, #f8f9fa, #ffffff);
+            border-left: 4px solid #4e73df;
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+        
+        .payment-info-item, .pickup-info-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .info-label {
+            width: 100px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .info-value {
+            flex: 1;
+        }
+        
+        .item-img-container {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        
+        .product-icon {
+            color: #6c757d;
+            font-size: 1.2rem;
+        }
+        
+        .product-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .modal-header-custom {
+            background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+            color: white;
+            border-bottom: none;
+        }
+        
+        .modal-footer-custom {
+            border-top: 1px solid #e9ecef;
+            background-color: #f8f9fa;
+        }
+        
+        .print-btn {
+            background-color: #fff;
+            color: #4e73df;
+            border: 1px solid #4e73df;
+            transition: all 0.2s;
+        }
+        
+        .print-btn:hover {
+            background-color: #4e73df;
+            color: #fff;
+        }
+        
+        /* Status badge styling */
+        .status-badge-pending {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .status-badge-processing {
+            background-color: #17a2b8;
+            color: white;
+        }
+        
+        .status-badge-ready {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .status-badge-completed {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .status-badge-canceled {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        /* Highlight price and total */
+        .price-highlight {
+            font-weight: 600;
+            color: #28a745;
+        }
+        
+        .subtotal-row {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
     </style>
 </head>
+
 <body>
     <!-- Add Admin Header -->
     <div class="admin-header text-center">
@@ -325,16 +472,24 @@ $todayCount = count($todayOrders);
                             </form>
                         </div>
                         <div class="col-md-6">
-                            <div class="d-flex justify-content-end">
-                                <div class="status-filter">
+                            <div class="d-flex justify-content-end">                                <div class="status-filter">
                                     <button class="btn btn-outline-secondary mr-2 filter-btn active" data-status="all">
                                         All Orders
                                     </button>
                                     <button class="btn btn-outline-warning mr-2 filter-btn" data-status="pending">
                                         Pending
                                     </button>
-                                    <button class="btn btn-outline-success filter-btn" data-status="completed">
+                                    <button class="btn btn-outline-info mr-2 filter-btn" data-status="processing">
+                                        Processing
+                                    </button>
+                                    <button class="btn btn-outline-primary mr-2 filter-btn" data-status="ready">
+                                        Ready
+                                    </button>
+                                    <button class="btn btn-outline-success mr-2 filter-btn" data-status="completed">
                                         Completed
+                                    </button>
+                                    <button class="btn btn-outline-danger filter-btn" data-status="canceled">
+                                        Canceled
                                     </button>
                                 </div>
                             </div>
@@ -364,18 +519,29 @@ $todayCount = count($todayOrders);
                                                 <tr data-status="<?= strtolower($order['order_status']) ?>">
                                                     <td><span class="order-id"><?= htmlspecialchars($order['order_id']) ?></span></td>
                                                     <td><?= htmlspecialchars($order['consumer_name']) ?></td>
-                                                    <td>
-                                                        <?php if ($order['order_status'] === 'pending'): ?>
+                                                    <td>                                        <?php if ($order['order_status'] === 'pending'): ?>
                                                             <span class="badge badge-warning status-badge">
                                                                 <i class="bi bi-hourglass-split"></i> Pending
+                                                            </span>
+                                                        <?php elseif ($order['order_status'] === 'processing'): ?>
+                                                            <span class="badge badge-info status-badge">
+                                                                <i class="bi bi-gear-fill"></i> Processing
+                                                            </span>
+                                                        <?php elseif ($order['order_status'] === 'ready'): ?>
+                                                            <span class="badge badge-primary status-badge">
+                                                                <i class="bi bi-box-seam"></i> Ready
                                                             </span>
                                                         <?php elseif ($order['order_status'] === 'completed'): ?>
                                                             <span class="badge badge-success status-badge">
                                                                 <i class="bi bi-check-circle"></i> Completed
                                                             </span>
-                                                        <?php else: ?>
+                                                        <?php elseif ($order['order_status'] === 'canceled'): ?>
                                                             <span class="badge badge-danger status-badge">
                                                                 <i class="bi bi-x-circle"></i> Canceled
+                                                            </span>
+                                                        <?php else: ?>
+                                                            <span class="badge badge-secondary status-badge">
+                                                                <i class="bi bi-question-circle"></i> <?= ucfirst($order['order_status']) ?>
                                                             </span>
                                                         <?php endif; ?>
                                                     </td>
@@ -537,11 +703,11 @@ $todayCount = count($todayOrders);
     <div class="modal fade" id="viewOrderModal" tabindex="-1" role="dialog" aria-labelledby="viewOrderModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
-                <div class="modal-header">
+                <div class="modal-header modal-header-custom">
                     <h5 class="modal-title" id="viewOrderModalLabel">
                         <i class="bi bi-bag-check"></i> Order Details
                     </h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -555,10 +721,10 @@ $todayCount = count($todayOrders);
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer modal-footer-custom">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" id="printOrderDetails">
-                        <i class="bi bi-printer"></i> Print
+                    <button type="button" class="btn print-btn" id="printOrderDetails">
+                        <i class="bi bi-printer"></i> Print Details
                     </button>
                 </div>
             </div>
@@ -594,11 +760,10 @@ $todayCount = count($todayOrders);
             });
 
             // Order Details Modal Functionality
-            $('.view-details-btn').click(function() {
+            $(document).on('click', '.view-details-btn', function() {
                 const orderId = $(this).data('order-id');
-                console.log("Loading details for order ID:", orderId); // Add debug logging
                 
-                $('#viewOrderModalLabel').html('<i class="bi bi-bag-check"></i> Order Details - #' + orderId);
+                $('#viewOrderModalLabel').html('<i class="bi bi-clipboard-data"></i> Order #' + orderId + ' Details');
                 $('#viewOrderModal').modal('show');
 
                 // Show loading spinner
@@ -610,395 +775,397 @@ $todayCount = count($todayOrders);
                         <p class="mt-3">Loading order details...</p>
                     </div>
                 `);
-                
+
                 // Fetch order details via AJAX
                 $.ajax({
                     url: '../../ajax/get-order-details.php',
                     type: 'GET',
                     data: { order_id: orderId },
-                    dataType: 'json',
                     success: function(response) {
-                        console.log("Response received:", response); // Debug log response
-                        
                         if (response.error) {
                             $('#orderDetailsContent').html(`
                                 <div class="alert alert-danger">
-                                    <i class="bi bi-exclamation-triangle"></i> Error: ${response.error}
+                                    <i class="bi bi-exclamation-triangle"></i> ${response.error}
                                 </div>
                             `);
                             return;
                         }
-
-                        // Format the order details
+                        
+                        // Enhanced order details display with improved aesthetics
                         let html = `
                             <div class="order-details-container">
+                                <!-- Order Summary Card with enhanced design -->
+                                <div class="card mb-4 border-0">
+                                    <div class="card-header d-flex justify-content-between align-items-center" 
+                                         style="background: linear-gradient(135deg, #3a4db1 0%, #1a2a6c 100%); color: white;">
+                                        <span><i class="bi bi-info-circle-fill mr-2"></i>Order Information</span>
+                                        <span class="badge status-badge-${response.order.order_status.toLowerCase()}">${getStatusBadge(response.order.order_status)}</span>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="order-summary-box mb-3">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <p class="mb-1"><i class="bi bi-hash text-primary mr-2"></i><strong>Order ID:</strong> #${response.order.order_id}</p>
+                                                    <p class="mb-1"><i class="bi bi-calendar-date text-primary mr-2"></i><strong>Date:</strong> ${formatDate(response.order.order_date)}</p>
+                                                    <p class="mb-0"><i class="bi bi-cash-stack text-success mr-2"></i><strong>Total:</strong> <span class="price-highlight">₱${response.subtotal.toFixed(2)}</span></p>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <p class="mb-1"><i class="bi bi-person-circle text-primary mr-2"></i><strong>Customer:</strong> ${response.order.username}</p>
+                                                    <p class="mb-1"><i class="bi bi-envelope text-primary mr-2"></i><strong>Email:</strong> ${response.order.email || 'N/A'}</p>
+                                                    <p class="mb-0"><i class="bi bi-telephone text-primary mr-2"></i><strong>Phone:</strong> ${response.order.contact_number || 'N/A'}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Items Table Card with enhanced styling -->
+                                <div class="card mb-4 border-0">
+                                    <div class="card-header" style="background: linear-gradient(135deg, #2c7873 0%, #1a5157 100%); color: white;">
+                                        <i class="bi bi-cart-fill mr-2"></i>Order Items
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table mb-0">
+                                                <thead style="background-color: #f8f9fa;">
+                                                    <tr>
+                                                        <th class="pl-3">Product</th>
+                                                        <th class="text-center">Price</th>
+                                                        <th class="text-center">Quantity</th>
+                                                        <th class="text-right pr-3">Subtotal</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>`;
+                                                
+                        let totalItems = 0;
+                        response.items.forEach(item => {
+                            totalItems += parseInt(item.quantity);
+                            const price = parseFloat(item.price || item.unit_price);
+                            const subtotal = price * parseInt(item.quantity);
+                            
+                            html += `
+                                <tr>
+                                    <td class="pl-3">
+                                        <div class="product-info">
+                                            <div class="item-img-container">
+                                                <i class="bi bi-box product-icon"></i>
+                                            </div>
+                                            <div>
+                                                <strong>${item.product_name || 'Unknown Product'}</strong>
+                                                ${item.unit_type ? `<div><small class="text-muted">Unit: ${item.unit_type}</small></div>` : ''}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">₱${price.toFixed(2)}</td>
+                                    <td class="text-center"><span class="badge badge-pill badge-light">${item.quantity}</span></td>
+                                    <td class="text-right pr-3 price-highlight">₱${subtotal.toFixed(2)}</td>
+                                </tr>`;
+                        });
+                                
+                        html += `
+                                                </tbody>
+                                                <tfoot class="subtotal-row">
+                                                    <tr>
+                                                        <td class="pl-3"><strong>Total</strong></td>
+                                                        <td class="text-center">${response.items.length} product(s)</td>
+                                                        <td class="text-center">${totalItems} item(s)</td>
+                                                        <td class="text-right pr-3 price-highlight">₱${response.subtotal.toFixed(2)}</td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Two-column layout with enhanced cards -->
                                 <div class="row">
-                                    <!-- Customer Information -->
+                                    <!-- Payment Details -->
                                     <div class="col-md-6 mb-4">
-                                        <div class="card h-100 border-left-primary">
-                                            <div class="card-header bg-gradient-primary text-white">
-                                                <i class="bi bi-person-circle mr-2"></i> Customer Information
+                                        <div class="card h-100 border-0">
+                                            <div class="card-header" style="background: linear-gradient(135deg, #28724f 0%, #185230 100%); color: white;">
+                                                <i class="bi bi-credit-card-fill mr-2"></i>Payment Information
                                             </div>
                                             <div class="card-body">
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-person mr-2"></i>Name:</span>
-                                                    <span class="info-value font-weight-bold">${response.order.username}</span>
+                                                <div class="payment-info-item">
+                                                    <span class="info-label">Status:</span>
+                                                    <span class="info-value"><span class="badge ${getPaymentStatusClass(response.payment.status)}">${response.payment.status.toUpperCase()}</span></span>
                                                 </div>
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-envelope mr-2"></i>Email:</span>
-                                                    <span class="info-value">${response.order.email}</span>
+                                                <div class="payment-info-item">
+                                                    <span class="info-label">Method:</span>
+                                                    <span class="info-value">${formatPaymentMethod(response.payment.method)}</span>
                                                 </div>
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-telephone mr-2"></i>Phone:</span>
-                                                    <span class="info-value">${response.order.contact_number || 'N/A'}</span>
-                                                </div>
+                                                ${response.payment.date ? `
+                                                <div class="payment-info-item">
+                                                    <span class="info-label">Date:</span>
+                                                    <span class="info-value">${formatDate(response.payment.date)}</span>
+                                                </div>` : ''}
+                                                ${response.payment.amount ? `
+                                                <div class="payment-info-item">
+                                                    <span class="info-label">Amount:</span>
+                                                    <span class="info-value price-highlight">₱${parseFloat(response.payment.amount).toFixed(2)}</span>
+                                                </div>` : ''}
                                             </div>
                                         </div>
                                     </div>
                                     
-                                    <!-- Order Information -->
+                                    <!-- Pickup Details -->
                                     <div class="col-md-6 mb-4">
-                                        <div class="card h-100 border-left-info">
-                                            <div class="card-header bg-gradient-info text-white">
-                                                <i class="bi bi-bag-check mr-2"></i> Order Information
+                                        <div class="card h-100 border-0">
+                                            <div class="card-header" style="background: linear-gradient(135deg, #b35c2d 0%, #8c4a20 100%); color: white;">
+                                                <i class="bi bi-truck mr-2"></i>Pickup Details
                                             </div>
                                             <div class="card-body">
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-hash mr-2"></i>Order ID:</span>
-                                                    <span class="info-value font-weight-bold">#${response.order.order_id}</span>
+                                                <div class="pickup-info-item">
+                                                    <span class="info-label">Status:</span>
+                                                    <span class="info-value"><span class="badge ${getPickupStatusClass(response.pickup.status)}">${response.pickup.status ? response.pickup.status.toUpperCase() : 'PENDING'}</span></span>
                                                 </div>
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-calendar-date mr-2"></i>Date:</span>
-                                                    <span class="info-value">${new Date(response.order.order_date).toLocaleString()}</span>
+                                                <div class="pickup-info-item">
+                                                    <span class="info-label">Location:</span>
+                                                    <span class="info-value"><i class="bi bi-geo-alt text-danger mr-1"></i>${response.pickup.location || 'Municipal Agriculture Office'}</span>
                                                 </div>
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-flag mr-2"></i>Status:</span>
-                                                    <span class="badge badge-${response.order.order_status === 'completed' ? 'success' : 
-                                                                            (response.order.order_status === 'pending' ? 'warning' : 'danger')} badge-pill px-3 py-2">
-                                                        <i class="bi bi-${response.order.order_status === 'completed' ? 'check-circle' : 
-                                                                        (response.order.order_status === 'pending' ? 'hourglass-split' : 'x-circle')} mr-1"></i>
-                                                        ${response.order.order_status.toUpperCase()}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Payment Information -->
-                                <div class="card mb-4 border-left-purple shadow-sm">
-                                    <div class="card-header bg-gradient-purple text-white">
-                                        <i class="bi bi-credit-card mr-2"></i> Payment Information
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-check-circle mr-2"></i>Status:</span>
-                                                    <span class="badge badge-${
-                                                        response.payment.status === 'completed' ? 'success' : 
-                                                        (response.payment.status === 'pending' ? 'warning' : 
-                                                        (response.payment.status === 'failed' ? 'danger' : 'secondary'))
-                                                    } badge-pill px-3 py-2">
-                                                        ${response.payment.status === 'not_processed' ? 'NOT PROCESSED' : response.payment.status.toUpperCase()}
-                                                    </span>
-                                                </div>
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-wallet2 mr-2"></i>Method:</span>
-                                                    <span class="info-value font-weight-bold">${
-                                                        response.payment.method === 'credit_card' ? '<i class="bi bi-credit-card mr-1"></i> Credit Card' :
-                                                        response.payment.method === 'paypal' ? '<i class="bi bi-paypal mr-1"></i> PayPal' :
-                                                        response.payment.method === 'bank_transfer' ? '<i class="bi bi-bank mr-1"></i> Bank Transfer' :
-                                                        response.payment.method === 'cash_on_pickup' ? '<i class="bi bi-cash mr-1"></i> Cash on Pickup' :
-                                                        response.payment.method
-                                                    }</span>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                ${response.payment.date ? `
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-calendar mr-2"></i>Date:</span>
-                                                    <span class="info-value">${new Date(response.payment.date).toLocaleString()}</span>
+                                                ${response.pickup.date ? `
+                                                <div class="pickup-info-item">
+                                                    <span class="info-label">Date:</span>
+                                                    <span class="info-value"><i class="bi bi-calendar-check text-primary mr-1"></i>${formatDate(response.pickup.date)}</span>
                                                 </div>` : ''}
-                                                ${response.payment.amount ? `
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-cash-stack mr-2"></i>Amount:</span>
-                                                    <span class="info-value">₱${parseFloat(response.payment.amount).toFixed(2)}</span>
+                                                ${response.pickup.contact_person ? `
+                                                <div class="pickup-info-item">
+                                                    <span class="info-label">Contact:</span>
+                                                    <span class="info-value"><i class="bi bi-person text-info mr-1"></i>${response.pickup.contact_person}</span>
                                                 </div>` : ''}
-                                                ${response.payment.transaction_reference ? `
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-hash mr-2"></i>Ref:</span>
-                                                    <span class="info-value font-monospace">${response.payment.transaction_reference}</span>
-                                                </div>` : ''}
-                                            </div>
-                                        </div>
-                                        ${response.payment.payment_notes ? `
-                                        <div class="mt-3 p-2 bg-light rounded">
-                                            <small class="text-muted"><i class="bi bi-info-circle mr-1"></i> Notes: ${response.payment.payment_notes}</small>
-                                        </div>` : ''}
-                                    </div>
-                                </div>`;
-                                
-                        // Pickup Information if available
-                        if (response.pickup) {
-                            html += `
-                                <div class="card mb-4 border-left-success shadow-sm">
-                                    <div class="card-header bg-gradient-success text-white d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <i class="bi bi-truck mr-2"></i> Pickup Details
-                                        </div>
-                                        <span class="badge badge-light pickup-id-badge">ID: #${response.pickup.pickup_id}</span>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-calendar-event mr-2"></i>Pickup Date:</span>
-                                                    <span class="info-value font-weight-bold">${response.pickup.pickup_date ? new Date(response.pickup.pickup_date).toLocaleString() : 'Not scheduled'}</span>
-                                                </div>
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-geo-alt mr-2"></i>Location:</span>
-                                                    <span class="info-value">${response.pickup.pickup_location || 'Not set'}</span>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-person-badge mr-2"></i>Contact Person:</span>
-                                                    <span class="info-value">${response.pickup.contact_person || 'Not assigned'}</span>
-                                                </div>
-                                                ${response.pickup.pickup_notes ? `
-                                                <div class="info-item">
-                                                    <span class="info-label"><i class="bi bi-card-text mr-2"></i>Notes:</span>
-                                                    <span class="info-value notes-text">${response.pickup.pickup_notes}</span>
+                                                ${response.pickup.notes ? `
+                                                <div class="mt-3 pt-2 border-top">
+                                                    <p class="mb-1"><strong><i class="bi bi-sticky text-warning mr-2"></i>Notes:</strong></p>
+                                                    <p class="mb-0 pl-3 text-muted font-italic">${response.pickup.notes}</p>
                                                 </div>` : ''}
                                             </div>
                                         </div>
                                     </div>
-                                </div>`;
-                        }
-                        
-                        // Order Items
-                        html += `
-                            <div class="card mb-4 border-left-warning shadow-sm">
-                                <div class="card-header bg-gradient-warning text-dark">
-                                    <i class="bi bi-cart mr-2"></i> Order Items
                                 </div>
-                                <div class="card-body p-0">
-                                    <div class="table-responsive">
-                                        <table class="table table-striped table-hover mb-0">
-                                            <thead class="thead-light">
-                                                <tr>
-                                                    <th class="pl-3">Product</th>
-                                                    <th class="text-center">Price</th>
-                                                    <th class="text-center">Quantity</th>
-                                                    <th class="text-right pr-3">Total</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>`;
-                        
-                        let totalItems = 0;
-                        response.items.forEach(item => {
-                            totalItems += parseInt(item.quantity);
-                            html += `
-                                <tr>
-                                    <td class="pl-3 font-weight-bold">${item.product_name || 'Unknown Product'}</td>
-                                    <td class="text-center">₱${parseFloat(item.price).toFixed(2)}</td>
-                                    <td class="text-center">${item.quantity}</td>
-                                    <td class="text-right pr-3">₱${(parseFloat(item.price) * parseInt(item.quantity)).toFixed(2)}</td>
-                                </tr>`;
-                        });
-                        
-                        html += `
-                                            </tbody>
-                                            <tfoot class="bg-light">
-                                                <tr>
-                                                    <td class="pl-3 font-weight-bold">Order Summary</td>
-                                                    <td class="text-center">${response.items.length} product(s)</td>
-                                                    <td class="text-center">${totalItems} item(s)</td>
-                                                    <td class="text-right pr-3 font-weight-bold text-success">₱${response.subtotal.toFixed(2)}</td>
-                                                </tr>
-                                            </tfoot>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="text-right">
-                                <div class="order-total-box p-3 bg-light rounded shadow-sm">
-                                    <span class="total-label">Total Amount:</span>
-                                    <span class="total-value">₱${response.subtotal.toFixed(2)}</span>
-                                </div>
-                            </div>
-                        </div>`;
+                            </div>`;
                         
                         $('#orderDetailsContent').html(html);
                         
-                        // Add custom styling for the order details
-                        $('<style>')
-                            .text(`
-                                .order-details-container {
-                                    font-family: 'Poppins', sans-serif;
-                                }
-                                .border-left-primary {
-                                    border-left: 4px solid #4e73df !important;
-                                }
-                                .border-left-info {
-                                    border-left: 4px solid #36b9cc !important;
-                                }
-                                .border-left-success {
-                                    border-left: 4px solid #1cc88a !important;
-                                }
-                                .border-left-warning {
-                                    border-left: 4px solid #f6c23e !important;
-                                }
-                                .border-left-purple {
-                                    border-left: 4px solid #7b4ea8 !important;
-                                }
-                                .bg-gradient-primary {
-                                    background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
-                                }
-                                .bg-gradient-info {
-                                    background: linear-gradient(135deg, #36b9cc 0%, #258391 100%);
-                                }
-                                .bg-gradient-success {
-                                    background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);
-                                }
-                                .bg-gradient-warning {
-                                    background: linear-gradient(135deg, #f6c23e 0%, #dda20a 100%);
-                                }
-                                .bg-gradient-purple {
-                                    background: linear-gradient(135deg, #7b4ea8 0%, #5b3b7e 100%);
-                                    color: #fff;
-                                }
-                                .info-item {
-                                    margin-bottom: 12px;
-                                    display: flex;
-                                    align-items: center;
-                                }
-                                .info-label {
-                                    width: 90px;
-                                    color: #6c757d;
-                                    font-size: 14px;
-                                }
-                                .info-value {
-                                    flex: 1;
-                                    color: #212529;
-                                    font-weight: 500;
-                                }
-                                .notes-text {
-                                    font-style: italic;
-                                    color: #6c757d;
-                                }
-                                .pickup-id-badge {
-                                    font-family: monospace;
-                                    letter-spacing: 1px;
-                                }
-                                .order-total-box {
-                                    display: inline-block;
-                                    min-width: 200px;
-                                    text-align: right;
-                                    background-color: #f8f9fa;
-                                    border-left: 4px solid #28a745;
-                                }
-                                .total-label {
-                                    font-weight: 500;
-                                    font-size: 18px;
-                                    color: #495057;
-                                    margin-right: 10px;
-                                }
-                                .total-value {
-                                    font-weight: 700;
-                                    font-size: 22px;
-                                    color: #28a745;
-                                }
-                                .card {
-                                    border-radius: 0.5rem;
-                                    overflow: hidden;
-                                    transition: transform 0.2s, box-shadow 0.2s;
-                                    margin-bottom: 1.5rem;
-                                }
-                                .card:hover {
-                                    transform: translateY(-3px);
-                                    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-                                }
-                                .card-header {
-                                    padding: 0.75rem 1.25rem;
-                                    font-weight: 600;
-                                }
-                                table.table td, table.table th {
-                                    vertical-align: middle;
-                                }
-                                .badge {
-                                    padding: 0.5em 0.85em;
-                                    font-size: 0.85em;
-                                    font-weight: 600;
-                                }
-                                .badge-pill {
-                                    border-radius: 50rem;
-                                }
-                                .badge-success {
-                                    background-color: #2ecc71;
-                                    color: white;
-                                }
-                                .badge-warning {
-                                    background-color: #f39c12;
-                                    color: #212529;
-                                }
-                                .badge-danger {
-                                    background-color: #e74c3c;
-                                    color: white;
-                                }
-                                .badge-secondary {
-                                    background-color: #6c757d;
-                                    color: white;
-                                }
-                                /* Improved styles for the payment information section */
-                                .bg-light {
-                                    background-color: #f1f3f5 !important;
-                                }
-                                .font-monospace {
-                                    font-family: monospace;
-                                    letter-spacing: 0.5px;
-                                    color: #212529 !important;
-                                    background-color: #e9ecef;
-                                    padding: 2px 4px;
-                                    border-radius: 3px;
-                                }
-                                .text-muted {
-                                    color: #495057 !important;
-                                }
-                                /* Add a light background to the payment card body for better contrast */
-                                .border-left-purple .card-body {
-                                    background-color: #f8f5ff;
-                                }
-                            `)
-                            .appendTo('head');
+                        // Helper functions for formatting
+                        function formatDate(dateStr) {
+                            if (!dateStr) return 'N/A';
+                            const date = new Date(dateStr);
+                            return date.toLocaleString('en-US', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+                        }
+                        
+                        function getStatusBadge(status) {
+                            switch(status) {
+                                case 'pending': return '<i class="bi bi-hourglass-split"></i> PENDING';
+                                case 'processing': return '<i class="bi bi-gear-fill"></i> PROCESSING';
+                                case 'ready': return '<i class="bi bi-box-seam"></i> READY';
+                                case 'completed': return '<i class="bi bi-check-circle"></i> COMPLETED';
+                                case 'canceled': return '<i class="bi bi-x-circle"></i> CANCELED';
+                                default: return status ? status.toUpperCase() : 'UNKNOWN';
+                            }
+                        }
+                        
+                        function getPaymentStatusClass(status) {
+                            switch(status) {
+                                case 'completed': return 'bg-success';
+                                case 'pending': return 'bg-warning text-dark';
+                                case 'failed': return 'bg-danger';
+                                default: return 'bg-secondary';
+                            }
+                        }
+                        
+                        function getPickupStatusClass(status) {
+                            switch(status) {
+                                case 'completed': return 'bg-success';
+                                case 'ready': return 'bg-primary';
+                                case 'pending': return 'bg-warning text-dark';
+                                case 'canceled': return 'bg-danger';
+                                default: return 'bg-info';
+                            }
+                        }
+                        
+                        function formatPaymentMethod(method) {
+                            switch(method) {
+                                case 'credit_card': return '<i class="bi bi-credit-card"></i> Credit Card';
+                                case 'paypal': return '<i class="bi bi-paypal"></i> PayPal';
+                                case 'bank_transfer': return '<i class="bi bi-bank"></i> Bank Transfer';
+                                case 'cash_on_pickup': return '<i class="bi bi-cash"></i> Cash on Pickup';
+                                default: return method || 'Not specified';
+                            }
+                        }
                     },
                     error: function(xhr, status, error) {
-                        console.error('AJAX Error:', error);
-                        console.error('Status:', status);
-                        console.error('Response:', xhr.responseText);
-                        
                         $('#orderDetailsContent').html(`
                             <div class="alert alert-danger">
                                 <i class="bi bi-exclamation-triangle"></i> Failed to load order details. Please try again.
-                                <br>Error: ${error || 'Unknown error'} 
+                                <br>Error: ${error || 'Unknown error'}
+                                <br>Status: ${status}
+                                <br>Response: ${xhr.responseText ? xhr.responseText.substring(0, 300) : 'No response'}
                             </div>
                         `);
+                        console.error("AJAX Error:", error);
+                        console.error("Status:", status);
+                        console.error("Response:", xhr.responseText);
                     }
                 });
             });
             
-            // Print functionality
-            $('#printOrderDetails').click(function() {
+            // Print functionality with enhanced styling
+            $(document).on('click', '#printOrderDetails', function() {
                 const printContents = document.getElementById('orderDetailsContent').innerHTML;
                 const originalContents = document.body.innerHTML;
+                
+                const printStyles = `
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+                        
+                        body { 
+                            font-family: 'Poppins', sans-serif;
+                            padding: 25px;
+                            color: #333;
+                        }
+                        
+                        h1 {
+                            color: #1a2a6c;
+                            text-align: center;
+                            margin-bottom: 25px;
+                            font-weight: 600;
+                        }
+                        
+                        .card {
+                            border: 1px solid #e3e6f0;
+                            border-radius: 8px;
+                            margin-bottom: 25px;
+                            page-break-inside: avoid;
+                        }
+                        
+                        .card-header {
+                            background-color: #3a4db1;
+                            color: white;
+                            padding: 12px 15px;
+                            font-weight: bold;
+                            border-radius: 8px 8px 0 0;
+                        }
+                        
+                        .card-header.items-header {
+                            background-color: #2c7873;
+                        }
+                        
+                        .card-header.payment-header {
+                            background-color: #28724f;
+                        }
+                        
+                        .card-header.pickup-header {
+                            background-color: #b35c2d;
+                        }
+                        
+                        .card-body {
+                            padding: 15px;
+                        }
+                        
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                        }
+                        
+                        th, td {
+                            border: 1px solid #e3e6f0;
+                            padding: 10px;
+                            text-align: left;
+                        }
+                        
+                        th {
+                            background-color: #f8f9fc;
+                            font-weight: 600;
+                        }
+                        
+                        .text-right { text-align: right; }
+                        .text-center { text-align: center; }
+                        
+                        .badge {
+                            padding: 5px 8px;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            font-weight: 500;
+                            display: inline-block;
+                        }
+                        
+                        .price-highlight {
+                            color: #28a745;
+                            font-weight: 600;
+                        }
+                        
+                        .subtotal-row {
+                            background-color: #f8f9fc;
+                            font-weight: 600;
+                        }
+                        
+                        .info-section {
+                            display: flex;
+                            flex-wrap: wrap;
+                        }
+                        
+                        .info-item {
+                            width: 100%;
+                            margin-bottom: 10px;
+                        }
+                        
+                        .info-label {
+                            font-weight: 600;
+                            min-width: 100px;
+                            display: inline-block;
+                        }
+                        
+                        .footer {
+                            text-align: center;
+                            margin-top: 30px;
+                            font-size: 12px;
+                            color: #858796;
+                        }
+                        
+                        .print-header {
+                            text-align: center;
+                            margin-bottom: 20px;
+                        }
+                        
+                        .company-name {
+                            font-size: 24px;
+                            font-weight: bold;
+                            margin: 0;
+                            color: #1a2a6c;
+                        }
+                        
+                        .company-address {
+                            margin: 5px 0;
+                        }
+                        
+                        @media print {
+                            .no-print { display: none; }
+                        }
+                    </style>
+                `;
+                
                 document.body.innerHTML = `
-                    <div style="padding: 30px;">
-                        <h1 style="text-align: center; margin-bottom: 20px;">Order Details</h1>
+                    <div class="print-container">
+                        <div class="print-header">
+                            <h1 class="company-name">Valencia Farmers Market</h1>
+                            <p class="company-address">Municipal Agriculture Office, Valencia, Negros Oriental</p>
+                            <p>Order Receipt</p>
+                        </div>
+                        ${printStyles}
                         ${printContents}
+                        <div class="footer">
+                            <p>Thank you for supporting local farmers!</p>
+                            <p>Printed on: ${new Date().toLocaleString()}</p>
+                        </div>
                     </div>
                 `;
+                
                 window.print();
                 document.body.innerHTML = originalContents;
                 location.reload();

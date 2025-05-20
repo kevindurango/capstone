@@ -159,9 +159,10 @@ function handleGetPickups() {
             // Only select pickups that match these orders
             if (!empty($orderIdsFound)) {
                 $placeholders = str_repeat("?,", count($orderIdsFound) - 1) . "?";
-                $sql = "SELECT p.*, o.order_status, o.order_date, o.consumer_id
+                $sql = "SELECT p.*, o.order_status, o.order_date, o.consumer_id, py.payment_method
                         FROM pickups p
                         JOIN orders o ON p.order_id = o.order_id
+                        LEFT JOIN payments py ON p.payment_id = py.payment_id
                         WHERE p.order_id IN (" . $placeholders . ")
                         AND o.consumer_id = ?
                         ORDER BY p.pickup_date DESC";
@@ -314,18 +315,20 @@ function handleGetPickups() {
             // Use JOIN to verify the user has access to this order
             if (isset($_GET['user_id'])) {
                 $userId = filter_input(INPUT_GET, 'user_id', FILTER_VALIDATE_INT);
-                $sql = "SELECT p.*, o.order_status, o.order_date, o.consumer_id
+                $sql = "SELECT p.*, o.order_status, o.order_date, o.consumer_id, py.payment_method
                         FROM pickups p
                         JOIN orders o ON p.order_id = o.order_id
+                        LEFT JOIN payments py ON p.payment_id = py.payment_id
                         WHERE p.order_id = ? AND o.consumer_id = ?";
                         
                 $stmt = $conn->prepare($sql);
                 $stmt->bind_param("ii", $orderId, $userId);
                 debugLog("SQL query prepared for order_id: " . $orderId . " and user_id: " . $userId);
             } else {
-                $sql = "SELECT p.*, o.order_status, o.order_date, o.consumer_id
+                $sql = "SELECT p.*, o.order_status, o.order_date, o.consumer_id, py.payment_method
                         FROM pickups p
                         JOIN orders o ON p.order_id = o.order_id
+                        LEFT JOIN payments py ON p.payment_id = py.payment_id
                         WHERE p.order_id = ?";
                         
                 $stmt = $conn->prepare($sql);

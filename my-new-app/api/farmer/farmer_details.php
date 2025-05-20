@@ -51,11 +51,31 @@ try {
                 throw new Exception('User is not found or not a farmer');
             }
 
-            // Get farmer details with barangay name
-            $details_query = "SELECT fd.*, b.barangay_name 
-                            FROM farmer_details fd
-                            LEFT JOIN barangays b ON fd.barangay_id = b.barangay_id
-                            WHERE fd.user_id = ?";
+            // Enhanced query to get more comprehensive farmer details
+            $details_query = "SELECT 
+                fd.*,
+                b.barangay_name,
+                u.first_name, 
+                u.last_name,
+                u.contact_number,
+                u.email,
+                COUNT(DISTINCT ff.field_id) as field_count,
+                SUM(ff.field_size) as total_field_size,
+                COUNT(DISTINCT p.product_id) as product_count,
+                (
+                    SELECT GROUP_CONCAT(DISTINCT bp.product_id)
+                    FROM barangay_products bp
+                    JOIN farmer_fields ff2 ON bp.field_id = ff2.field_id
+                    WHERE ff2.farmer_id = fd.user_id
+                ) as crop_ids
+                FROM farmer_details fd
+                LEFT JOIN barangays b ON fd.barangay_id = b.barangay_id
+                LEFT JOIN users u ON fd.user_id = u.user_id
+                LEFT JOIN farmer_fields ff ON fd.user_id = ff.farmer_id
+                LEFT JOIN products p ON fd.user_id = p.farmer_id AND p.status = 'approved'
+                WHERE fd.user_id = ?
+                GROUP BY fd.detail_id, fd.user_id, b.barangay_name, u.first_name, u.last_name, u.contact_number, u.email";
+                
             $stmt = $conn->prepare($details_query);
             $stmt->bind_param('i', $user_id);
             $stmt->execute();
@@ -64,7 +84,7 @@ try {
             if ($result->num_rows > 0) {
                 $farm_details = $result->fetch_assoc();
                 
-                // Format the farm detail data
+                // Format the farm detail data with enhanced information
                 $response['farm_details'] = [
                     'detail_id' => (int)$farm_details['detail_id'],
                     'user_id' => (int)$farm_details['user_id'],
@@ -77,7 +97,19 @@ try {
                     'income' => $farm_details['income'] !== null ? (float)$farm_details['income'] : null,
                     'farm_location' => $farm_details['farm_location'],
                     'barangay_id' => isset($farm_details['barangay_id']) ? (int)$farm_details['barangay_id'] : null,
-                    'barangay_name' => $farm_details['barangay_name'] ?? null
+                    'barangay_name' => $farm_details['barangay_name'] ?? null,
+                    'farmer' => [
+                        'first_name' => $farm_details['first_name'],
+                        'last_name' => $farm_details['last_name'],
+                        'full_name' => $farm_details['first_name'] . ' ' . $farm_details['last_name'],
+                        'contact_number' => $farm_details['contact_number'],
+                        'email' => $farm_details['email']
+                    ],
+                    'summary' => [
+                        'field_count' => (int)$farm_details['field_count'],
+                        'total_field_size' => (float)$farm_details['total_field_size'],
+                        'product_count' => (int)$farm_details['product_count']
+                    ]
                 ];
                 
                 // Get farmer's fields
@@ -197,6 +229,27 @@ try {
             $user_id = intval($_POST['user_id']);
             $data = $_POST;
             error_log("Form data received with user_id: $user_id");
+            
+            // Handle file upload for farm_image if present
+            $uploadedFile = null;
+            if (isset($_FILES['farm_image']) && $_FILES['farm_image']['error'] === UPLOAD_ERR_OK) {
+                $uploadDir = '../../uploads/farms/';
+                
+                // Create directory if it doesn't exist
+                if (!file_exists($uploadDir)) {
+                    mkdir($uploadDir, 0777, true);
+                }
+                
+                $filename = 'farm_' . time() . '_' . basename($_FILES['farm_image']['name']);
+                $uploadFile = $uploadDir . $filename;
+                
+                if (move_uploaded_file($_FILES['farm_image']['tmp_name'], $uploadFile)) {
+                    $data['farm_image'] = 'uploads/farms/' . $filename;
+                    error_log("File uploaded successfully: " . $data['farm_image']);
+                } else {
+                    error_log("Failed to upload file: " . $_FILES['farm_image']['error']);
+                }
+            }
         } 
         // Check if data is coming as JSON
         else {
@@ -258,51 +311,108 @@ try {
             $income = isset($data['income']) ? floatval($data['income']) : null;
             $farm_location = isset($data['farm_location']) ? trim($data['farm_location']) : '';
             
+            // Modify the update query to support section editing
             if ($result->num_rows > 0) {
                 // Update existing details
                 $detail_id = $result->fetch_assoc()['detail_id'];
                 
-                $update_query = "UPDATE farmer_details SET 
-                    farm_name = ?, 
-                    farm_type = ?, 
-                    certifications = ?, 
-                    crop_varieties = ?, 
-                    machinery_used = ?, 
-                    farm_size = ?, 
-                    income = ?, 
-                    farm_location = ?,
-                    barangay_id = ? 
-                    WHERE detail_id = ?";
-                    
-                $stmt = $conn->prepare($update_query);
-                $stmt->bind_param(
-                    'sssssddsii',
-                    $farm_name,
-                    $farm_type,
-                    $certifications,
-                    $crop_varieties,
-                    $machinery_used,
-                    $farm_size,
-                    $income,
-                    $farm_location,
-                    $barangay_id,
-                    $detail_id
-                );
+                // Build dynamic update query based on provided fields
+                $updateFields = [];
+                $updateTypes = '';
+                $updateValues = [];
                 
-                if (!$stmt->execute()) {
-                    throw new Exception('Failed to update farm details: ' . $conn->error);
+                // Only include fields that are provided in the request
+                if (isset($data['farm_name'])) {
+                    $updateFields[] = 'farm_name = ?';
+                    $updateTypes .= 's';
+                    $updateValues[] = $farm_name;
                 }
                 
-                // Log activity
-                $action = "Farmer ID: $user_id updated farm details";
-                $log_query = "INSERT INTO activitylogs (user_id, action, action_date) VALUES (?, ?, CURRENT_TIMESTAMP)";
-                $log_stmt = $conn->prepare($log_query);
-                $log_stmt->bind_param("is", $user_id, $action);
-                $log_stmt->execute();
+                if (isset($data['farm_type'])) {
+                    $updateFields[] = 'farm_type = ?';
+                    $updateTypes .= 's';
+                    $updateValues[] = $farm_type;
+                }
                 
-                $response['success'] = true;
-                $response['message'] = 'Farm details updated successfully';
+                if (isset($data['certifications'])) {
+                    $updateFields[] = 'certifications = ?';
+                    $updateTypes .= 's';
+                    $updateValues[] = $certifications;
+                }
                 
+                if (isset($data['crop_varieties'])) {
+                    $updateFields[] = 'crop_varieties = ?';
+                    $updateTypes .= 's';
+                    $updateValues[] = $crop_varieties;
+                }
+                
+                if (isset($data['machinery_used'])) {
+                    $updateFields[] = 'machinery_used = ?';
+                    $updateTypes .= 's';
+                    $updateValues[] = $machinery_used;
+                }
+                
+                if (isset($data['farm_size'])) {
+                    $updateFields[] = 'farm_size = ?';
+                    $updateTypes .= 'd';
+                    $updateValues[] = $farm_size;
+                }
+                
+                if (isset($data['income'])) {
+                    $updateFields[] = 'income = ?';
+                    $updateTypes .= 'd';
+                    $updateValues[] = $income;
+                }
+                
+                if (isset($data['farm_location'])) {
+                    $updateFields[] = 'farm_location = ?';
+                    $updateTypes .= 's';
+                    $updateValues[] = $farm_location;
+                }
+                
+                if (isset($data['barangay_id'])) {
+                    $updateFields[] = 'barangay_id = ?';
+                    $updateTypes .= 'i';
+                    $updateValues[] = $barangay_id;
+                }
+                
+                if (isset($data['farm_image'])) {
+                    $updateFields[] = 'farm_image = ?';
+                    $updateTypes .= 's';
+                    $updateValues[] = $data['farm_image'];
+                }
+                
+                // Only proceed if there are fields to update
+                if (!empty($updateFields)) {
+                    $update_query = "UPDATE farmer_details SET " . implode(', ', $updateFields) . " WHERE detail_id = ?";
+                    $updateTypes .= 'i'; // For detail_id
+                    $updateValues[] = $detail_id;
+                    
+                    $stmt = $conn->prepare($update_query);
+                    
+                    // Use call_user_func_array to dynamically bind parameters
+                    if (!empty($updateValues)) {
+                        $bindParams = array_merge([$stmt, $updateTypes], $updateValues);
+                        call_user_func_array('mysqli_stmt_bind_param', $bindParams);
+                    }
+                    
+                    if (!$stmt->execute()) {
+                        throw new Exception('Failed to update farm details: ' . $conn->error);
+                    }
+                    
+                    // Log activity
+                    $action = "Farmer ID: $user_id updated farm details";
+                    $log_query = "INSERT INTO activitylogs (user_id, action, action_date) VALUES (?, ?, CURRENT_TIMESTAMP)";
+                    $log_stmt = $conn->prepare($log_query);
+                    $log_stmt->bind_param("is", $user_id, $action);
+                    $log_stmt->execute();
+                    
+                    $response['success'] = true;
+                    $response['message'] = 'Farm details updated successfully';
+                } else {
+                    $response['success'] = true;
+                    $response['message'] = 'No fields to update';
+                }
             } else {
                 // Create new details
                 $insert_query = "INSERT INTO farmer_details (

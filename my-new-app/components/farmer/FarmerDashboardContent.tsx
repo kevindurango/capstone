@@ -5,17 +5,24 @@ import {
   FlatList,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { FarmerStats } from "./FarmerStats";
 import { FarmerQuickActions } from "./FarmerQuickActions";
-import { FarmerRecentProducts } from "./FarmerRecentProducts";
+import FarmerRecentProducts from "./FarmerRecentProducts";
 import { FarmerNotifications } from "./FarmerNotifications";
 import { FarmerMarketInsights } from "./FarmerMarketInsights";
 import { FarmerTips } from "./FarmerTips";
-import FarmerProfile from "./FarmerProfile";
 import { FarmerContactSupport } from "./FarmerContactSupport";
 import { COLORS } from "@/constants/Colors";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
 
 // Types
 interface UserData {
@@ -79,7 +86,7 @@ interface Props {
   onRefresh: () => void;
   navigateToAddProduct: () => void;
   navigateToManageProducts: () => void;
-  navigateToFarmProfile: () => void;
+  navigateToFarmProfile: (tab?: string) => void;
   navigateToProductDetails: (productId: number) => void;
   navigateToNotifications: () => void;
   navigateToOrders: () => void;
@@ -105,6 +112,43 @@ export function FarmerDashboardContent({
   navigateToOrders,
   handleLogout,
 }: Props) {
+  // Button animation values
+  const profileScale = useSharedValue(1);
+  const farmScale = useSharedValue(1);
+  const fieldsScale = useSharedValue(1);
+
+  const profileAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: profileScale.value }],
+  }));
+
+  const farmAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: farmScale.value }],
+  }));
+
+  const fieldsAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: fieldsScale.value }],
+  }));
+
+  const handlePressIn = (button: "profile" | "farm" | "fields") => {
+    const scaleValue =
+      button === "profile"
+        ? profileScale
+        : button === "farm"
+          ? farmScale
+          : fieldsScale;
+    scaleValue.value = withSpring(0.95);
+  };
+
+  const handlePressOut = (button: "profile" | "farm" | "fields") => {
+    const scaleValue =
+      button === "profile"
+        ? profileScale
+        : button === "farm"
+          ? farmScale
+          : fieldsScale;
+    scaleValue.value = withSpring(1);
+  };
+
   // Show loading state
   if (loading && !refreshing) {
     return (
@@ -171,14 +215,120 @@ export function FarmerDashboardContent({
     {
       id: "profile",
       component: (
-        <FarmerProfile
-          navigation={{
-            navigate: navigateToFarmProfile,
-          }}
-        />
+        <View style={styles.profileButtonContainer}>
+          <ThemedText style={styles.profileButtonTitle}>
+            Farmer Profile & Farm Information
+          </ThemedText>
+          <ThemedText style={styles.profileButtonSubtitle}>
+            View and manage your profile, farm details, and field information
+          </ThemedText>
+          <View style={styles.profileButtonsRow}>
+            <TouchableOpacity
+              style={styles.profileButtonMultiple}
+              onPress={() => navigateToFarmProfile("profile")}
+              onPressIn={() => handlePressIn("profile")}
+              onPressOut={() => handlePressOut("profile")}
+              activeOpacity={0.9}
+            >
+              <Animated.View
+                style={[{ width: "100%", height: "100%" }, profileAnimStyle]}
+              >
+                <LinearGradient
+                  colors={["#2E7D32", "#1B5E20"]}
+                  style={styles.buttonGradient}
+                >
+                  <Ionicons
+                    name="person"
+                    size={22}
+                    color="#fff"
+                    style={styles.buttonIcon}
+                  />
+                  <ThemedText style={styles.profileButtonText}>
+                    Profile
+                  </ThemedText>
+                </LinearGradient>
+              </Animated.View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.profileButtonMultiple}
+              onPress={() => navigateToFarmProfile("farm-details")}
+              onPressIn={() => handlePressIn("farm")}
+              onPressOut={() => handlePressOut("farm")}
+              activeOpacity={0.9}
+            >
+              <Animated.View
+                style={[{ width: "100%", height: "100%" }, farmAnimStyle]}
+              >
+                <LinearGradient
+                  colors={["#2E7D32", "#1B5E20"]}
+                  style={styles.buttonGradient}
+                >
+                  <Ionicons
+                    name="home"
+                    size={22}
+                    color="#fff"
+                    style={styles.buttonIcon}
+                  />
+                  <ThemedText style={styles.profileButtonText}>Farm</ThemedText>
+                </LinearGradient>
+              </Animated.View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.profileButtonMultiple}
+              onPress={() => navigateToFarmProfile("fields")}
+              onPressIn={() => handlePressIn("fields")}
+              onPressOut={() => handlePressOut("fields")}
+              activeOpacity={0.9}
+            >
+              <Animated.View
+                style={[{ width: "100%", height: "100%" }, fieldsAnimStyle]}
+              >
+                <LinearGradient
+                  colors={["#2E7D32", "#1B5E20"]}
+                  style={styles.buttonGradient}
+                >
+                  <Ionicons
+                    name="leaf"
+                    size={22}
+                    color="#fff"
+                    style={styles.buttonIcon}
+                  />
+                  <ThemedText style={styles.profileButtonText}>
+                    Fields
+                  </ThemedText>
+                </LinearGradient>
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
+        </View>
       ),
     },
-    { id: "support", component: <FarmerContactSupport /> },
+    {
+      id: "support",
+      component: (
+        <View style={{ marginTop: 24 }}>
+          <View
+            style={{
+              marginBottom: 12,
+              paddingHorizontal: 16,
+            }}
+          >
+            <ThemedText
+              style={{
+                fontSize: 18,
+                fontWeight: "bold",
+                color: COLORS.text,
+              }}
+            >
+              Agricultural Support Resources
+            </ThemedText>
+          </View>
+          <FarmerContactSupport />
+        </View>
+      ),
+    },
   ];
 
   return (
@@ -242,5 +392,70 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: COLORS.light,
     fontWeight: "600",
+  },
+  profileButtonContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  profileButtonTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: COLORS.primary,
+    marginBottom: 8,
+  },
+  profileButtonSubtitle: {
+    fontSize: 14,
+    color: COLORS.muted,
+    marginBottom: 16,
+  },
+  profileButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  profileButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 13,
+    marginTop: 4,
+    textAlign: "center",
+  },
+  profileButtonsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 16,
+    paddingHorizontal: 5,
+    gap: 12,
+  },
+  profileButtonMultiple: {
+    width: "28%",
+    aspectRatio: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  buttonGradient: {
+    paddingHorizontal: 8,
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    height: "100%",
+  },
+  buttonIcon: {
+    marginBottom: 4,
   },
 });

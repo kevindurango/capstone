@@ -120,15 +120,12 @@ try {
     $cardExpiryYear = null;
     $transactionReference = isset($paymentData['transaction_reference']) ? $paymentData['transaction_reference'] : null;
     $paymentNotes = isset($paymentData['payment_notes']) ? $paymentData['payment_notes'] : null;
-    
-    // Validate payment method
-    $allowedMethods = ['credit_card', 'paypal', 'bank_transfer', 'cash_on_pickup'];
+      // Validate payment method
+    $allowedMethods = ['credit_card', 'paypal', 'bank_transfer', 'cash_on_pickup', 'gcash'];
     if (!in_array($paymentMethod, $allowedMethods)) {
-        sendErrorResponse("Invalid payment method. Allowed methods: credit_card, paypal, bank_transfer, cash_on_pickup", 400);
+        sendErrorResponse("Invalid payment method. Allowed methods: credit_card, paypal, bank_transfer, cash_on_pickup, gcash", 400);
     }
-    log_timing("Data validation");
-    
-    // For credit card payments, extract card details securely
+    log_timing("Data validation");        // For credit card payments, extract card details securely
     if ($paymentMethod === 'credit_card' && isset($paymentData['card_details'])) {
         $cardDetails = $paymentData['card_details'];
         
@@ -161,6 +158,27 @@ try {
             $cardExpiryYear = (int)$matches[2];
             // Convert 2-digit year to 4-digit year
             $cardExpiryYear = $cardExpiryYear + 2000;
+        }
+    }
+    
+    // For GCash payments, extract GCash details
+    $gcashPhoneNumber = null;
+    $gcashReferenceId = null;
+    if ($paymentMethod === 'gcash' && isset($paymentData['gcash_details'])) {
+        $gcashDetails = $paymentData['gcash_details'];
+        
+        // Get GCash phone number
+        if (isset($gcashDetails['phone_number'])) {
+            $gcashPhoneNumber = $gcashDetails['phone_number'];
+        }
+        
+        // Get GCash reference ID
+        if (isset($gcashDetails['reference_id'])) {
+            $gcashReferenceId = $gcashDetails['reference_id'];
+            // If reference ID is provided, use it as transaction reference
+            if (!empty($gcashReferenceId)) {
+                $transactionReference = $gcashReferenceId;
+            }
         }
     }
     log_timing("Card processing");
@@ -218,8 +236,7 @@ try {
         $paymentStatus = 'pending'; // Default status
         
         // Generate a transaction reference if not provided
-        if (!$transactionReference) {
-            // Create a unique transaction reference with prefix based on payment method
+        if (!$transactionReference) {            // Create a unique transaction reference with prefix based on payment method
             $prefix = '';
             switch ($paymentMethod) {
                 case 'credit_card':
@@ -234,6 +251,9 @@ try {
                 case 'cash_on_pickup':
                     $prefix = 'CP';
                     break;
+                case 'gcash':
+                    $prefix = 'GC';
+                    break;
                 default:
                     $prefix = 'TX';
             }
@@ -244,14 +264,22 @@ try {
             $transactionReference = "$prefix-$orderId-$timestamp-$random";
             error_log("[DEBUG] Generated transaction reference: $transactionReference");
         }
-        
-        if ($paymentMethod === 'cash_on_pickup') {
+          if ($paymentMethod === 'cash_on_pickup') {
             // For cash on pickup, we just record the payment intent
             $paymentStatus = 'pending';
         } else if ($paymentMethod === 'credit_card') {
             // In a real app, you would integrate with a payment gateway here
             // For now, we'll simulate a successful payment
             $paymentStatus = 'completed';
+        } else if ($paymentMethod === 'gcash') {
+            // For GCash payments, check if reference ID was provided
+            if (!empty($gcashReferenceId)) {
+                // If reference ID was provided, assume it's verified and mark as completed
+                $paymentStatus = 'completed';
+            } else {
+                // No reference yet, mark as pending
+                $paymentStatus = 'pending';
+            }
         } else {
             // For bank_transfer or paypal, payment needs verification
             $paymentStatus = 'pending';
@@ -345,8 +373,7 @@ try {
         $paymentId = $conn->insert_id;
         $paymentStmt->close();
         log_timing("Payment record created");
-        
-        // If it's a credit card payment, store card details
+          // If it's a credit card payment, store card details
         if ($paymentMethod === 'credit_card' && $cardLastFour) {
             try {
                 // Try simplified version first that's guaranteed to work
@@ -376,6 +403,31 @@ try {
             } catch (Exception $e) {
                 // Log but continue - card details are not critical
                 debug_log("Credit card details storage failed, continuing payment process", $e->getMessage());
+            }
+        }
+        
+        // If it's a GCash payment, store GCash details
+        if ($paymentMethod === 'gcash' && ($gcashPhoneNumber || $gcashReferenceId)) {
+            try {
+                // Insert GCash payment details
+                $gcashQuery = "INSERT INTO payment_gcash (
+                    payment_id, 
+                    phone_number, 
+                    reference_id
+                ) VALUES (?, ?, ?)";
+                
+                $gcashStmt = $conn->prepare($gcashQuery);
+                
+                if ($gcashStmt) {
+                    $gcashStmt->bind_param("iss", $paymentId, $gcashPhoneNumber, $gcashReferenceId);
+                    $gcashStmt->execute();
+                    $gcashStmt->close();
+                } else {
+                    debug_log("Could not insert into payment_gcash: " . $conn->error);
+                }
+            } catch (Exception $e) {
+                // Log but continue - GCash details are not critical for payment process
+                debug_log("GCash details storage failed, continuing payment process", $e->getMessage());
             }
         }
         

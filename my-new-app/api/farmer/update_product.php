@@ -1,8 +1,14 @@
 <?php
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 header("Content-Type: application/json");
+
+// Handle preflight OPTIONS request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 // Include database connection
 require_once '../config/database.php';
@@ -69,6 +75,21 @@ function validateUnitType($unit_type) {
     
     // Default to kilogram if invalid
     return "kilogram";
+}
+
+// For connectivity testing
+if (isset($_GET['test'])) {
+    echo json_encode([
+        'success' => true,
+        'message' => 'API endpoint is reachable',
+        'timestamp' => date('Y-m-d H:i:s'),
+        'client_ip' => $_SERVER['REMOTE_ADDR'],
+        'server_ip' => $_SERVER['SERVER_ADDR'] ?? 'unknown',
+        'http_host' => $_SERVER['HTTP_HOST'],
+        'remote_host' => gethostbyaddr($_SERVER['REMOTE_ADDR']),
+        'method' => $_SERVER['REQUEST_METHOD']
+    ]);
+    exit();
 }
 
 // Response array
@@ -145,6 +166,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stock = filter_var($_POST['stock'], FILTER_SANITIZE_NUMBER_INT);
         $unit_type = validateUnitType(htmlspecialchars(trim($_POST['unit_type']), ENT_QUOTES, 'UTF-8'));
         
+        // Get barangay and field information if provided
+        $barangay_id = null;
+        $field_id = null;
+        
+        if (isset($_POST['barangay_id']) && !empty($_POST['barangay_id'])) {
+            $barangay_id = filter_var($_POST['barangay_id'], FILTER_SANITIZE_NUMBER_INT);
+            error_log("[UPDATE_PRODUCT] Received barangay_id: " . $barangay_id);
+        }
+        
+        if (isset($_POST['field_id'])) {
+            // Important: Check if field_id is non-empty rather than just isset
+            // This allows setting field_id to null to remove field association
+            if (!empty($_POST['field_id'])) {
+                $field_id = filter_var($_POST['field_id'], FILTER_SANITIZE_NUMBER_INT);
+                error_log("[UPDATE_PRODUCT] Received field_id: " . $field_id);
+                
+                // If field_id is provided, get its barangay_id to ensure consistency
+                if ($field_id) {
+                    $conn = getConnection();
+                    $stmt = $conn->prepare("SELECT barangay_id, field_name FROM farmer_fields WHERE field_id = ? AND farmer_id = ?");
+                    $stmt->bind_param("ii", $field_id, $user_id);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    
+                    if ($result->num_rows > 0) {
+                        $field_data = $result->fetch_assoc();
+                        $barangay_id = $field_data['barangay_id']; // Override barangay_id with the field's barangay
+                        error_log("[UPDATE_PRODUCT] Updated barangay_id from field: " . $barangay_id . ", field name: " . $field_data['field_name']);
+                    } else {
+                        // Field doesn't exist or doesn't belong to farmer
+                        error_log("[UPDATE_PRODUCT] Field ID $field_id not found or doesn't belong to farmer $user_id");
+                        throw new Exception("Invalid field selected. Please choose a field that belongs to you.");
+                    }
+                }
+            } else {
+                // Explicitly set field_id to null when empty string is submitted
+                $field_id = null;
+                error_log("[UPDATE_PRODUCT] Field ID explicitly set to NULL");
+            }
+        }
+        
         error_log("[UPDATE_PRODUCT] Validated unit_type: " . $unit_type);
         
         // Log the request for debugging
@@ -155,11 +217,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Check if connection is successful
         if (!$conn) {
-            throw new Exception("Database connection failed");
+            error_log("[UPDATE_PRODUCT] Database connection failed. Check database configuration.");
+            throw new Exception("Database connection failed. Please try again later.");
+        }
+        
+        // Try to ping the database to verify connection is active
+        if (!$conn->ping()) {
+            error_log("[UPDATE_PRODUCT] Database connection lost after initial connection");
+            // Attempt to reconnect
+            $conn = getConnection();
+            if (!$conn || !$conn->ping()) {
+                error_log("[UPDATE_PRODUCT] Failed to reconnect to database");
+                throw new Exception("Database connection error. Please try again later.");
+            }
         }
         
         // Start transaction
-        $conn->begin_transaction();
+        try {
+            $conn->begin_transaction();
+        } catch (Exception $e) {
+            error_log("[UPDATE_PRODUCT] Transaction start failed: " . $e->getMessage());
+            throw new Exception("Failed to start database transaction. Please try again later.");
+        }
         
         // Check if product exists and belongs to the user
         $stmt = $conn->prepare("SELECT p.*, u.role_id FROM products p
@@ -400,6 +479,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception("No valid categories were provided");
         }
         
+        // Handle barangay product mapping
+        if ($barangay_id) {
+            error_log("[UPDATE_PRODUCT] Processing barangay product mapping with barangay_id: $barangay_id, product_id: $product_id, field_id: " . ($field_id === null ? "NULL" : $field_id));
+            
+            // Check if the product already exists in barangay_products
+            $stmt = $conn->prepare("SELECT id FROM barangay_products WHERE product_id = ?");
+            $stmt->bind_param("i", $product_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            // Default values for new entries
+            $estimated_production = 0;
+            $production_unit = $unit_type;
+            $year = date('Y');
+            $season_id = 1; // Default season
+            $planted_area = 0;
+            $area_unit = 'hectare';
+            
+            if ($result->num_rows > 0) {
+                // Update existing entry - use different binding for NULL field_id
+                $barangay_product = $result->fetch_assoc();
+                error_log("[UPDATE_PRODUCT] Updating existing barangay product mapping: " . $barangay_product['id']);
+                
+                if ($field_id === null) {
+                    // Handle NULL field_id with proper SQL
+                    $stmt = $conn->prepare("UPDATE barangay_products SET field_id = NULL, barangay_id = ? WHERE id = ?");
+                    $stmt->bind_param("ii", $barangay_id, $barangay_product['id']);
+                } else {
+                    $stmt = $conn->prepare("UPDATE barangay_products SET field_id = ?, barangay_id = ? WHERE id = ?");
+                    $stmt->bind_param("iii", $field_id, $barangay_id, $barangay_product['id']);
+                }
+                
+                if (!$stmt->execute()) {
+                    error_log("[UPDATE_PRODUCT] Update barangay product error: " . $stmt->error);
+                    throw new Exception("Failed to update product barangay mapping: " . $stmt->error);
+                }
+                
+                error_log("[UPDATE_PRODUCT] Barangay product mapping updated successfully with field_id: " . ($field_id === null ? "NULL" : $field_id));
+            } else {
+                // Create new entry - use different binding for NULL field_id
+                error_log("[UPDATE_PRODUCT] Creating new barangay product mapping");
+                
+                if ($field_id === null) {
+                    $stmt = $conn->prepare("INSERT INTO barangay_products (barangay_id, product_id, estimated_production, production_unit, year, season_id, planted_area, area_unit, field_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)");
+                    $stmt->bind_param("iidsiiis", $barangay_id, $product_id, $estimated_production, $production_unit, $year, $season_id, $planted_area, $area_unit);
+                } else {
+                    $stmt = $conn->prepare("INSERT INTO barangay_products (barangay_id, product_id, estimated_production, production_unit, year, season_id, planted_area, area_unit, field_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->bind_param("iidsiisii", $barangay_id, $product_id, $estimated_production, $production_unit, $year, $season_id, $planted_area, $area_unit, $field_id);
+                }
+                
+                if (!$stmt->execute()) {
+                    error_log("[UPDATE_PRODUCT] Insert barangay product error: " . $stmt->error);
+                    throw new Exception("Failed to create product barangay mapping: " . $stmt->error);
+                }
+                
+                error_log("[UPDATE_PRODUCT] New barangay product mapping created with ID: " . $conn->insert_id);
+            }
+        } else {
+            // No barangay selected, remove any existing barangay_products entry
+            error_log("[UPDATE_PRODUCT] No barangay selected, removing any existing barangay_products mapping");
+            $stmt = $conn->prepare("DELETE FROM barangay_products WHERE product_id = ?");
+            $stmt->bind_param("i", $product_id);
+            $stmt->execute();
+        }
+        
         // Add activity log entry
         $action = "Farmer ID: $user_id updated product ID: $product_id details - Name: $name, Price: $price, Stock: $stock, Unit: $unit_type";
         $stmt = $conn->prepare("INSERT INTO activitylogs (user_id, action, action_date) VALUES (?, ?, CURRENT_TIMESTAMP)");
@@ -417,13 +561,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'name' => $name,
             'updated_at' => date('Y-m-d H:i:s'),
             'image_path' => $image_path,
-            'unit_type' => $unit_type
+            'unit_type' => $unit_type,
+            'barangay_id' => $barangay_id,
+            'field_id' => $field_id
         ];
         
     } catch (Exception $e) {
         // Rollback transaction on error
         if (isset($conn) && $conn && $conn->ping()) {
-            if ($conn->inTransaction()) {
+            if (method_exists($conn, 'inTransaction') && $conn->inTransaction()) {
                 $conn->rollback();
             }
         }

@@ -18,40 +18,18 @@ class Order {
     public function getOrdersWithPickupDetails(): array {
         try {
             $stmt = $this->pdo->prepare("
-                SELECT 
-                    o.order_id, 
-                    o.consumer_id, 
-                    o.order_status, 
-                    o.order_date, 
-                    o.pickup_details,
-                    u.username AS consumer_name,
-                    p.pickup_id,
-                    p.pickup_status,
-                    p.pickup_location,
-                    p.pickup_date,
-                    p.contact_person,
-                    p.pickup_notes
-                FROM orders AS o
-                JOIN users AS u ON o.consumer_id = u.user_id
-                LEFT JOIN pickups AS p ON o.order_id = p.order_id
-                WHERE o.pickup_details IS NOT NULL
+                SELECT o.*, u.username, u.email, u.contact_number,
+                       p.pickup_id, p.pickup_status, p.pickup_date, 
+                       p.pickup_location, p.pickup_notes, p.contact_person,
+                       pm.payment_status, pm.amount
+                FROM orders o
+                JOIN users u ON o.consumer_id = u.user_id
+                LEFT JOIN pickups p ON o.order_id = p.order_id
+                LEFT JOIN payments pm ON o.order_id = pm.order_id
                 ORDER BY o.order_date DESC
             ");
             $stmt->execute();
-            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            // Add default values for null fields
-            return array_map(function($row) {
-                return array_merge([
-                    'pickup_id' => null,
-                    'pickup_location' => 'Not set',
-                    'pickup_date' => date('Y-m-d H:i:s'), // Current date as default
-                    'contact_person' => 'Unassigned',
-                    'pickup_notes' => 'No notes',
-                    'pickup_status' => 'pending'
-                ], $row);
-            }, $results);
-
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log("Error in getOrdersWithPickupDetails: " . $e->getMessage());
             return [];
@@ -90,14 +68,21 @@ class Order {
      * @return array An array of associative arrays, each representing an order item.
      */
     public function getOrderItemsByOrderId(int $order_id): array {
-        $stmt = $this->pdo->prepare("
-            SELECT *
-            FROM orderitems
-            WHERE order_id = :order_id
-        ");
-        $stmt->bindParam(':order_id', $order_id, PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT oi.*, p.name as product_name, p.price as unit_price,
+                       p.unit_type, p.image as product_image
+                FROM orderitems oi
+                LEFT JOIN products p ON oi.product_id = p.product_id
+                WHERE oi.order_id = :order_id
+            ");
+            $stmt->bindParam(':order_id', $order_id, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting order items: " . $e->getMessage());
+            return [];
+        }
     }
 
     /**
@@ -106,10 +91,10 @@ class Order {
      * @param int $order_id The ID of the order to update.
      * @param string $new_status The new status to set for the order.
      * @return bool True on success, false on failure.
-     */
+     */    
     public function updateOrderStatus(int $order_id, string $new_status): bool {
-        // Validate the status value based on our database schema's enum values
-        $allowedStatuses = ['pending', 'processing', 'completed', 'canceled'];
+        // Validate the status value based on the database enum values
+        $allowedStatuses = ['pending', 'processing', 'ready', 'completed', 'canceled'];
 
         if (!in_array($new_status, $allowedStatuses)) {
             $this->lastError = "Invalid order status: $new_status. Allowed values are: " . implode(", ", $allowedStatuses);
@@ -278,15 +263,36 @@ class Order {
      * @return array|false An associative array representing the order details, or false if not found.
      */
     public function getOrderDetails(int $order_id) {
-        $query = "SELECT o.order_id, u.username AS consumer_name, o.order_status, o.order_date, p.pickup_status, p.pickup_location, p.pickup_date, p.assigned_to, p.pickup_notes
-                  FROM orders AS o
-                  JOIN users AS u ON o.consumer_id = u.user_id
-                  LEFT JOIN pickups AS p ON o.order_id = p.order_id
-                  WHERE o.order_id = :order_id";
-        $stmt = $this->pdo->prepare($query);
-        $stmt->bindParam(':order_id', $order_id, PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetch(PDO::FETCH_ASSOC);
+        try {
+            $query = "SELECT o.*, u.username, u.email, u.contact_number,
+                           p.pickup_id, p.pickup_status, p.pickup_date, 
+                           p.pickup_location, p.pickup_notes, p.contact_person,
+                           pm.payment_id, pm.payment_status, pm.amount, pm.payment_date,
+                           pm.payment_method
+                    FROM orders o
+                    JOIN users u ON o.consumer_id = u.user_id
+                    LEFT JOIN pickups p ON o.order_id = p.order_id
+                    LEFT JOIN payments pm ON o.order_id = pm.order_id
+                    WHERE o.order_id = :order_id";
+            
+            $stmt = $this->pdo->prepare($query);
+            $stmt->bindParam(':order_id', $order_id, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            $order = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($order) {
+                // Get order items
+                $order['items'] = $this->getOrderItemsByOrderId($order_id);
+                // Calculate total
+                $order['total'] = array_reduce($order['items'], function($carry, $item) {
+                    return $carry + ($item['price'] * $item['quantity']);
+                }, 0);
+            }
+            return $order;
+        } catch (PDOException $e) {
+            error_log("Error getting order details: " . $e->getMessage());
+            return false;
+        }
     }
 
     public function getOrdersByStatus($status) {
@@ -433,35 +439,29 @@ class Order {
             error_log("Error getting today's pickup count: " . $e->getMessage());
             return 0;
         }
-    }
-
-    public function getAssignedPickupCount() {
+    }    public function getPendingPickupCount() {
         try {
             $query = "SELECT COUNT(*) FROM pickups 
-                     WHERE pickup_status = 'assigned' 
-                     AND assigned_to IS NOT NULL";
+                     WHERE pickup_status = 'pending'";
             $stmt = $this->pdo->query($query);
             return (int)$stmt->fetchColumn();
         } catch (PDOException $e) {
-            error_log("Error getting assigned pickup count: " . $e->getMessage());
+            error_log("Error getting pending pickup count: " . $e->getMessage());
             return 0;
         }
     }
 
     public function getPickupDetails($pickupId) {
-        try {
-            $query = "SELECT p.*, 
+        try {            $query = "SELECT p.*, 
                             o.order_date, 
                             o.order_status,
                             o.pickup_details,
                             CONCAT(u.first_name, ' ', u.last_name) as consumer_name,
                             u.email,
-                            u.contact_number,
-                            d.username as driver_name
+                            u.contact_number
                      FROM pickups p
                      JOIN orders o ON p.order_id = o.order_id
                      JOIN users u ON o.consumer_id = u.user_id
-                     LEFT JOIN users d ON p.assigned_to = d.user_id
                      WHERE p.pickup_id = :pickup_id";
 
             $stmt = $this->pdo->prepare($query);
@@ -488,46 +488,7 @@ class Order {
             error_log("Error getting pickup details: " . $e->getMessage());
             return null;
         }
-    }
-
-    public function assignPickup($pickupId, $driverName, $notes = '') {
-        try {
-            // Ensure pickup record exists
-            $pickup = $this->getPickupDetails($pickupId);
-            if (!$pickup || !isset($pickup['pickup_id'])) {
-                $this->createPickupRecord($pickupId);
-            }
-
-            // Update pickup assignment with driver name
-            $query = "UPDATE pickups 
-                     SET assigned_to = :driver_name, 
-                         pickup_status = 'assigned',
-                         pickup_notes = :notes,
-                         pickup_date = NOW() 
-                     WHERE pickup_id = :pickup_id";
-            
-            $stmt = $this->pdo->prepare($query);
-            $stmt->bindParam(':driver_name', $driverName, PDO::PARAM_STR);
-            $stmt->bindParam(':notes', $notes, PDO::PARAM_STR);
-            $stmt->bindParam(':pickup_id', $pickupId, PDO::PARAM_INT);
-            
-            return $stmt->execute();
-        } catch (PDOException $e) {
-            error_log("Error assigning pickup: " . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Get a list of available drivers (static list for now)
-     */
-    public function getAvailableDrivers() {
-        return [
-            ['id' => 'Driver 1', 'name' => 'John Driver'],
-            ['id' => 'Driver 2', 'name' => 'Mary Driver'],
-            ['id' => 'Driver 3', 'name' => 'Sam Driver']
-        ];
-    }
+    }    
 
     function validatePickupStatus($status) {
         $valid_statuses = ['pending', 'scheduled', 'in_transit', 'picked_up', 'completed', 'cancelled'];

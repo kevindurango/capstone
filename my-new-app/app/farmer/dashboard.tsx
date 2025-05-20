@@ -381,35 +381,38 @@ export default function FarmerDashboard() {
       return false;
     }
   };
-
-  // Navigate to add product screen
+  // Navigate to add product screen - using replace to prevent back buttons
   const navigateToAddProduct = () => {
-    router.push("/farmer/add-product");
+    router.replace("/farmer/add-product");
   };
 
-  // Navigate to manage products screen
+  // Navigate to manage products screen - using replace to prevent back buttons
   const navigateToManageProducts = () => {
-    router.push("/farmer/products");
+    router.replace("/farmer/products");
   };
 
-  // Navigate to farm profile screen
-  const navigateToFarmProfile = () => {
-    router.push("/farmer/farm-profile");
+  // Navigate to farm profile screen - using replace to prevent back buttons
+  const navigateToFarmProfile = (tab?: string) => {
+    if (tab) {
+      router.replace(`/farmer/profile?tab=${tab}`);
+    } else {
+      router.replace("/farmer/profile");
+    }
   };
 
-  // Navigate to specific product details
+  // Navigate to specific product details - using replace to prevent back buttons
   const navigateToProductDetails = (productId: number) => {
-    router.push(`/farmer/products?id=${productId}`);
+    router.replace(`/farmer/products?id=${productId}`);
   };
 
-  // Navigate to all notifications
+  // Navigate to all notifications - using replace to prevent back buttons
   const navigateToNotifications = () => {
-    router.push("/farmer/notifications" as any);
+    router.replace("/farmer/notifications" as any);
   };
 
-  // Navigate to market orders
+  // Navigate to market orders - using replace to prevent back buttons
   const navigateToOrders = () => {
-    router.push("/farmer/orders");
+    router.replace("/farmer/orders");
   };
 
   // Show loading state while checking authentication

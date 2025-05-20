@@ -45,6 +45,8 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
   const [cardName, setCardName] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [cvv, setCvv] = useState("");
+  const [gcashPhoneNumber, setGcashPhoneNumber] = useState("");
+  const [gcashReferenceId, setGcashReferenceId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(true);
 
@@ -52,6 +54,8 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [paymentResult, setPaymentResult] = useState<any>(null);
   const [showSuccessScreen, setShowSuccessScreen] = useState(false);
+  // State for payment method button dimensions
+  const [paymentMethodWidth, setPaymentMethodWidth] = useState(0);
 
   // Check network connectivity on component mount
   useEffect(() => {
@@ -63,6 +67,14 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
       unsubscribe();
     };
   }, []);
+
+  // Calculate payment method button dimensions once when the component mounts
+  useEffect(() => {
+    if (visible) {
+      // Reset this on each open so we recalculate sizes
+      setPaymentMethodWidth(0);
+    }
+  }, [visible]);
 
   useEffect(() => {
     // Test connectivity to the API server when component mounts
@@ -161,7 +173,6 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
       JSON.stringify(user, null, 2)
     );
   }, [user]);
-
   // Define interface for payment payload
   interface PaymentPayload {
     order_id: number;
@@ -175,6 +186,10 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
       expiry_month: number;
       expiry_year: number;
       cvv: string;
+    };
+    gcash_details?: {
+      phone_number: string;
+      reference_id?: string;
     };
   }
 
@@ -231,9 +246,7 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
         payment_method: selectedPaymentMethod,
         user_id: userId, // Use the extracted user ID
         amount: orderTotal,
-      };
-
-      // Add card details for credit card payments
+      }; // Add card details for credit card payments
       if (selectedPaymentMethod === "credit_card") {
         const [month, year] = expiryDate.split("/");
         paymentPayload.card_details = {
@@ -243,6 +256,14 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
           expiry_month: parseInt(month || "0"),
           expiry_year: parseInt(year || "0"),
           cvv: cvv,
+        };
+      }
+
+      // Add GCash details for gcash payments
+      if (selectedPaymentMethod === "gcash") {
+        paymentPayload.gcash_details = {
+          phone_number: gcashPhoneNumber,
+          reference_id: gcashReferenceId,
         };
       }
 
@@ -429,7 +450,6 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
       </View>
     );
   };
-
   // Format payment method for display
   const formatPaymentMethodName = (method: string): string => {
     switch (method) {
@@ -439,13 +459,16 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
         return "Bank Transfer";
       case "cash_on_pickup":
         return "Cash on Pickup";
+      case "gcash":
+        return "GCash";
+      case "paypal":
+        return "PayPal";
       default:
         return method
           .replace(/_/g, " ")
           .replace(/\b\w/g, (l) => l.toUpperCase());
     }
   };
-
   const handlePayment = async () => {
     // Basic validation
     if (selectedPaymentMethod === "credit_card") {
@@ -470,6 +493,46 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
         Alert.alert(
           "Cannot Process Credit Card",
           "Credit card payments require an internet connection. Please try another payment method or check your connection.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+    }
+
+    // Validate GCash payments
+    if (selectedPaymentMethod === "gcash") {
+      if (!gcashPhoneNumber) {
+        Alert.alert(
+          "Missing Information",
+          "Please enter your GCash phone number."
+        );
+        return;
+      }
+
+      if (
+        gcashPhoneNumber.length !== 11 ||
+        !gcashPhoneNumber.startsWith("09")
+      ) {
+        Alert.alert(
+          "Invalid Phone Number",
+          "Please enter a valid GCash phone number (format: 09XXXXXXXXX)"
+        );
+        return;
+      }
+
+      if (!gcashReferenceId) {
+        Alert.alert(
+          "Missing Information",
+          "Please enter the GCash reference number from your transaction."
+        );
+        return;
+      }
+
+      // For GCash payments, check connectivity
+      if (!isConnected) {
+        Alert.alert(
+          "Cannot Process GCash Payment",
+          "GCash payments require an internet connection to verify. Please check your connection.",
           [{ text: "OK" }]
         );
         return;
@@ -570,6 +633,7 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
       style={[
         paymentStyles.paymentMethodOption,
         selectedPaymentMethod === method && paymentStyles.paymentMethodSelected,
+        { width: "48%", marginBottom: 10 }, // Set fixed width and add margin
       ]}
       onPress={() => setSelectedPaymentMethod(method)}
     >
@@ -584,6 +648,8 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
           selectedPaymentMethod === method &&
             paymentStyles.paymentMethodTextSelected,
         ]}
+        numberOfLines={1} // Prevent text from wrapping
+        ellipsizeMode="tail" // Add ellipsis if text is too long
       >
         {title}
       </Text>
@@ -674,10 +740,18 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
                     </Text>
                   </View>
                 </View>
-
                 <View style={paymentStyles.paymentMethodSection}>
                   <Text style={paymentStyles.sectionTitle}>Payment Method</Text>
-                  <View style={paymentStyles.paymentMethodOptions}>
+                  <View
+                    style={[
+                      paymentStyles.paymentMethodOptions,
+                      {
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        justifyContent: "space-between",
+                      },
+                    ]}
+                  >
                     {renderPaymentMethodOption(
                       "credit_card",
                       "Credit/Debit Card",
@@ -689,13 +763,17 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
                       "business-outline"
                     )}
                     {renderPaymentMethodOption(
+                      "gcash",
+                      "GCash",
+                      "phone-portrait-outline"
+                    )}
+                    {renderPaymentMethodOption(
                       "cash_on_pickup",
                       "Cash on Pickup",
                       "cash-outline"
                     )}
                   </View>
                 </View>
-
                 {selectedPaymentMethod === "credit_card" && (
                   <View style={paymentStyles.cardDetailsSection}>
                     <Text style={paymentStyles.sectionTitle}>Card Details</Text>
@@ -756,7 +834,6 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
                     </View>
                   </View>
                 )}
-
                 {selectedPaymentMethod === "bank_transfer" && (
                   <View style={paymentStyles.bankDetailsSection}>
                     <Text style={paymentStyles.sectionTitle}>
@@ -785,7 +862,66 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
                     </Text>
                   </View>
                 )}
+                {selectedPaymentMethod === "gcash" && (
+                  <View style={paymentStyles.bankDetailsSection}>
+                    <Text style={paymentStyles.sectionTitle}>
+                      GCash Payment
+                    </Text>
+                    <View style={paymentStyles.cashPickupInfo}>
+                      <Ionicons
+                        name="information-circle-outline"
+                        size={24}
+                        color={COLORS.accent}
+                      />
+                      <Text style={paymentStyles.cashPickupText}>
+                        Please send payment to the GCash number below and enter
+                        your mobile number and payment reference ID to confirm
+                        your transaction.
+                      </Text>
+                    </View>
 
+                    <View style={paymentStyles.bankInfo}>
+                      <Text style={paymentStyles.bankInfoItem}>
+                        GCash Account: Municipal Agriculture Office
+                      </Text>
+                      <Text style={paymentStyles.bankInfoItem}>
+                        GCash Number: 09123456789
+                      </Text>
+                      <Text style={paymentStyles.bankInfoItem}>
+                        Amount: ₱{orderTotal.toFixed(2)}
+                      </Text>
+                      <Text style={paymentStyles.bankInfoItem}>
+                        Reference: Order #{orderId || "Pending"}
+                      </Text>
+                    </View>
+
+                    <View style={paymentStyles.inputContainer}>
+                      <Text style={paymentStyles.inputLabel}>
+                        Your GCash Phone Number
+                      </Text>
+                      <TextInput
+                        style={paymentStyles.input}
+                        placeholder="09XXXXXXXXX"
+                        keyboardType="phone-pad"
+                        maxLength={11}
+                        value={gcashPhoneNumber}
+                        onChangeText={setGcashPhoneNumber}
+                      />
+                    </View>
+
+                    <View style={paymentStyles.inputContainer}>
+                      <Text style={paymentStyles.inputLabel}>
+                        GCash Reference Number
+                      </Text>
+                      <TextInput
+                        style={paymentStyles.input}
+                        placeholder="Enter the reference number from your GCash receipt"
+                        value={gcashReferenceId}
+                        onChangeText={setGcashReferenceId}
+                      />
+                    </View>
+                  </View>
+                )}
                 {selectedPaymentMethod === "cash_on_pickup" && (
                   <View style={paymentStyles.cashPickupSection}>
                     <Text style={paymentStyles.sectionTitle}>
@@ -808,7 +944,6 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
                     </Text>
                   </View>
                 )}
-
                 {error && (
                   <View style={paymentStyles.errorContainer}>
                     <Text style={paymentStyles.errorText}>{error}</Text>

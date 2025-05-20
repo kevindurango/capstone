@@ -7,7 +7,7 @@ import {
 } from "react-native";
 import { useAuth } from "@/contexts/AuthContext";
 import FarmerProfile from "@/components/farmer/FarmerProfile";
-import { Redirect, useRouter } from "expo-router";
+import { Redirect, useRouter, useLocalSearchParams } from "expo-router";
 import { authService } from "@/services/authService";
 import { COLORS } from "@/constants/Colors";
 
@@ -18,7 +18,11 @@ import { COLORS } from "@/constants/Colors";
 export default function FarmerProfileScreen() {
   const { isAuthenticated, isFarmer, logout } = useAuth();
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [initialTab, setInitialTab] = useState(
+    (params.tab as string) || "Profile"
+  );
 
   // Check authentication
   if (isAuthenticated === undefined) {
@@ -38,11 +42,9 @@ export default function FarmerProfileScreen() {
   if (!isFarmer) {
     return <Redirect href="/consumer/dashboard" />;
   }
-
-  const handleNavigateToFarmProfile = () => {
-    // This function can be used for additional navigation needs
-    // Since we're already on the profile page, it doesn't need to do anything
-    // It's kept for compatibility with the FarmerProfile component
+  const handleNavigateToFarmProfile = (tab = "Profile") => {
+    // Set the initialTab state to switch between tabs
+    setInitialTab(tab);
   };
 
   const handleLogout = async (): Promise<boolean> => {
@@ -59,13 +61,9 @@ export default function FarmerProfileScreen() {
       setIsLoading(false);
     }
   };
-
   return (
     <SafeAreaView style={styles.container}>
-      <FarmerProfile
-        navigateToFarmProfile={handleNavigateToFarmProfile}
-        handleLogout={handleLogout}
-      />
+      <FarmerProfile initialTab={initialTab} />
     </SafeAreaView>
   );
 }

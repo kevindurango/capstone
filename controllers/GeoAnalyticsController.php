@@ -1,8 +1,10 @@
 <?php
+require_once dirname(__DIR__) . '/models/Database.php';
 require_once dirname(__DIR__) . '/models/Dashboard.php';
 require_once dirname(__DIR__) . '/models/Farmer.php';
 require_once dirname(__DIR__) . '/models/Log.php';
-require_once '../models/Database.php';
+
+
 
 /**
  * GeoAnalyticsController handles geographic and agricultural analysis
@@ -33,7 +35,10 @@ class GeoAnalyticsController {
      */
     public function getFarmerDistribution() {
         try {
-            return $this->dashboard->getFarmersPerBarangay();
+            // Use the existing database view for consistency with reports
+            $query = "SELECT * FROM view_farmers_per_barangay ORDER BY farmer_count DESC";
+            $stmt = $this->conn->query($query);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
             $this->log->logError("Error in getFarmerDistribution: " . $e->getMessage());
             return [];
@@ -47,7 +52,10 @@ class GeoAnalyticsController {
      */
     public function getCropProductionByBarangay() {
         try {
-            return $this->dashboard->getCropsPerBarangay();
+            // Use the existing database view for consistency with reports
+            $query = "SELECT * FROM view_crops_per_barangay ORDER BY barangay_name, total_production DESC";
+            $stmt = $this->conn->query($query);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
             $this->log->logError("Error in getCropProductionByBarangay: " . $e->getMessage());
             return [];
@@ -61,7 +69,10 @@ class GeoAnalyticsController {
      */
     public function getSeasonalCropProduction() {
         try {
-            return $this->dashboard->getSeasonalCropProduction();
+            // Use the existing database view for consistency with reports
+            $query = "SELECT * FROM view_seasonal_crops ORDER BY season_name, total_production DESC";
+            $stmt = $this->conn->query($query);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
             $this->log->logError("Error in getSeasonalCropProduction: " . $e->getMessage());
             return [];
@@ -105,7 +116,26 @@ class GeoAnalyticsController {
      */
     public function getBarangayEfficiencyMetrics() {
         try {
-            return $this->dashboard->getBarangayEfficiencyMetrics();
+            // Calculate yield rates (production per area) for each barangay
+            $query = "SELECT 
+                        b.barangay_id,
+                        b.barangay_name,
+                        SUM(bp.estimated_production) AS total_production,
+                        SUM(bp.planted_area) AS total_area,
+                        CASE 
+                            WHEN SUM(bp.planted_area) > 0 
+                            THEN SUM(bp.estimated_production) / SUM(bp.planted_area) 
+                            ELSE 0 
+                        END AS yield_rate,
+                        bp.production_unit,
+                        bp.area_unit
+                    FROM barangays b
+                    LEFT JOIN barangay_products bp ON b.barangay_id = bp.barangay_id
+                    GROUP BY b.barangay_id, b.barangay_name, bp.production_unit, bp.area_unit
+                    ORDER BY yield_rate DESC";
+            
+            $stmt = $this->conn->query($query);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
             $this->log->logError("Error in getBarangayEfficiencyMetrics: " . $e->getMessage());
             return [];

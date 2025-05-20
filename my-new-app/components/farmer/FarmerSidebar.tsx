@@ -70,7 +70,6 @@ export default function FarmerSidebar({
       }).start();
     }
   }, [isVisible, translateX]);
-
   const handleNavigation = (route: string) => {
     // Close sidebar first, then navigate
     Animated.timing(translateX, {
@@ -79,10 +78,10 @@ export default function FarmerSidebar({
       useNativeDriver: true,
     }).start(() => {
       onClose();
-      // Use push for navigation
+      // Use replace for navigation to prevent back button issues
       try {
         if (navigationRouter) {
-          navigationRouter.push(route as any);
+          navigationRouter.replace(route as any);
         }
       } catch (error) {
         console.error("Navigation error:", error);

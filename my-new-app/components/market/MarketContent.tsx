@@ -28,6 +28,7 @@ import Orders from "./Orders";
 import SchedulePickupScreen from "./SchedulePickupScreen";
 import { CATEGORIES, Product } from "./types";
 import { marketStyles } from "./styles";
+import { getImageUrl } from "@/constants/Config"; // Add this import
 
 const MarketContent: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -222,9 +223,9 @@ const MarketContent: React.FC = () => {
 
   // Handle payment cancellation
   const handlePaymentCancel = () => {
-    console.log("[MarketContent] Payment cancelled");
+    console.log("[MarketContent] Payment canceled");
     setPaymentVisible(false);
-    // Don't clear the cart since payment was cancelled
+    // Don't clear the cart since payment was canceled
   };
 
   // Function to handle closing schedule pickup modal
@@ -250,6 +251,56 @@ const MarketContent: React.FC = () => {
     );
   };
 
+  // Add the checkImageUrl helper function from products.tsx
+  const checkImageUrl = async (url: string | null, productId: number) => {
+    try {
+      // If URL is null or empty, return early
+      if (!url) {
+        console.log(`[Market] No image URL for product ${productId}`);
+        return { exists: false, isImage: false };
+      }
+
+      console.log(
+        `[Market] Checking image URL for product ${productId}: ${url}`
+      );
+
+      // Add cache busting parameter to prevent browser caching
+      const cacheBuster = `?t=${new Date().getTime()}`;
+      const urlWithCacheBuster = `${url}${cacheBuster}`;
+
+      const response = await fetch(urlWithCacheBuster, {
+        method: "HEAD",
+        headers: {
+          // Strengthen cache control headers
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      });
+
+      const status = response.status;
+      const contentType = response.headers.get("content-type") || "";
+
+      console.log(`[Market] Image check result for product ${productId}:`, {
+        status,
+        contentType,
+        isImage: contentType.startsWith("image/"),
+        url: urlWithCacheBuster,
+      });
+
+      return {
+        exists: status >= 200 && status < 300,
+        isImage: contentType.startsWith("image/"),
+      };
+    } catch (error) {
+      console.error(
+        `[Market] Error checking image URL for product ${productId}:`,
+        error
+      );
+      return { exists: false, isImage: false };
+    }
+  };
+
   // Function to fetch products
   const fetchProducts = useCallback(
     async (reset = false) => {
@@ -257,15 +308,21 @@ const MarketContent: React.FC = () => {
         setLoading(true);
         const newOffset = reset ? 0 : offset;
 
+        // Add cache busting parameter to prevent API response caching
+        const cacheBuster = `${new Date().getTime()}`;
+        const searchWithCache = searchQuery.trim()
+          ? `${searchQuery.trim()}_${cacheBuster}`
+          : undefined;
+
         const response = await marketService.getProducts({
           category: selectedCategory,
-          search: searchQuery.trim() || undefined,
+          search: searchWithCache,
           limit,
           offset: newOffset,
         });
 
         if (response && response.status === "success") {
-          const fetchedProducts = response.data.products || [];
+          let fetchedProducts = response.data.products || [];
 
           console.log(
             "[Market] Fetched products:",
@@ -280,6 +337,68 @@ const MarketContent: React.FC = () => {
             setProducts([]);
             setHasMore(false);
           } else {
+            // Pre-validate image URLs when products are loaded
+            if (fetchedProducts.length > 0) {
+              console.log(
+                `[Market] Pre-validating images for ${fetchedProducts.length} products`
+              );
+
+              // Process each product to ensure image paths are correct
+              const processedProducts = fetchedProducts.map(
+                (product: Product) => {
+                  if (product.image) {
+                    // Make sure image path is correctly formatted
+                    // Remove any duplicate slashes or path issues
+                    const cleanImagePath = product.image
+                      .replace(/\/+/g, "/")
+                      .trim();
+                    return { ...product, image: cleanImagePath };
+                  }
+                  return product;
+                }
+              );
+
+              // Check each product's image URL in parallel with improved cache busting
+              try {
+                const imageChecks = await Promise.all(
+                  processedProducts
+                    .filter((p: Product) => p.image) // Only check products with images
+                    .map(async (product: Product) => {
+                      try {
+                        const imageUrl = getImageUrl(product.image!);
+                        const result = await checkImageUrl(
+                          imageUrl,
+                          product.id
+                        );
+                        return {
+                          productId: product.id,
+                          url: imageUrl,
+                          ...result,
+                        };
+                      } catch (err) {
+                        console.error(
+                          `[Market] Error processing image for product ${product.id}:`,
+                          err
+                        );
+                        return {
+                          productId: product.id,
+                          url: null,
+                          exists: false,
+                          isImage: false,
+                        };
+                      }
+                    })
+                );
+
+                console.log("[Market] Image validation results:", imageChecks);
+              } catch (imageError) {
+                console.error("[Market] Error validating images:", imageError);
+              }
+
+              // Update products with processed ones
+              fetchedProducts = processedProducts;
+            }
+
             // Update products list
             if (reset) {
               setProducts(fetchedProducts);

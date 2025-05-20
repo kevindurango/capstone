@@ -24,6 +24,7 @@ import Animated, {
   FadeInDown,
   SlideInRight,
 } from "react-native-reanimated";
+import { Stack } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
@@ -89,20 +90,6 @@ const SERVICE_CATEGORIES: ServiceCategory[] = [
       "Consumer connection",
       "Product visibility",
       "Market price tracking",
-    ],
-  },
-  {
-    id: "logistics",
-    title: "Logistics & Delivery",
-    description:
-      "Transportation and delivery services for agricultural products.",
-    icon: "car",
-    services: [
-      "Driver assignment",
-      "Pickup scheduling",
-      "Delivery tracking",
-      "Vehicle type matching",
-      "Load capacity planning",
     ],
   },
   {
@@ -259,28 +246,20 @@ export default function ServicesScreen() {
   const router = useRouter();
   const scrollY = useSharedValue(0);
 
-  const headerAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: withTiming(scrollY.value > 50 ? 1 : 0),
-      transform: [{ translateY: withTiming(scrollY.value > 50 ? 0 : -20) }],
-    };
-  });
-
   return (
-    <SafeAreaView edges={["top"]} style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={COLORS.primary}
-        translucent={Platform.OS === "android"}
+    <View style={styles.container}>
+      {/* Use Stack.Screen to customize navigation header */}
+      <Stack.Screen
+        options={{
+          title: "Agricultural Services",
+          headerStyle: {
+            backgroundColor: COLORS.primary,
+          },
+          headerTintColor: COLORS.light,
+          headerShadowVisible: false,
+        }}
       />
-
-      {/* Animated Header */}
-      <Animated.View style={[styles.animatedHeader, headerAnimatedStyle]}>
-        <ThemedText style={styles.animatedHeaderTitle}>
-          Agricultural Services
-        </ThemedText>
-      </Animated.View>
-
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
@@ -305,13 +284,12 @@ export default function ServicesScreen() {
               </ThemedText>
             </Animated.View>
             <Animated.View entering={FadeInDown.delay(200).springify()}>
-              <ThemedText style={styles.heroTitle}>
+              <ThemedText style={styles.heroSubtitle}>
                 {HERO_SECTION.subtitle}
               </ThemedText>
             </Animated.View>
           </View>
         </View>
-
         {/* Main Content */}
         <View style={styles.mainContent}>
           {/* Introduction */}
@@ -361,54 +339,28 @@ export default function ServicesScreen() {
           </Animated.View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.primary,
-  },
-  animatedHeader: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: Platform.OS === "ios" ? 90 : 70,
-    backgroundColor: COLORS.primary,
-    zIndex: 100,
-    paddingTop: Platform.OS === "ios" ? 45 : 25,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  animatedHeaderTitle: {
-    fontSize: 18,
-    color: COLORS.light,
-    fontWeight: "700",
+    backgroundColor: "#f8f8f8",
   },
   scrollView: {
     flex: 1,
-    backgroundColor: "#f8f8f8",
   },
   contentContainer: {
     flexGrow: 1,
     paddingBottom: SPACING.xxxl,
   },
-
   // Hero Section
   heroContainer: {
-    height: 120, // Fixed from incorrect value of 96
+    height: 160,
     position: "relative",
+    width: "100%",
+    backgroundColor: COLORS.primary,
   },
   heroImage: {
     width: "100%",
@@ -420,21 +372,29 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "rgba(27, 94, 32, 0.85)",
-    paddingHorizontal: SPACING.xl, // Increased horizontal padding
-    paddingTop: SPACING.xl, // Increased top padding
-    paddingBottom: SPACING.xxl, // Increased bottom padding
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.xxl,
   },
   heroTitle: {
-    fontSize: 23, // Slightly larger font
+    fontSize: 23,
     fontWeight: "700",
     color: COLORS.light,
-    marginBottom: SPACING.sm, // Increased spacing between title and subtitle
+    marginBottom: SPACING.sm,
   },
-
+  heroSubtitle: {
+    fontSize: 18,
+    fontWeight: "500",
+    color: COLORS.light,
+    opacity: 0.9,
+  },
   // Main Content
   mainContent: {
     padding: SPACING.lg,
-    paddingBottom: SPACING.xxxl,
+    backgroundColor: "#f8f8f8",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginTop: -20,
   },
 
   // Sections

@@ -333,19 +333,19 @@ function getStatusBadgeClass($status) {
     }
     
     .admin-header {
-      background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-      color: white;
-      padding: 10px 0;
+        background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+        color: white;
+        padding: 10px 0;
       margin-bottom: 20px;
     }
     
     .admin-badge {
-      background-color: #6a11cb;
-      color: white;
-      font-size: 0.8rem;
-      padding: 3px 8px;
-      border-radius: 4px;
-      margin-left: 10px;
+        background-color: #6a11cb;
+        color: white;
+        font-size: 0.8rem;
+        padding: 3px 8px;
+        border-radius: 4px;
+        margin-left: 10px;
     }
     
     .page-header {
@@ -358,9 +358,9 @@ function getStatusBadgeClass($status) {
     /* Batch action buttons styling */
     .admin-controls .btn {
       height: 36px; /* Fixed height */
-      display: flex;
-      align-items: center;
-      justify-content: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       font-weight: 500;
       text-transform: uppercase;
       font-size: 0.75rem;
@@ -439,8 +439,8 @@ function getStatusBadgeClass($status) {
     .no-image {
       width: 50px;
       height: 50px;
-      display: flex;
-      align-items: center;
+        display: flex;
+        align-items: center;
       justify-content: center;
       background-color: #f5f5f5;
       border-radius: 4px;
@@ -476,9 +476,9 @@ function getStatusBadgeClass($status) {
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       border: none;
       color: white;
       font-size: 16px;
@@ -565,7 +565,7 @@ function getStatusBadgeClass($status) {
     }
     
     .toast-header {
-      display: flex;
+        display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 10px 15px;
@@ -770,24 +770,24 @@ function getStatusBadgeClass($status) {
             <div class="card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
+            <div>
                             <h5 class="card-title mb-1"><i class="bi bi-layers"></i> Bulk Actions</h5>
-                            <small class="text-muted">Logged in as: <?= $_SESSION['username'] ?> (Administrator)</small>
-                        </div>
+                <small class="text-muted">Logged in as: <?= $_SESSION['username'] ?> (Administrator)</small>
+            </div>
                     </div>
                     <div class="d-flex flex-wrap justify-content-between">
                         <button class="btn btn-outline-primary flex-fill mx-1 mb-0" id="selectAllBtn">
-                            <i class="bi bi-check-all"></i> Select All
-                        </button>
+                    <i class="bi bi-check-all"></i> Select All
+                </button>
                         <button class="btn btn-success flex-fill mx-1 mb-0" id="batchApproveBtn" disabled>
                             <i class="bi bi-check2"></i> Approve
-                        </button>
+                </button>
                         <button class="btn btn-warning flex-fill mx-1 mb-0" id="batchRejectBtn" disabled>
                             <i class="bi bi-x"></i> Reject
-                        </button>
+                </button>
                         <button class="btn btn-danger flex-fill mx-1 mb-0" id="batchDeleteBtn" disabled>
                             <i class="bi bi-trash"></i> Delete
-                        </button>
+                </button>
                     </div>
                 </div>
             </div>
@@ -920,17 +920,17 @@ function getStatusBadgeClass($status) {
                       </td>
                       <td>
                         <div class="action-btn-group">
-                            <?php if ($product['status'] !== 'approved'): ?>
+                          <?php if ($product['status'] !== 'approved'): ?>
                                 <button type="button" class="action-btn action-btn-approve" data-id="<?= $product['product_id'] ?>" title="Approve Product">
                                     <i class="bi bi-check-circle"></i>
-                                </button>
-                            <?php endif; ?>
+                              </button>
+                          <?php endif; ?>
                             
-                            <?php if ($product['status'] !== 'rejected'): ?>
+                          <?php if ($product['status'] !== 'rejected'): ?>
                                 <button type="button" class="action-btn action-btn-reject" data-id="<?= $product['product_id'] ?>" title="Reject Product">
                                     <i class="bi bi-x-circle"></i>
-                                </button>
-                            <?php endif; ?>
+                              </button>
+                          <?php endif; ?>
                             
                             <button type="button" class="action-btn action-btn-edit" data-id="<?= $product['product_id'] ?>" title="Edit Product">
                                 <i class="bi bi-pencil"></i>
@@ -943,7 +943,7 @@ function getStatusBadgeClass($status) {
                       </td>
                     </tr>
                   <?php endforeach; ?>
-                </tbody>
+                  </tbody>
               </table>
             </div>
           </div>
@@ -1289,14 +1289,51 @@ function getStatusBadgeClass($status) {
             const action = $(this).data('action');
             const id = $(this).data('id');
             
-            $('#confirmModal').modal('hide');
-            
             if (action === 'delete-batch') {
+                $('#confirmModal').modal('hide');
                 submitBatchAction('delete');
-            } else if (action === 'delete-product') {
-                // Implement product deletion
-                // AJAX call to delete single product
-                // Future implementation
+            } else if (action === 'delete-product' && id) {
+                // Show loading state
+                $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...');
+                
+                // Make AJAX call to delete the product
+                $.ajax({
+                    url: '../../ajax/product-actions.php',
+                    type: 'POST',
+                    data: {
+                        action: 'delete_product',
+                        product_id: id
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        $('#confirmModal').modal('hide');
+                        
+                        if (response.success) {
+                            // Try multiple selectors to find and remove the product row
+                            // This fixes compatibility with both data-id and data-product-id attributes
+                            const $row = $(`tr[data-product-id="${id}"]`).length ? 
+                                        $(`tr[data-product-id="${id}"]`) : 
+                                        $(`tr.product-row[data-id="${id}"]`);
+                            
+                            $row.fadeOut(400, function() {
+                                $(this).remove();
+                                // Update counts in dashboard
+                                updateProductCounts();
+                            });
+                            
+                            showToast('Success', 'Product deleted successfully', 'success');
+                        } else {
+                            showToast('Error', response.message || 'Failed to delete product', 'error');
+                        }
+                    },
+                    error: function() {
+                        $('#confirmModal').modal('hide');
+                        showToast('Error', 'Failed to connect to server', 'error');
+                    },
+                    complete: function() {
+                        $('#confirmAction').prop('disabled', false).text('Confirm');
+                    }
+                });
             }
         });
 
@@ -1304,28 +1341,89 @@ function getStatusBadgeClass($status) {
             const selectedProducts = $('.product-checkbox:checked').map(function() {
                 return $(this).val();
             }).get();
+            
+            // If action is delete, use AJAX like single product deletion for consistency
+            if (action === 'delete') {
+                // Show loading indicator
+                $('#batchDeleteBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...');
+                
+                let completedCount = 0;
+                let successCount = 0;
+                let errorCount = 0;
+                
+                // Process each product deletion with AJAX
+                selectedProducts.forEach(function(productId) {
+                    $.ajax({
+                        url: '../../ajax/product-actions.php',
+                        type: 'POST',
+                        data: {
+                            action: 'delete_product',
+                            product_id: productId
+                        },
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.success) {
+                                successCount++;
+                                // Remove the row from the table
+                                const $row = $(`tr[data-product-id="${productId}"]`).length ?
+                                            $(`tr[data-product-id="${productId}"]`) :
+                                            $(`tr.product-row[data-id="${productId}"]`);
+                                $row.fadeOut(400, function() { $(this).remove(); });
+                            } else {
+                                errorCount++;
+                            }
+                        },
+                        error: function() {
+                            errorCount++;
+                        },
+                        complete: function() {
+                            completedCount++;
+                            
+                            // When all requests are completed
+                            if (completedCount === selectedProducts.length) {
+                                // Update the UI
+                                updateProductCounts();
+                                $('#batchDeleteBtn').prop('disabled', false).html('Delete');
+                                
+                                // Show results
+                                if (successCount > 0) {
+                                    showToast('Success', `Successfully deleted ${successCount} products`, 'success');
+                                }
+                                if (errorCount > 0) {
+                                    showToast('Warning', `Failed to delete ${errorCount} products`, 'warning');
+                                }
+                                
+                                // Uncheck "select all" checkbox
+                                $('#selectAll').prop('checked', false);
+                                updateBatchButtons();
+                            }
+                        }
+                    });
+                });
+            } else {
+                // For other actions, use the original form submission approach
+                const form = $('<form>', {
+                    'method': 'POST',
+                    'action': window.location.href
+                });
 
-            const form = $('<form>', {
-                'method': 'POST',
-                'action': window.location.href
-            });
-
-            form.append($('<input>', {
-                'type': 'hidden',
-                'name': 'batch_action',
-                'value': action
-            }));
-
-            selectedProducts.forEach(function(productId) {
                 form.append($('<input>', {
                     'type': 'hidden',
-                    'name': 'selected_products[]',
-                    'value': productId
+                    'name': 'batch_action',
+                    'value': action
                 }));
-            });
 
-            $(document.body).append(form);
-            form.submit();
+                selectedProducts.forEach(function(productId) {
+                    form.append($('<input>', {
+                        'type': 'hidden',
+                        'name': 'selected_products[]',
+                        'value': productId
+                    }));
+                });
+
+                $(document.body).append(form);
+                form.submit();
+            }
         }
 
         // Search and filter functionality
@@ -1349,7 +1447,7 @@ function getStatusBadgeClass($status) {
             $('#priceMax').val('');
             applyFilters();
         });
-        
+
         function applyFilters() {
             const search = $('#productSearch').val().toLowerCase();
             const category = $('#categoryFilter').val();
@@ -1474,19 +1572,19 @@ function getStatusBadgeClass($status) {
             
             // Handle blur event
             $input.blur(function() {
-                const newPrice = parseFloat($input.val());
-                
+            const newPrice = parseFloat($input.val());
+
                 if (newPrice > 0 && newPrice !== currentPrice) {
-                    $.ajax({
+                $.ajax({
                         url: window.location.href,
-                        method: 'POST',
+                    method: 'POST',
                         data: {
                             ajax_action: 'update_price',
                             product_id: productId,
                             new_price: newPrice
                         },
                         dataType: 'json',
-                        success: function(response) {
+                    success: function(response) {
                             if (response.success) {
                                 $cell.html('₱' + newPrice.toFixed(2));
                                 showToast('Success', 'Price updated successfully');
@@ -1557,17 +1655,17 @@ function getStatusBadgeClass($status) {
                                 }
                                 showToast('Error', response.message, 'error');
                             }
-                        },
-                        error: function() {
+                    },
+                    error: function() {
                             if (hasWarning) {
                                 $cell.html(`<span class="stock-warning">${currentStock}</span> <span class="unit-badge">${unitType}</span>`);
                             } else {
                                 $cell.html(`${currentStock} <span class="unit-badge">${unitType}</span>`);
                             }
                             showToast('Error', 'Failed to update stock', 'error');
-                        }
-                    });
-                } else {
+                    }
+                });
+            } else {
                     if (hasWarning) {
                         $cell.html(`<span class="stock-warning">${currentStock}</span> <span class="unit-badge">${unitType}</span>`);
                     } else {
@@ -1578,7 +1676,7 @@ function getStatusBadgeClass($status) {
             
             // Submit on enter key
             $input.keypress(function(e) {
-                if (e.which === 13) {
+            if (e.which === 13) {
                     $input.blur();
                 }
             });
@@ -1664,7 +1762,7 @@ function getStatusBadgeClass($status) {
                         $('#editProductModal').modal('hide');
                         
                         // Reload page to show updated data
-                        setTimeout(function() {
+            setTimeout(function() {
                             window.location.reload();
                         }, 1000);
                     } else {
@@ -1704,7 +1802,7 @@ function getStatusBadgeClass($status) {
                         $('#createProductModal').modal('hide');
                         
                         // Reload page to show updated data
-                        setTimeout(function() {
+                setTimeout(function() {
                             window.location.reload();
                         }, 1000);
                     } else {
@@ -1771,25 +1869,8 @@ function getStatusBadgeClass($status) {
   
   <script>
 
-    // Handle rejection form submission
-    $('#rejectProductForm').submit(function(e) {
-        e.preventDefault();
-        
-        // Validate that notes are provided
-        const notes = $('#rejection_notes').val().trim();
-        if (!notes) {
-            showToast('Error', 'Please provide a reason for rejection', 'error');
-            return;
-        }
-        
-        // Show loading state
-        const $submitBtn = $(this).find('button[type="submit"]');
-        const originalBtnText = $submitBtn.text();
-        $submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...');
-        
-        // Submit form
-        this.submit();
-    });
+    // Handle rejection form submission - This is a placeholder that will be overridden by the complete implementation below
+    // The complete implementation is located further down in the script
     
     // Handle confirmation modal actions
     $('#confirmAction').on('click', function() {
@@ -1843,13 +1924,29 @@ function getStatusBadgeClass($status) {
     
     // Function to update product counts in dashboard
     function updateProductCounts() {
-        // This can be expanded to make an AJAX call if needed
+        // Calculate counts from visible rows
         const totalCount = $('.product-row').length;
         $('#totalProductCount').text(totalCount);
         
-        // Update other counts if needed
+        // Update status-specific counts
         const pendingCount = $('.product-row[data-status="pending"]').length;
         $('#pendingCount').text(pendingCount);
+        
+        const approvedCount = $('.product-row[data-status="approved"]').length;
+        $('#approvedCount').text(approvedCount);
+        
+        const rejectedCount = $('.product-row[data-status="rejected"]').length;
+        $('#rejectedCount').text(rejectedCount);
+        
+        // Update low stock count if element exists
+        if ($('#lowStockCount').length) {
+            const lowStockThreshold = 10; // You may want to adjust this based on your business logic
+            const lowStockCount = $('.product-row').filter(function() {
+                const stock = parseInt($(this).find('.product-stock').text());
+                return !isNaN(stock) && stock < lowStockThreshold;
+            }).length;
+            $('#lowStockCount').text(lowStockCount);
+        }
     }
 
     // Handle rejection form submission

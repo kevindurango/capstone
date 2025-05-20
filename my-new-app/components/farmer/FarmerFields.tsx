@@ -114,28 +114,32 @@ const FarmerFields: React.FC<FarmerFieldsProps> = ({
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editingFieldId, setEditingFieldId] = useState<number | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
-  
+
   // Determine which farmer ID to use - prefer prop over context
   const effectiveFarmerId = farmerId || user?.user_id;
 
   useEffect(() => {
     // Log which farmer ID we're using for debugging
     console.log("[FarmerFields] Using farmer ID:", effectiveFarmerId);
-    
+
     // First validate that we have an actual farmer ID before doing anything
     if (effectiveFarmerId) {
       // Validate the user is a farmer before proceeding
-      validateFarmerId(effectiveFarmerId).then(isValidFarmer => {
+      validateFarmerId(effectiveFarmerId).then((isValidFarmer) => {
         if (isValidFarmer) {
           fetchFields();
           fetchBarangays();
         } else {
-          console.error("[FarmerFields] Invalid farmer ID or user is not a farmer");
+          console.error(
+            "[FarmerFields] Invalid farmer ID or user is not a farmer"
+          );
           setLoading(false);
         }
       });
     } else {
-      console.warn("[FarmerFields] No farmer ID available, cannot fetch fields");
+      console.warn(
+        "[FarmerFields] No farmer ID available, cannot fetch fields"
+      );
       setLoading(false);
     }
   }, [effectiveFarmerId, refreshTrigger]);
@@ -143,7 +147,9 @@ const FarmerFields: React.FC<FarmerFieldsProps> = ({
   // Helper function to validate farmer ID
   const validateFarmerId = async (id: number): Promise<boolean> => {
     try {
-      const response = await fetch(buildApiUrl(`farmer/validate_farmer.php?user_id=${id}`));
+      const response = await fetch(
+        buildApiUrl(`farmer/validate_farmer.php?user_id=${id}`)
+      );
       const data = await response.json();
       return data.success && data.is_farmer === true;
     } catch (error) {
@@ -154,7 +160,9 @@ const FarmerFields: React.FC<FarmerFieldsProps> = ({
 
   const fetchFields = async () => {
     if (!effectiveFarmerId) {
-      console.error("[FarmerFields] Cannot fetch fields: No farmer ID available");
+      console.error(
+        "[FarmerFields] Cannot fetch fields: No farmer ID available"
+      );
       setLoading(false);
       return;
     }
@@ -382,7 +390,10 @@ const FarmerFields: React.FC<FarmerFieldsProps> = ({
   // Update the handleSubmit function to ensure user_id is always included
   const handleSubmit = async () => {
     if (!effectiveFarmerId) {
-      Alert.alert("Error", "Farmer ID is not available. Please log in again or refresh the page.");
+      Alert.alert(
+        "Error",
+        "Farmer ID is not available. Please log in again or refresh the page."
+      );
       return;
     }
 
@@ -403,9 +414,9 @@ const FarmerFields: React.FC<FarmerFieldsProps> = ({
     }
 
     // Always ensure farmer_id is set to the effective farmer ID
-    setCurrentField(prev => ({
+    setCurrentField((prev) => ({
       ...prev,
-      farmer_id: effectiveFarmerId
+      farmer_id: effectiveFarmerId,
     }));
 
     setSaving(true);
@@ -421,7 +432,17 @@ const FarmerFields: React.FC<FarmerFieldsProps> = ({
         farmer_id: effectiveFarmerId, // Ensure farmer_id is always included
       };
 
-      console.log("[FarmerFields] Submitting field with farmer_id:", effectiveFarmerId);
+      // The issue is here: when editing, we need to include field_id in the request body
+      // The API expects field_id in the body, not just as a URL parameter
+      if (isEditing && editingFieldId) {
+        // Use type assertion to add field_id property
+        (fieldData as any).field_id = editingFieldId;
+      }
+
+      console.log(
+        "[FarmerFields] Submitting field with farmer_id:",
+        effectiveFarmerId
+      );
 
       const response = await fetch(endpoint, {
         method,
@@ -484,21 +505,21 @@ const FarmerFields: React.FC<FarmerFieldsProps> = ({
     try {
       // Explicitly construct the URL with both required parameters
       const url = `${API_URL}/farmer/farmer_fields.php?field_id=${fieldId}&farmer_id=${effectiveFarmerId}`;
-      
+
       console.log("[FarmerFields] Deleting field with URL:", url);
-      
+
       const response = await fetch(url, {
         method: "DELETE",
         headers: {
-          "Accept": "application/json",
+          Accept: "application/json",
           "Content-Type": "application/json",
-        }
+        },
       });
 
       // Debug the response
       const responseText = await response.text();
       console.log("[FarmerFields] Delete response:", responseText);
-      
+
       let data;
       try {
         data = JSON.parse(responseText);
@@ -993,6 +1014,7 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 50,
+    color: "#333", // Add explicit text color
   },
   modalButtons: {
     flexDirection: "row",

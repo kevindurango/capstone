@@ -45,7 +45,7 @@ switch ($action) {
     case 'getPickupDetails':
         getPickupDetails();
         break;
-
+        
     case 'getProductDetails':
         getProductDetails();
         break;
@@ -103,11 +103,11 @@ function getOrderDetails() {
         
         // Get pickup details for this order
         $pickupQuery = "SELECT p.*
-                      FROM pickups p
+                          FROM pickups p
                       WHERE p.order_id = :order_id";
-        $stmt = $conn->prepare($pickupQuery);
+            $stmt = $conn->prepare($pickupQuery);
         $stmt->execute(['order_id' => $order_id]);
-        $pickup = $stmt->fetch(PDO::FETCH_ASSOC);
+            $pickup = $stmt->fetch(PDO::FETCH_ASSOC);
         
         // Get order items
         $itemsQuery = "SELECT oi.*, p.name
@@ -168,16 +168,16 @@ function outputOrderDetails($order, $pickup, $items) {
                     
     if (!empty($order['contact_number'])) {
         $html .= '<div class="row mb-2">
-                    <div class="col-5 text-muted">Contact:</div>
-                    <div class="col-7">' . htmlspecialchars($order['contact_number']) . '</div>
+                        <div class="col-5 text-muted">Contact:</div>
+                        <div class="col-7">' . htmlspecialchars($order['contact_number']) . '</div>
                   </div>';
     }
     
     if (!empty($order['email'])) {
         $html .= '<div class="row mb-2">
-                    <div class="col-5 text-muted">Email:</div>
-                    <div class="col-7">' . htmlspecialchars($order['email']) . '</div>
-                  </div>';
+                        <div class="col-5 text-muted">Email:</div>
+                        <div class="col-7">' . htmlspecialchars($order['email']) . '</div>
+            </div>';
     }
                     
     $html .= '</div>
@@ -330,16 +330,16 @@ function updatePickupStatus() {
         
         // Update pickup status using the Pickup model
         if ($pickupClass->updatePickupStatus($pickup['order_id'], $new_status)) {
-            // Log activity
-            if ($user_id) {
+        // Log activity
+        if ($user_id) {
                 $logMessage = "Updated pickup #$pickup_id status to $new_status";
-                $logClass->logActivity($user_id, $logMessage);
-            }
-            
-            // Commit transaction
-            $conn->commit();
-            
-            echo json_encode(['success' => true, 'message' => 'Pickup status updated successfully']);
+            $logClass->logActivity($user_id, $logMessage);
+        }
+        
+        // Commit transaction
+        $conn->commit();
+        
+        echo json_encode(['success' => true, 'message' => 'Pickup status updated successfully']);
         } else {
             $conn->rollBack();
             echo json_encode(['success' => false, 'message' => 'Failed to update pickup status']);
@@ -360,12 +360,11 @@ function bulkSchedulePickups() {
     
     // Get POST data
     $orderIds = $_POST['order_ids'] ?? [];
-    $driverId = $_POST['driver_id'] ?? '';
     $pickupDate = $_POST['pickup_date'] ?? '';
     $pickupLocation = $_POST['pickup_location'] ?? '';
     
     // Validate inputs
-    if (empty($orderIds) || empty($driverId) || empty($pickupDate) || empty($pickupLocation)) {
+    if (empty($orderIds) || empty($pickupDate) || empty($pickupLocation)) {
         echo json_encode(['success' => false, 'message' => 'Missing required fields']);
         return;
     }
@@ -392,13 +391,12 @@ function bulkSchedulePickups() {
             }
             
             // Insert new pickup
-            $insertQuery = "INSERT INTO pickups (order_id, assigned_to, pickup_date, pickup_location, pickup_status) 
-                           VALUES (:order_id, :driver_id, :pickup_date, :pickup_location, 'scheduled')";
+            $insertQuery = "INSERT INTO pickups (order_id, pickup_date, pickup_location, pickup_status) 
+                           VALUES (:order_id, :pickup_date, :pickup_location, 'scheduled')";
             $stmt = $conn->prepare($insertQuery);
             
             if ($stmt->execute([
                 'order_id' => $orderId,
-                'driver_id' => (string)$driverId,
                 'pickup_date' => $pickupDate,
                 'pickup_location' => $pickupLocation
             ])) {
@@ -406,12 +404,7 @@ function bulkSchedulePickups() {
             }
         }
         
-        // Update driver status to busy if at least one pickup was scheduled
         if ($scheduled > 0) {
-            $updateDriverQuery = "UPDATE driver_details SET availability_status = 'busy' 
-                                WHERE user_id = :driver_id";
-            $stmt = $conn->prepare($updateDriverQuery);
-            $stmt->execute(['driver_id' => $driverId]);
             
             // Log activity
             if ($user_id) {
@@ -535,8 +528,7 @@ function getPickupDetails() {
             p.pickup_status, 
             p.pickup_date, 
             p.pickup_location, 
-            p.pickup_notes,
-            p.contact_person
+            p.pickup_notes
         FROM pickups p
         WHERE p.pickup_id = :pickup_id";
         
@@ -623,15 +615,15 @@ function getPickupDetails() {
         if (!empty($pickup['contact_person'])) {
             $html .= '<p><strong>Contact Person:</strong> ' . htmlspecialchars($pickup['contact_person']) . '</p>';
         }
-        
-        $html .= '</div></div>';
                 
+        $html .= '</div></div>';
+        
         if (!empty($pickup['pickup_notes'])) {
             $html .= '<div class="mt-3 p-3 bg-light rounded">
                 <strong>Notes:</strong><br>' . nl2br(htmlspecialchars($pickup['pickup_notes'])) . '
             </div>';
         }
-                
+        
         $html .= '</div></div>';
         
         // Consumer information section
@@ -647,7 +639,7 @@ function getPickupDetails() {
                             <p><strong>Phone:</strong> <a href="tel:' . htmlspecialchars($order['consumer_phone'] ?? '') . '">' . htmlspecialchars($order['consumer_phone'] ?? 'N/A') . '</a></p>
                             <p><strong>Email:</strong> <a href="mailto:' . htmlspecialchars($order['consumer_email'] ?? '') . '">' . htmlspecialchars($order['consumer_email'] ?? 'N/A') . '</a></p>
                         </div>';
-                        
+            
             if (!empty($order['pickup_details'])) {
                 $html .= '<div class="col-md-6">
                     <p><strong>Additional Pickup Details:</strong></p>

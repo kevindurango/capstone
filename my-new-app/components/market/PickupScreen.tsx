@@ -371,7 +371,6 @@ const PickupScreen: React.FC<PickupScreenProps> = ({ visible, onClose }) => {
         return "#0288d1"; // Light blue
       case "completed":
         return "#388e3c"; // Dark green
-      case "cancelled":
       case "canceled":
         return "#d32f2f"; // Red
       default:
@@ -392,7 +391,6 @@ const PickupScreen: React.FC<PickupScreenProps> = ({ visible, onClose }) => {
         return "In Transit";
       case "completed":
         return "Completed";
-      case "cancelled":
       case "canceled":
         return "Canceled";
       default:
@@ -413,7 +411,6 @@ const PickupScreen: React.FC<PickupScreenProps> = ({ visible, onClose }) => {
         return "car-outline"; // Car icon
       case "completed":
         return "bag-check-outline"; // Bag with checkmark
-      case "cancelled":
       case "canceled":
         return "close-circle-outline"; // X icon
       default:

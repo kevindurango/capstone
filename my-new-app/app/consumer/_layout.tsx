@@ -9,7 +9,6 @@ import { useAuth } from "@/contexts/AuthContext";
  */
 export default function ConsumerLayout() {
   const { isConsumer } = useAuth();
-
   return (
     <Stack
       screenOptions={{
@@ -20,6 +19,7 @@ export default function ConsumerLayout() {
         headerTitleStyle: {
           fontWeight: "bold",
         },
+        headerBackVisible: false, // Explicitly hide back button on all screens
       }}
     >
       <Stack.Screen
@@ -40,18 +40,28 @@ export default function ConsumerLayout() {
         name="orders"
         options={{
           title: "My Orders",
+          // Keep the header for order details
         }}
       />
       <Stack.Screen
         name="profile"
         options={{
           title: "My Profile",
+          // Keep the header for the profile page
         }}
       />
       <Stack.Screen
         name="about"
         options={{
           title: "About",
+          // Keep the header for the about page
+        }}
+      />{" "}
+      <Stack.Screen
+        name="services"
+        options={{
+          title: "Services",
+          headerBackVisible: true, // Enable back button specifically for services page
         }}
       />
     </Stack>

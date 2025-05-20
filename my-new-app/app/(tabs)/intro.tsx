@@ -1,3 +1,4 @@
+import React from "react";
 import { useRouter } from "expo-router";
 import {
   StyleSheet,
@@ -8,16 +9,16 @@ import {
   ScrollView,
   BackHandler,
   ActivityIndicator,
+  Text,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  interpolate,
 } from "react-native-reanimated";
 import { useAuth } from "@/contexts/AuthContext";
 import { authService } from "@/services/authService";
@@ -32,25 +33,28 @@ const COLORS = {
   dark: "#1B5E20",
   text: "#263238",
   muted: "#78909C",
-  gradient: ["#2E7D32", "#1B5E20", "#0D3010"] as const,
+  gradient: ["#2E7D32", "#1B5E20", "#0D3010"],
   shadow: "#000000",
 };
 
 // Card data for the benefits section
+// Define the type for Ionicons names
+type IconName = React.ComponentProps<typeof Ionicons>["name"];
+
 const benefitCards = [
   {
-    icon: "leaf-outline" as const,
+    icon: "leaf-outline" as IconName,
     title: "Quality Products",
     description: "Direct from local farmers, ensuring freshness and quality",
   },
   {
-    icon: "people-outline" as const,
+    icon: "people-outline" as IconName,
     title: "Support Farmers",
     description:
       "Your purchase directly supports local agricultural communities",
   },
   {
-    icon: "globe-outline" as const,
+    icon: "globe-outline" as IconName,
     title: "Market Access",
     description: "Connecting farmers to wider markets and opportunities",
   },
@@ -132,8 +136,8 @@ export default function IntroScreen() {
     return (
       <LinearGradient
         colors={COLORS.gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        start={[0, 0]}
+        end={[1, 1]}
         style={[styles.container, styles.loadingContainer]}
       >
         <ActivityIndicator size="large" color={COLORS.secondary} />
@@ -145,8 +149,8 @@ export default function IntroScreen() {
   return (
     <LinearGradient
       colors={COLORS.gradient}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+      start={[0, 0]}
+      end={[1, 1]}
       style={styles.container}
     >
       {/* Decorative elements */}
@@ -157,50 +161,58 @@ export default function IntroScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View style={[styles.headerContainer, animatedStyle]}>
-          <Ionicons name="basket" size={60} color={COLORS.secondary} />
-          <ThemedText style={styles.title}>Farm to Table Platform</ThemedText>
-          <View style={styles.divider} />
-          <ThemedText style={styles.subtitle}>
-            Connecting local farmers directly to communities
-          </ThemedText>
+        <Animated.View>
+          <Animated.View style={[styles.headerContainer, animatedStyle]}>
+            <Ionicons name="basket" size={60} color={COLORS.secondary} />
+            <ThemedText style={styles.title}>Farm to Table Platform</ThemedText>
+            <View style={styles.divider} />
+            <ThemedText style={styles.subtitle}>
+              Connecting local farmers directly to communities
+            </ThemedText>
+          </Animated.View>
         </Animated.View>
 
-        <Animated.View style={[styles.imageContainer, animatedStyle]}>
-          <Image
-            source={{
-              uri: "https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80",
-            }}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
-          <View style={styles.imageOverlay} />
+        <Animated.View>
+          <Animated.View style={[styles.imageContainer, animatedStyle]}>
+            <Image
+              source={{
+                uri: "https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80",
+              }}
+              style={styles.heroImage}
+              resizeMode="cover"
+            />
+            <View style={styles.imageOverlay} />
+          </Animated.View>
         </Animated.View>
 
-        <Animated.View style={[styles.infoContainer, animatedStyle]}>
-          <ThemedText style={styles.sectionTitle}>
-            Why Choose Our Platform?
-          </ThemedText>
-
-          <View style={styles.cardsContainer}>
-            {benefitCards.map((card, index) => (
-              <View key={index} style={styles.card}>
-                <View style={styles.cardIconContainer}>
-                  <Ionicons name={card.icon} size={28} color={COLORS.primary} />
+        <Animated.View>
+          <Animated.View style={[styles.infoContainer, animatedStyle]}>
+            <ThemedText style={styles.sectionTitle}>
+              Why Choose Our Platform?
+            </ThemedText>
+            <View style={styles.cardsContainer}>
+              {benefitCards.map((card, index) => (
+                <View key={index} style={styles.card}>
+                  <View style={styles.cardIconContainer}>
+                    <Ionicons
+                      name={card.icon as any}
+                      size={28}
+                      color={COLORS.primary}
+                    />
+                  </View>
+                  <ThemedText style={styles.cardTitle}>{card.title}</ThemedText>
+                  <ThemedText style={styles.cardDescription}>
+                    {card.description}
+                  </ThemedText>
                 </View>
-                <ThemedText style={styles.cardTitle}>{card.title}</ThemedText>
-                <ThemedText style={styles.cardDescription}>
-                  {card.description}
-                </ThemedText>
-              </View>
-            ))}
-          </View>
-
-          <ThemedText style={styles.description}>
-            The Municipal Agriculture Office provides this innovative platform
-            connecting farmers directly to consumers, expanding market reach
-            while ensuring fair prices for quality local produce.
-          </ThemedText>
+              ))}
+            </View>
+            <ThemedText style={styles.description}>
+              The Municipal Agriculture Office provides this innovative platform
+              connecting farmers directly to consumers, expanding market reach
+              while ensuring fair prices for quality local produce.
+            </ThemedText>
+          </Animated.View>
         </Animated.View>
 
         <TouchableOpacity
@@ -210,8 +222,8 @@ export default function IntroScreen() {
         >
           <LinearGradient
             colors={[COLORS.accent, "#FF7D26"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
+            start={[0, 0]}
+            end={[1, 0]}
             style={styles.buttonGradient}
           >
             <ThemedText style={styles.buttonText}>Continue</ThemedText>

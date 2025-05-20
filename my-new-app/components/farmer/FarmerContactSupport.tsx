@@ -15,6 +15,7 @@ export function FarmerContactSupport() {
   return (
     <View style={styles.contactContainer}>
       <ThemedText style={styles.contactTitle}>Agricultural Support</ThemedText>
+      <View style={styles.divider} />
       <View style={styles.contactInfo}>
         <View style={styles.contactItem}>
           <Ionicons name="location" size={24} color={COLORS.primary} />
@@ -48,6 +49,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E0E0E0",
+    marginVertical: 8,
   },
   contactTitle: {
     fontSize: 18,

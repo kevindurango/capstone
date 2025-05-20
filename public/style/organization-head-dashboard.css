@@ -36,7 +36,7 @@
   align-items: center;
   overflow: hidden;
   position: relative;
-  height: 120px;
+  height: 200px;
 }
 
 /* Override card color variants with consistent green theme */
@@ -1084,7 +1084,7 @@ button:focus {
   margin-bottom: 0;
   font-weight: 600;
   font-size: 1.1rem;
-  color: #ffffff;
+  color: #050202;
   display: flex;
   align-items: center;
 }

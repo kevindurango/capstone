@@ -16,6 +16,7 @@ import { productStyles } from "./styles";
 import FeedbackList from "./FeedbackList";
 import { useAuth } from "@/contexts/AuthContext";
 import { getImageUrl } from "@/constants/Config";
+import ProductImage from "@/components/ui/ProductImage";
 
 interface ProductItemProps {
   item: Product;
@@ -33,6 +34,26 @@ const ProductItem = React.memo(({ item, onAddToCart }: ProductItemProps) => {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
   const buttonScale = useState(new Animated.Value(1))[0];
+
+  // Log the image path for debugging when the component mounts
+  useEffect(() => {
+    // Check if item has image_url or image property
+    const imagePath = item.image_url || item.image;
+
+    if (imagePath) {
+      console.log(`[Market] Original image path: ${imagePath}`);
+      try {
+        const fullUrl = getImageUrl(imagePath);
+        console.log(`[Market] Transformed image URL: ${fullUrl}`);
+      } catch (error) {
+        console.error("[Market] Error getting image URL:", error);
+        setImageError(true);
+      }
+    } else {
+      console.log("[Market] No image available for this product");
+      setImageError(true);
+    }
+  }, [item]);
 
   // Function to handle adding to cart with visual feedback
   const handleAddToCart = (e: any) => {
@@ -77,6 +98,11 @@ const ProductItem = React.memo(({ item, onAddToCart }: ProductItemProps) => {
     }
   };
 
+  // Get the correct image path from either image_url or image property
+  const getImagePath = () => {
+    return item.image_url || item.image || null;
+  };
+
   return (
     <>
       <TouchableOpacity
@@ -84,17 +110,11 @@ const ProductItem = React.memo(({ item, onAddToCart }: ProductItemProps) => {
         onPress={() => setShowProductDetail(true)}
       >
         <View style={productStyles.productImageContainer}>
-          {!imageError && item.image_url ? (
-            <Image
-              source={{ uri: getImageUrl(item.image_url) }}
+          {!imageError ? (
+            <ProductImage
+              imagePath={getImagePath()}
               style={productStyles.productImage}
-              resizeMode="cover"
-              onError={() => {
-                console.error(
-                  `[Market] Failed to load image: ${getImageUrl(item.image_url)}`
-                );
-                setImageError(true);
-              }}
+              productId={item.id}
             />
           ) : (
             <View style={productStyles.placeholderImage}>
@@ -238,11 +258,11 @@ const ProductItem = React.memo(({ item, onAddToCart }: ProductItemProps) => {
             {activeTab === "details" ? (
               <View>
                 <View style={productStyles.productImageContainerLarge}>
-                  {!imageError && item.image_url ? (
-                    <Image
-                      source={{ uri: getImageUrl(item.image_url) }}
+                  {!imageError ? (
+                    <ProductImage
+                      imagePath={getImagePath()}
                       style={productStyles.productImageLarge}
-                      resizeMode="cover"
+                      productId={item.id}
                     />
                   ) : (
                     <View style={productStyles.placeholderImageLarge}>

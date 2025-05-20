@@ -4,12 +4,10 @@ function viewOrder(orderId) {
     '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>'
   );
   $("#orderDetailsModal").modal("show");
-
   $.ajax({
-    url: "../../ajax/order-actions.php",
+    url: "../../ajax/get-order-details.php",
     type: "GET",
     data: {
-      action: "get_order_details",
       order_id: orderId,
     },
     success: function (response) {
@@ -120,6 +118,76 @@ function updateOrderStatus(orderId) {
   $("#status_order_id").val(orderId);
   $("#updateStatusModal").modal("show");
 }
+
+// Handle status update form submission
+$(document).ready(function () {
+  $("#updateStatusForm").on("submit", function (e) {
+    e.preventDefault();
+
+    const orderId = $("#status_order_id").val();
+    const newStatus = $("#new_status").val();
+
+    // Show loading state
+    const submitBtn = $(this).find('button[type="submit"]');
+    const originalBtnText = submitBtn.html();
+    submitBtn
+      .prop("disabled", true)
+      .html('<i class="bi bi-arrow-repeat"></i> Updating...');
+
+    $.ajax({
+      url: "manager-order-oversight.php",
+      type: "POST",
+      data: {
+        order_id: orderId,
+        new_status: newStatus,
+        update_status: true,
+      },
+      success: function (response) {
+        try {
+          const result =
+            typeof response === "string" ? JSON.parse(response) : response;
+
+          if (result.success) {
+            // Update the status badge in the table
+            const statusBadgeClass = getStatusBadgeClass(newStatus);
+            const row = $('button[data-id="' + orderId + '"]').closest("tr");
+            const statusCell = row.find("td:eq(5)");
+            statusCell.html(
+              `<span class="badge badge-${statusBadgeClass}">${
+                newStatus.charAt(0).toUpperCase() + newStatus.slice(1)
+              }</span>`
+            ); // Show success message
+            const alertHtml = `
+                            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                <i class="bi bi-check-circle-fill"></i> ${
+                                  result.message ||
+                                  "Order status updated successfully"
+                                }
+                                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>`;
+            $("main[role='main']").prepend(alertHtml);
+
+            // Close the modal
+            $("#updateStatusModal").modal("hide");
+          } else {
+            throw new Error(result.message || "Failed to update order status");
+          }
+        } catch (err) {
+          alert(err.message);
+        }
+      },
+      error: function () {
+        alert("Server error occurred. Please try again.");
+      },
+      complete: function () {
+        // Restore button state
+        submitBtn.prop("disabled", false).html(originalBtnText);
+      },
+    });
+  });
+});
 
 function exportOrderReport() {
   const dateRange = {

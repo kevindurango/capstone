@@ -10,7 +10,9 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  SafeAreaView,
 } from "react-native";
+import { COLORS } from "@/constants/Colors";
 import { Picker } from "@react-native-picker/picker";
 import { FontAwesome } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -21,6 +23,8 @@ import { getApiBaseUrlSync } from "@/services/apiConfig";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { NavigationContainer } from "@react-navigation/native";
 import SafeTopTabBar from "../SafeTopTabBar";
+import { getImageUrl } from "@/constants/Config"; // Import getImageUrl function
+import { useRouter } from "expo-router"; // Import useRouter from expo-router
 
 // Use the standardized API URL from apiConfig
 const API_URL = getApiBaseUrlSync();
@@ -42,6 +46,7 @@ const buildApiUrl = (endpoint: string) => {
 
 interface FarmerProfileProps {
   navigation?: any;
+  initialTab?: string;
 }
 
 interface FarmerDetails {
@@ -92,8 +97,12 @@ const FARM_TYPES = [
 // Create a Tab navigator for the profile sections
 const Tab = createMaterialTopTabNavigator();
 
-const FarmerProfile: React.FC<FarmerProfileProps> = ({ navigation }) => {
-  const { user } = useContext(AuthContext);
+const FarmerProfile: React.FC<FarmerProfileProps> = ({
+  navigation,
+  initialTab = "Profile",
+}) => {
+  const router = useRouter(); // Add the router hook
+  const { user, updateUserContext } = useContext(AuthContext);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -129,6 +138,7 @@ const FarmerProfile: React.FC<FarmerProfileProps> = ({ navigation }) => {
   const [barangays, setBarangays] = useState<Barangay[]>([]);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [refreshFieldsTrigger, setRefreshFieldsTrigger] = useState(0);
+  const [imageError, setImageError] = useState(false); // Add state to track image loading errors
 
   useEffect(() => {
     if (user) {
@@ -226,8 +236,12 @@ const FarmerProfile: React.FC<FarmerProfileProps> = ({ navigation }) => {
         const imageData = await imageResponse.json();
 
         if (imageData.success && imageData.image_url) {
-          // Store the image URL even if it's just a default placeholder
+          // Store the image URL and use getImageUrl to process it
           setProfileImage(imageData.image_url);
+          console.log(`[Profile] Original image path: ${imageData.image_url}`);
+          console.log(
+            `[Profile] Transformed URL: ${getImageUrl(imageData.image_url)}`
+          );
         }
       } catch (error) {
         console.error("Error fetching profile image:", error);
@@ -356,11 +370,13 @@ const FarmerProfile: React.FC<FarmerProfileProps> = ({ navigation }) => {
         user.first_name !== profileData.first_name ||
         user.last_name !== profileData.last_name
       ) {
-        updateUser({
-          ...user,
-          first_name: profileData.first_name,
-          last_name: profileData.last_name,
-        });
+        if (updateUserContext) {
+          updateUserContext({
+            ...user,
+            first_name: profileData.first_name,
+            last_name: profileData.last_name,
+          });
+        }
       }
 
       // Update original data
@@ -407,41 +423,6 @@ const FarmerProfile: React.FC<FarmerProfileProps> = ({ navigation }) => {
       "Profile image upload is not currently available. This feature will be implemented in a future update.",
       [{ text: "OK", style: "default" }]
     );
-
-    // The original code below is commented out since we don't have profile_image storage:
-    /*
-    try {
-      // Request permissions
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission Required",
-          "Please allow access to your photos to change profile picture."
-        );
-        return;
-      }
-
-      // Pick an image
-      let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const selectedImage = result.assets[0];
-        setProfileImage(selectedImage.uri);
-        // Upload image implementation would go here
-      }
-    } catch (error) {
-      console.error("Error selecting image:", error);
-      Alert.alert(
-        "Error",
-        "Failed to select profile picture. Please try again later."
-      );
-    }
-    */
   };
 
   // Create components for each tab
@@ -451,10 +432,16 @@ const FarmerProfile: React.FC<FarmerProfileProps> = ({ navigation }) => {
       <View style={styles.profileHeader}>
         <View style={styles.profileImageContainer}>
           <TouchableOpacity onPress={selectProfileImage} disabled={!editMode}>
-            {profileImage ? (
+            {profileImage && !imageError ? (
               <Image
-                source={{ uri: profileImage }}
+                source={{ uri: getImageUrl(profileImage) }} // Use getImageUrl to transform the image path
                 style={styles.profileImage}
+                onError={() => {
+                  console.error(
+                    `[Profile] Failed to load image: ${getImageUrl(profileImage)}`
+                  );
+                  setImageError(true);
+                }}
               />
             ) : (
               <View style={styles.profilePlaceholder}>
@@ -834,12 +821,18 @@ const FarmerProfile: React.FC<FarmerProfileProps> = ({ navigation }) => {
 
   const FieldsTab = () => (
     <View style={styles.tabContainer}>
-      <FarmerFields 
-        refreshTrigger={refreshFieldsTrigger} 
+      <FarmerFields
+        refreshTrigger={refreshFieldsTrigger}
         farmerId={user?.user_id} // Explicitly pass the farmer ID
       />
     </View>
   );
+
+  // Navigate back to dashboard
+  const handleBackToDashboard = () => {
+    console.log("Navigating back to farmer dashboard");
+    router.replace("/farmer/dashboard" as any);
+  };
 
   if (loading) {
     return (
@@ -849,42 +842,72 @@ const FarmerProfile: React.FC<FarmerProfileProps> = ({ navigation }) => {
       </View>
     );
   }
+  // Map initialTab parameter to screen name
+  const getInitialRouteName = () => {
+    switch (initialTab?.toLowerCase()) {
+      case "profile":
+        return "Profile";
+      case "farm-details":
+        return "Farm Details";
+      case "fields":
+        return "Fields";
+      default:
+        return "Profile";
+    }
+  };
 
   return (
-    <NavigationContainer independent={true}>
-      <Tab.Navigator
-        tabBar={props => <SafeTopTabBar {...props} />}
-        screenOptions={{
-          tabBarActiveTintColor: "#0066cc",
-          tabBarInactiveTintColor: "#666",
-          tabBarLabelStyle: { fontSize: 14, fontWeight: "bold" },
-          tabBarStyle: { backgroundColor: "#fff" },
-          tabBarIndicatorStyle: { backgroundColor: "#0066cc" },
-        }}
-      >
-        <Tab.Screen
-          name="Profile"
-          component={ProfileInfoTab}
-          options={{
-            tabBarItemStyle: { width: "auto" },
+    <SafeAreaView style={styles.container}>
+      {/* Header with Back Button */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={handleBackToDashboard}
+        >
+          <FontAwesome name="arrow-left" size={20} color="#333" />
+          <Text style={styles.backButtonText}>Back to Dashboard</Text>
+        </TouchableOpacity>
+      </View>
+
+      <NavigationContainer independent={true} key={refreshFieldsTrigger}>
+        <Tab.Navigator
+          initialRouteName={getInitialRouteName()}
+          tabBar={(props) => <SafeTopTabBar {...props} />}
+          screenOptions={{
+            tabBarActiveTintColor: COLORS.primary,
+            tabBarInactiveTintColor: "#666",
+            tabBarLabelStyle: { fontSize: 14, fontWeight: "bold" },
+            tabBarStyle: { backgroundColor: "#fff" },
+            tabBarIndicatorStyle: { backgroundColor: COLORS.primary },
           }}
-        />
-        <Tab.Screen
-          name="Farm Details"
-          component={FarmDetailsTab}
-          options={{
-            tabBarItemStyle: { width: "auto" },
-          }}
-        />
-        <Tab.Screen
-          name="Fields"
-          component={FieldsTab}
-          options={{
-            tabBarItemStyle: { width: "auto" },
-          }}
-        />
-      </Tab.Navigator>
-    </NavigationContainer>
+        >
+          <Tab.Screen
+            name="Profile"
+            component={ProfileInfoTab}
+            options={{
+              tabBarItemStyle: { width: "auto" },
+              tabBarLabelStyle: { fontSize: 14 },
+            }}
+          />
+          <Tab.Screen
+            name="Farm Details"
+            component={FarmDetailsTab}
+            options={{
+              tabBarItemStyle: { width: "auto" },
+              tabBarLabelStyle: { fontSize: 14 },
+            }}
+          />
+          <Tab.Screen
+            name="Fields"
+            component={FieldsTab}
+            options={{
+              tabBarItemStyle: { width: "auto" },
+              tabBarLabelStyle: { fontSize: 14 },
+            }}
+          />
+        </Tab.Navigator>
+      </NavigationContainer>
+    </SafeAreaView>
   );
 };
 
@@ -892,6 +915,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f8f8",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e1e1e1",
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 5,
+  },
+  backButtonText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: "#333",
+    fontWeight: "500",
   },
   loadingContainer: {
     flex: 1,
@@ -1083,6 +1125,3 @@ const styles = StyleSheet.create({
 });
 
 export default FarmerProfile;
-function updateUser(arg0: any) {
-  throw new Error("Function not implemented.");
-}

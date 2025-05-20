@@ -25,24 +25,6 @@ switch($action) {
         $tracking = $orderClass->getPickupTracking($pickupId);
         include '../views/manager/partials/pickup-tracking.php';
         break;
-
-    case 'getDrivers':
-        $drivers = $orderClass->getAvailableDrivers();
-        foreach ($drivers as $driver) {
-            echo "<option value='{$driver['user_id']}'>{$driver['first_name']} {$driver['last_name']}</option>";
-        }
-        break;
-
-    case 'assign':
-        $pickupId = $_POST['pickup_id'];
-        $driverId = $_POST['driver_id'];
-        $notes = $_POST['notes'];
-        
-        $result = $orderClass->assignPickup($pickupId, $driverId, $notes);
-        if ($result) {
-            $logClass->logActivity($_SESSION['user_id'], "Assigned pickup #$pickupId to driver #$driverId");
-        }
-        echo json_encode(['success' => $result]);
         break;
 
     case 'updateStatus':
@@ -62,16 +44,14 @@ switch($action) {
         header('Content-Disposition: attachment; filename="pickup_report.csv"');
         
         $output = fopen('php://output', 'w');
-        fputcsv($output, ['Pickup ID', 'Order ID', 'Status', 'Date', 'Location', 'Driver', 'Notes']);
+        fputcsv($output, ['Pickup ID', 'Order ID', 'Status', 'Date', 'Location', 'Notes']);
         
         foreach ($pickups as $pickup) {
-            fputcsv($output, [
-                $pickup['pickup_id'],
+            fputcsv($output, [                $pickup['pickup_id'],
                 $pickup['order_id'],
                 $pickup['pickup_status'],
                 $pickup['pickup_date'],
                 $pickup['pickup_location'],
-                $pickup['assigned_to'],
                 $pickup['pickup_notes']
             ]);
         }

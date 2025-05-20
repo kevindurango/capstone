@@ -29,6 +29,44 @@ interface Order {
   items_count: number;
   pickup_date?: string;
   pickup_time?: string;
+  // Optional fields that might be present in detailed responses
+  consumer_id?: number;
+  consumer_contact?: string;
+  pickup_details?: string;
+  items?: OrderItem[];
+  payment?: PaymentInfo;
+  pickup?: PickupInfo;
+}
+
+// Add these interfaces to match the API response structure
+interface OrderItem {
+  order_item_id: number;
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  price: number;
+  total: number;
+  unit_type: string;
+  image?: string;
+}
+
+interface PaymentInfo {
+  payment_id: number;
+  method: string;
+  status: string;
+  date: string;
+  amount: number;
+  reference: string;
+}
+
+interface PickupInfo {
+  pickup_id: number;
+  status: string;
+  date: string;
+  location: string;
+  notes?: string;
+  office_location?: string;
+  contact_person?: string;
 }
 
 // Order details type
@@ -47,7 +85,7 @@ interface OrderStats {
   pending: number;
   confirmed: number;
   completed: number;
-  cancelled: number;
+  canceled: number;
 }
 
 export default function FarmerOrders() {
@@ -62,7 +100,7 @@ export default function FarmerOrders() {
     pending: 0,
     confirmed: 0,
     completed: 0,
-    cancelled: 0,
+    canceled: 0,
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,22 +118,30 @@ export default function FarmerOrders() {
 
     try {
       setLoading(true);
-      // Updated to use the farmer_orders.php endpoint which supports both GET and POST
+      // Use the farmer_orders.php endpoint which now properly handles both GET and POST
       const response = await fetch(
         `${IPConfig.API_BASE_URL}/farmer/farmer_orders.php?farmer_id=${user.user_id}`
       );
 
-      // Keep the stats endpoint as before
+      // Update to fetch stats from the farmer_orders.php endpoint
+      // This will ensure we get accurate stats specific to this farmer
       const statsResponse = await fetch(
-        `${IPConfig.API_BASE_URL}/order.php?farmer_id=${user.user_id}&stats=true`
+        `${IPConfig.API_BASE_URL}/farmer/farmer_orders.php?farmer_id=${user.user_id}&stats=true`
       );
 
       const data = await response.json();
       const statsData = await statsResponse.json();
 
       if (data.success) {
+        // Ensure we handle empty orders array properly
         setOrders(data.orders || []);
         setFilteredOrders(data.orders || []);
+
+        // Calculate statistics directly from orders data if stats endpoint fails
+        if (!statsData.success) {
+          const orderStats = calculateOrderStats(data.orders || []);
+          setStats(orderStats);
+        }
       } else {
         console.error("Error fetching orders:", data.message);
         Alert.alert(
@@ -106,6 +152,8 @@ export default function FarmerOrders() {
 
       if (statsData.success) {
         setStats(statsData.stats);
+      } else {
+        console.error("Error fetching order statistics:", statsData?.message);
       }
     } catch (error) {
       console.error("Error fetching orders:", error);
@@ -115,6 +163,36 @@ export default function FarmerOrders() {
       setRefreshing(false);
     }
   }, [user?.user_id]);
+
+  // Helper function to calculate order statistics from orders array
+  const calculateOrderStats = (orders: Order[]): OrderStats => {
+    const stats: OrderStats = {
+      total: orders.length,
+      pending: 0,
+      confirmed: 0,
+      completed: 0,
+      canceled: 0,
+    };
+
+    orders.forEach((order) => {
+      switch (order.status?.toLowerCase()) {
+        case "pending":
+          stats.pending++;
+          break;
+        case "confirmed":
+          stats.confirmed++;
+          break;
+        case "completed":
+          stats.completed++;
+          break;
+        case "canceled":
+          stats.canceled++;
+          break;
+      }
+    });
+
+    return stats;
+  };
 
   // Function to fetch order details
   const fetchOrderDetails = async (orderId: number) => {
@@ -162,7 +240,10 @@ export default function FarmerOrders() {
       const data = await response.json();
 
       if (data.success) {
-        Alert.alert("Success", `Order #${orderId} has been ${status}.`);
+        Alert.alert(
+          "Success",
+          `Order #${orderId} status updated to ${status}.`
+        );
         fetchOrders();
         if (selectedOrderId === orderId) {
           setShowOrderDetails(false);
@@ -188,19 +269,42 @@ export default function FarmerOrders() {
 
     let filtered = [...orders];
 
-    // Apply search filter
+    // Apply search filter with more robust null checks and improved search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (order) =>
-          order.customer_name.toLowerCase().includes(query) ||
-          order.order_id.toString().includes(query)
-      );
+      filtered = filtered.filter((order) => {
+        // Check order ID
+        if (order.order_id && order.order_id.toString().includes(query)) {
+          return true;
+        }
+
+        // Check customer name
+        if (
+          order.customer_name &&
+          order.customer_name.toLowerCase().includes(query)
+        ) {
+          return true;
+        }
+
+        // Check order date
+        if (order.order_date) {
+          const formattedDate = formatDate(order.order_date).toLowerCase();
+          if (formattedDate.includes(query)) {
+            return true;
+          }
+        }
+
+        return false;
+      });
     }
 
-    // Apply status filter
+    // Apply status filter with null check
     if (statusFilter) {
-      filtered = filtered.filter((order) => order.status === statusFilter);
+      filtered = filtered.filter(
+        (order) =>
+          order.status &&
+          order.status.toLowerCase() === statusFilter.toLowerCase()
+      );
     }
 
     setFilteredOrders(filtered);
@@ -245,14 +349,18 @@ export default function FarmerOrders() {
 
   // Get status color for display
   const getStatusColor = (status: string) => {
+    if (!status) return "#9E9E9E"; // Default grey for undefined status
+
     switch (status.toLowerCase()) {
       case "pending":
         return "#FFC107"; // Yellow
-      case "confirmed":
+      case "processing":
+        return "#FF9800"; // Orange
+      case "ready":
         return "#2196F3"; // Blue
       case "completed":
         return "#4CAF50"; // Green
-      case "cancelled":
+      case "canceled":
         return "#F44336"; // Red
       case "paid":
         return "#4CAF50"; // Green
@@ -388,17 +496,15 @@ export default function FarmerOrders() {
                 <TouchableOpacity
                   style={[styles.actionButton, styles.confirmButton]}
                   onPress={() =>
-                    updateOrderStatus(selectedOrderId, "confirmed")
+                    updateOrderStatus(selectedOrderId, "processing")
                   }
                 >
                   <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                  <Text style={styles.actionButtonText}>Confirm Order</Text>
+                  <Text style={styles.actionButtonText}>Process Order</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionButton, styles.cancelButton]}
-                  onPress={() =>
-                    updateOrderStatus(selectedOrderId, "cancelled")
-                  }
+                  onPress={() => updateOrderStatus(selectedOrderId, "canceled")}
                 >
                   <Ionicons name="close-circle" size={18} color="#fff" />
                   <Text style={styles.actionButtonText}>Cancel Order</Text>
@@ -406,7 +512,17 @@ export default function FarmerOrders() {
               </View>
             )}
 
-            {selectedOrder.status === "confirmed" && (
+            {selectedOrder.status === "processing" && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.confirmButton]}
+                onPress={() => updateOrderStatus(selectedOrderId, "ready")}
+              >
+                <Ionicons name="checkmark-done-circle" size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Mark as Ready</Text>
+              </TouchableOpacity>
+            )}
+
+            {selectedOrder.status === "ready" && (
               <TouchableOpacity
                 style={[styles.actionButton, styles.completeButton]}
                 onPress={() => updateOrderStatus(selectedOrderId, "completed")}
@@ -438,22 +554,26 @@ export default function FarmerOrders() {
             { backgroundColor: getStatusColor(item.status) },
           ]}
         >
-          <Text style={styles.statusText}>{item.status}</Text>
+          <Text style={styles.statusText}>{item.status || "Unknown"}</Text>
         </View>
       </View>
 
       <View style={styles.orderContent}>
         <View style={styles.orderRow}>
           <Ionicons name="person-outline" size={16} color="#666" />
-          <Text style={styles.orderText}>{item.customer_name}</Text>
+          <Text style={styles.orderText}>
+            {item.customer_name || "Unknown Customer"}
+          </Text>
         </View>
         <View style={styles.orderRow}>
           <Ionicons name="calendar-outline" size={16} color="#666" />
-          <Text style={styles.orderText}>{formatDate(item.order_date)}</Text>
+          <Text style={styles.orderText}>
+            {item.order_date ? formatDate(item.order_date) : "No date"}
+          </Text>
         </View>
         <View style={styles.orderRow}>
           <Ionicons name="cart-outline" size={16} color="#666" />
-          <Text style={styles.orderText}>{item.items_count} item(s)</Text>
+          <Text style={styles.orderText}>{item.items_count || 0} item(s)</Text>
         </View>
       </View>
 
@@ -466,10 +586,14 @@ export default function FarmerOrders() {
               { backgroundColor: getStatusColor(item.payment_status) },
             ]}
           >
-            <Text style={styles.paymentText}>{item.payment_status}</Text>
+            <Text style={styles.paymentText}>
+              {item.payment_status || "Unknown"}
+            </Text>
           </View>
         </View>
-        <Text style={styles.orderAmount}>{formatPrice(item.total_amount)}</Text>
+        <Text style={styles.orderAmount}>
+          {formatPrice(item.total_amount || 0)}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -480,7 +604,7 @@ export default function FarmerOrders() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => router.replace("/farmer/dashboard")}
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.light} />
         </TouchableOpacity>
@@ -491,19 +615,19 @@ export default function FarmerOrders() {
       {/* Stats Section */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.total}</Text>
+          <Text style={styles.statNumber}>{stats.total || 0}</Text>
           <Text style={styles.statLabel}>Total</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.pending}</Text>
+          <Text style={styles.statNumber}>{stats.pending || 0}</Text>
           <Text style={styles.statLabel}>Pending</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.confirmed}</Text>
+          <Text style={styles.statNumber}>{stats.confirmed || 0}</Text>
           <Text style={styles.statLabel}>Confirmed</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.completed}</Text>
+          <Text style={styles.statNumber}>{stats.completed || 0}</Text>
           <Text style={styles.statLabel}>Completed</Text>
         </View>
       </View>
@@ -569,17 +693,33 @@ export default function FarmerOrders() {
             <TouchableOpacity
               style={[
                 styles.filterButton,
-                statusFilter === "confirmed" && styles.activeFilterButton,
+                statusFilter === "processing" && styles.activeFilterButton,
               ]}
-              onPress={() => setStatusFilter("confirmed")}
+              onPress={() => setStatusFilter("processing")}
             >
               <Text
                 style={[
                   styles.filterButtonText,
-                  statusFilter === "confirmed" && styles.activeFilterText,
+                  statusFilter === "processing" && styles.activeFilterText,
                 ]}
               >
-                Confirmed
+                Processing
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                statusFilter === "ready" && styles.activeFilterButton,
+              ]}
+              onPress={() => setStatusFilter("ready")}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  statusFilter === "ready" && styles.activeFilterText,
+                ]}
+              >
+                Ready
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -601,17 +741,17 @@ export default function FarmerOrders() {
             <TouchableOpacity
               style={[
                 styles.filterButton,
-                statusFilter === "cancelled" && styles.activeFilterButton,
+                statusFilter === "canceled" && styles.activeFilterButton,
               ]}
-              onPress={() => setStatusFilter("cancelled")}
+              onPress={() => setStatusFilter("canceled")}
             >
               <Text
                 style={[
                   styles.filterButtonText,
-                  statusFilter === "cancelled" && styles.activeFilterText,
+                  statusFilter === "canceled" && styles.activeFilterText,
                 ]}
               >
-                Cancelled
+                Canceled
               </Text>
             </TouchableOpacity>
           </View>

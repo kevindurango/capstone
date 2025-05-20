@@ -270,16 +270,14 @@ export default function RegisterScreen() {
         translucent
         backgroundColor="transparent"
       />
-      <LinearGradient colors={COLORS.gradient} style={styles.container}>
+      <LinearGradient
+        colors={Array.from(COLORS.gradient)}
+        style={styles.container}
+      >
         <Animated.View
           entering={FadeInDown.delay(200).duration(800)}
           style={styles.logoContainer}
         >
-          <Image
-            source={require("@/assets/images/splash-icon.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
           <ThemedText style={styles.appName}>FarmersMarket</ThemedText>
         </Animated.View>
 
@@ -607,7 +605,7 @@ const styles = StyleSheet.create({
   },
   appName: {
     marginTop: SPACING.xs,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "600",
     color: COLORS.light,
   },
@@ -625,7 +623,7 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.xxl,
   },
   title: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: "bold",
     color: COLORS.light,
     marginBottom: SPACING.xs,

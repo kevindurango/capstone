@@ -52,14 +52,16 @@ export default function FarmerNavigation() {
       active: pathname === "/farmer/profile",
     },
   ];
-
   return (
     <View style={styles.container}>
       {navItems.map((item, index) => (
         <TouchableOpacity
           key={index}
-          style={styles.tabItem}
-          onPress={() => router.push(item.route as any)}
+          style={[styles.tabItem, item.active && styles.activeTabItem]}
+          onPress={() => {
+            console.log(`Navigating to: ${item.route}`);
+            router.replace(item.route as any);
+          }}
           accessibilityLabel={item.label}
         >
           <Ionicons
@@ -99,6 +101,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 8,
+  },
+  activeTabItem: {
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.primary,
   },
   tabLabel: {
     fontSize: 12,

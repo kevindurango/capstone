@@ -4,7 +4,7 @@
  */
 import { Platform } from "react-native";
 
-export const LOCAL_IP_ADDRESS = "192.168.1.12"; // This was the working IP address
+export const LOCAL_IP_ADDRESS = "192.168.1.12"; // This is the working IP address
 
 // Platform-specific base URL
 const getPlatformSpecificUrl = () => {

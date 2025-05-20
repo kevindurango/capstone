@@ -9,9 +9,22 @@ if (!isset($_SESSION['organization_head_logged_in']) || $_SESSION['organization_
 
 require_once '../../controllers/OrderController.php';
 require_once '../../models/Log.php';
+require_once '../../models/Order.php';
 
 $orderController = new OrderController();
 $logClass = new Log();
+$orderClass = new Order();
+
+function getStatusBadgeClass($status) {
+    switch ($status) {
+        case 'pending': return 'warning';
+        case 'processing': return 'info';
+        case 'ready': return 'primary';
+        case 'completed': return 'success';
+        case 'canceled': return 'danger';
+        default: return 'secondary';
+    }
+}
 
 // Get organization_head_user_id from session
 $organization_head_user_id = $_SESSION['organization_head_user_id'] ?? null;
@@ -92,38 +105,48 @@ if (empty($_SESSION['csrf_token'])) {
 // Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
     if (isset($_POST['update_status'])) {
-        $order_id = $_POST['order_id'];
-        $new_status = $_POST['new_status'];
+        $orderId = $_POST['order_id'];
+        $newStatus = $_POST['new_status'];
+        
+        // Initialize response array
+        $response = array();
         
         try {
-            if ($orderController->updateOrderStatus($order_id, $new_status)) {
-                $logClass->logActivity($organization_head_user_id, "Updated order #$order_id status to $new_status");
-                $_SESSION['message'] = "Order status updated successfully!";
-                $_SESSION['message_type'] = 'success';
+            if ($orderClass->updateOrderStatus($orderId, $newStatus)) {
+                $logClass->logActivity($organization_head_user_id, "Updated order #$orderId status to $newStatus");
                 
-                // Force page refresh to show updated status
-                header("Location: organization-head-order-management.php");
-                exit();
+                $response = array(
+                    'success' => true,
+                    'message' => "Order #$orderId status updated to $newStatus",
+                    'newStatus' => $newStatus
+                );
             } else {
-                $_SESSION['message'] = "Failed to update order status. Please check database logs.";
-                $_SESSION['message_type'] = 'danger';
+                $response = array(
+                    'success' => false,
+                    'message' => "Failed to update order status"
+                );
             }
         } catch (Exception $e) {
             error_log("Error updating order status: " . $e->getMessage());
-            $_SESSION['message'] = "An error occurred while updating the order status: " . $e->getMessage();
-            $_SESSION['message_type'] = 'danger';
+            
+            $response = array(
+                'success' => false,
+                'message' => "An error occurred while updating the order status: " . $e->getMessage()
+            );
         }
         
-        header("Location: organization-head-order-management.php");
-        exit();
+        // If this is an AJAX request, return JSON
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+            header('Content-Type: application/json');
+            echo json_encode($response);
+            exit;
+        }
     }
 
     // Handle logout
     if (isset($_POST['logout'])) {
-        // Use organization_head_user_id
-        if (isset($_SESSION['organization_head_user_id'])) {
-            $logClass->logActivity($_SESSION['organization_head_user_id'], "Organization Head logged out.");
-        }
+        $logClass->logActivity($organization_head_user_id, "Organization Head logged out");
         session_unset();
         session_destroy();
         header("Location: organization-head-login.php");
@@ -527,13 +550,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
                             <div class="col-md-6">
                                 <div class="filter-group d-flex justify-content-md-end">
                                     <div class="me-2 mr-3">
-                                        <span class="filter-label"><i class="bi bi-funnel"></i> Status:</span>
-                                        <select id="statusFilter" class="filter-control form-control-sm">
+                                        <span class="filter-label"><i class="bi bi-funnel"></i> Status:</span>                                        <select id="statusFilter" class="filter-control form-control-sm">
                                             <option value="">All Statuses</option>
                                             <option value="pending" <?= $status_filter == 'pending' ? 'selected' : '' ?>>Pending</option>
                                             <option value="processing" <?= $status_filter == 'processing' ? 'selected' : '' ?>>Processing</option>
+                                            <option value="ready" <?= $status_filter == 'ready' ? 'selected' : '' ?>>Ready</option>
                                             <option value="completed" <?= $status_filter == 'completed' ? 'selected' : '' ?>>Completed</option>
-                                            <option value="cancelled" <?= $status_filter == 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                                            <option value="canceled" <?= $status_filter == 'canceled' ? 'selected' : '' ?>>Canceled</option>
                                         </select>
                                     </div>
                                     <div>
@@ -641,10 +664,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
                                                             data-target="#orderDetailsModal">
                                                         <i class="bi bi-eye-fill"></i> View
                                                     </button>
-                                                    
-                                                    <button class="btn btn-sm btn-update update-status" 
+                                                      <button class="btn btn-sm btn-update update-status" 
                                                             data-order-id="<?= $order['order_id'] ?>"
-                                                            data-current-status="<?= $order['status'] ?>"
+                                                            data-current-status="<?= $status ?>"
                                                             data-toggle="modal" 
                                                             data-target="#updateStatusModal">
                                                         <i class="bi bi-pencil"></i> Update
@@ -739,14 +761,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <form method="POST">
+                <form id="update_status_form" method="POST">
                     <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                     <input type="hidden" name="order_id" id="updateOrderId">
                     <div class="modal-body">
                         <div class="form-group">
+                            <label for="current_status_display">Current Status</label>
+                            <div id="current_status_display" class="form-control bg-light"></div>
+                        </div>
+                        <div class="form-group">
                             <label for="new_status" class="font-weight-bold">New Status</label>
                             <select name="new_status" id="new_status" class="form-control" required>
                                 <option value="pending">Pending</option>
+                                <option value="processing">Processing</option>
+                                <option value="ready">Ready</option>
                                 <option value="completed">Completed</option>
                                 <option value="canceled">Canceled</option>
                             </select>
@@ -769,37 +797,398 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['csrf_token']) && hash_
     <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-    <script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>    <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Helper function to get badge class based on status
+            function getStatusBadgeClass(status) {
+                if (!status) return 'secondary';
+                
+                status = status.toLowerCase();
+                switch(status) {
+                    case 'pending': return 'warning';
+                    case 'processing': return 'info';
+                    case 'ready': return 'primary';
+                    case 'completed': return 'success';
+                    case 'cancelled': 
+                    case 'canceled': return 'danger';
+                    case 'not_processed': return 'warning';
+                    case 'assigned': return 'info';
+                    case 'in_transit': return 'processing';
+                    default: return 'secondary';
+                }
+            }
+            
+            // Helper function to get status icon
+            function getStatusIcon(status) {
+                if (!status) return 'question-circle';
+                
+                status = status.toLowerCase();
+                switch(status) {
+                    case 'pending': return 'hourglass-split';
+                    case 'processing': return 'arrow-repeat';
+                    case 'ready': return 'box-seam';
+                    case 'completed': return 'check-circle';
+                    case 'cancelled': 
+                    case 'canceled': return 'x-circle';
+                    case 'not_processed': return 'clock';
+                    case 'assigned': return 'person-check';
+                    case 'in_transit': return 'truck';
+                    default: return 'circle';
+                }
+            }
+            
             // View Order Details
             $('.view-order').click(function() {
                 const orderId = $(this).data('order-id');
-                $.get(`../../ajax/get-order-details.php?order_id=${orderId}`, function(data) {
-                    $('#orderDetailsContent').html(data);
-                }).fail(function() {
-                    $('#orderDetailsContent').html(`
-                        <div class="alert alert-danger">
-                            <i class="bi bi-exclamation-triangle"></i> Failed to load order details. Please try again.
+                $('#orderDetailsContent').html(`
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="sr-only">Loading...</span>
                         </div>
-                    `);
+                        <p class="mt-3">Loading order details...</p>
+                    </div>
+                `);
+                
+                // Fetch order details via AJAX
+                $.ajax({
+                    url: '../../ajax/get-order-details.php',
+                    method: 'GET',
+                    data: {
+                        order_id: orderId
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        try {
+                            if (response.success) {
+                                const order = response.order;
+                                const items = response.items || [];
+                                const payment = response.payment || {};
+                                const pickup = response.pickup || {};
+                                
+                                const html = `
+                                    <div class="order-details p-3">
+                                        <div class="row mb-4">
+                                            <div class="col-md-6">
+                                                <h6 class="font-weight-bold">Order Information</h6>
+                                                <div class="order-detail-row">
+                                                    <div class="order-detail-label">Order ID:</div>
+                                                    <div>#${order.order_id}</div>
+                                                </div>
+                                                <div class="order-detail-row">
+                                                    <div class="order-detail-label">Date Placed:</div>
+                                                    <div>${order.order_date}</div>
+                                                </div>
+                                                <div class="order-detail-row">
+                                                    <div class="order-detail-label">Status:</div>
+                                                    <div>
+                                                        <span class="status-badge status-${getStatusBadgeClass(order.order_status)}">
+                                                            <i class="bi bi-${getStatusIcon(order.order_status)} mr-1"></i>
+                                                            ${order.order_status}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div class="order-detail-row">
+                                                    <div class="order-detail-label">Customer:</div>
+                                                    <div>${order.customer_name || 'N/A'}</div>
+                                                </div>
+                                                <div class="order-detail-row">
+                                                    <div class="order-detail-label">Contact Email:</div>
+                                                    <div>${order.email || 'N/A'}</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6 class="font-weight-bold">Pickup Information</h6>
+                                                <div class="order-detail-row">
+                                                    <div class="order-detail-label">Status:</div>
+                                                    <div>
+                                                        <span class="status-badge status-${getStatusBadgeClass(pickup.status)}">
+                                                            <i class="bi bi-${getStatusIcon(pickup.status)} mr-1"></i>
+                                                            ${pickup.status}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div class="order-detail-row">
+                                                    <div class="order-detail-label">Location:</div>
+                                                    <div>${pickup.location || 'Not specified'}</div>
+                                                </div>
+                                                <div class="order-detail-row">
+                                                    <div class="order-detail-label">Date/Time:</div>
+                                                    <div>${pickup.date || 'Not scheduled'}</div>
+                                                </div>
+                                                <div class="order-detail-row">
+                                                    <div class="order-detail-label">Contact Person:</div>
+                                                    <div>${pickup.contact_person || 'Not specified'}</div>
+                                                </div>
+                                                ${pickup.notes ? `
+                                                <div class="order-detail-row">
+                                                    <div class="order-detail-label">Pickup Notes:</div>
+                                                    <div>${pickup.notes}</div>
+                                                </div>
+                                                ` : ''}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Payment Information -->
+                                        <div class="row mb-4">
+                                            <div class="col-md-12">
+                                                <h6 class="font-weight-bold">Payment Information</h6>
+                                                <div class="card bg-light">
+                                                    <div class="card-body">
+                                                        <div class="row">
+                                                            <div class="col-md-3">
+                                                                <div class="order-detail-label">Payment Status:</div>
+                                                                <div>
+                                                                    <span class="status-badge status-${getStatusBadgeClass(payment.status)}">
+                                                                        ${payment.status}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <div class="order-detail-label">Amount:</div>
+                                                                <div class="font-weight-bold">₱${Number(payment.amount).toFixed(2)}</div>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <div class="order-detail-label">Payment Date:</div>
+                                                                <div>${payment.date || 'Not processed'}</div>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <div class="order-detail-label">Payment Method:</div>
+                                                                <div>${payment.method || 'Not specified'}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Order Items -->
+                                        <div class="order-products">
+                                            <h6 class="font-weight-bold">Order Items</h6>
+                                            ${items && items.length > 0 ? `
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-bordered">
+                                                        <thead class="thead-light">
+                                                            <tr>
+                                                                <th>Product</th>
+                                                                <th>Unit Price</th>
+                                                                <th>Quantity</th>
+                                                                <th class="text-right">Subtotal</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            ${items.map(item => `
+                                                                <tr>
+                                                                    <td>
+                                                                        <div class="font-weight-bold">${item.product_name}</div>
+                                                                        ${item.description ? `<small class="text-muted">${item.description}</small>` : ''}
+                                                                    </td>
+                                                                    <td>₱${Number(item.price).toFixed(2)}</td>
+                                                                    <td>${item.quantity}</td>
+                                                                    <td class="text-right">₱${(Number(item.price) * Number(item.quantity)).toFixed(2)}</td>
+                                                                </tr>
+                                                            `).join('')}
+                                                        </tbody>
+                                                        <tfoot>
+                                                            <tr>
+                                                                <th colspan="3" class="text-right">Total:</th>
+                                                                <th class="text-right">₱${Number(response.subtotal).toFixed(2)}</th>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
+                                            ` : `
+                                                <div class="alert alert-info">
+                                                    <i class="bi bi-info-circle"></i> No items found for this order.
+                                                </div>
+                                            `}
+                                        </div>
+                                    </div>
+                                `;
+                                
+                                $('#orderDetailsContent').html(html);
+                            } else {
+                                $('#orderDetailsContent').html(`
+                                    <div class="alert alert-danger">
+                                        <i class="bi bi-exclamation-triangle"></i> ${response.error || 'Failed to load order details. Please try again.'}
+                                    </div>
+                                `);
+                            }
+                        } catch(e) {
+                            console.error("Error processing order details:", e);
+                            $('#orderDetailsContent').html(`
+                                <div class="alert alert-danger">
+                                    <i class="bi bi-exclamation-triangle"></i> Error processing order details. Please try again.
+                                </div>
+                            `);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("AJAX Error:", status, error);
+                        $('#orderDetailsContent').html(`
+                            <div class="alert alert-danger">
+                                <i class="bi bi-exclamation-triangle"></i> Failed to load order details. Please try again.
+                            </div>
+                        `);
+                    }
                 });
             });
-
+            
             // Update Status
             $('.update-status').click(function() {
                 const orderId = $(this).data('order-id');
                 let currentStatus = $(this).data('current-status');
+                
+                console.log("Update Status clicked for order:", orderId, "Current status:", currentStatus);
                 
                 // Make sure we map cancelled to canceled for the form
                 if (currentStatus === 'cancelled') {
                     currentStatus = 'canceled';
                 }
                 
+                // Set values in the modal
                 $('#updateOrderId').val(orderId);
                 $('#new_status').val(currentStatus);
+                
+                // Display current status with proper styling
+                const badgeClass = getStatusBadgeClass(currentStatus);
+                const icon = getStatusIcon(currentStatus);
+                $('#current_status_display').html(`
+                    <span class="status-badge status-${badgeClass}">
+                        <i class="bi bi-${icon} mr-1"></i>
+                        ${currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}
+                    </span>
+                `);
             });
-
+            
+            // Handle status update form submission
+            $('#update_status_form').on('submit', function(e) {
+                e.preventDefault();
+                
+                const orderId = $('#updateOrderId').val();
+                const newStatus = $('#new_status').val();
+                const csrfToken = $('input[name="csrf_token"]').val();
+                
+                console.log("Submitting status update for order:", orderId, "New status:", newStatus);
+                
+                // Show loading state
+                const submitBtn = $(this).find('button[type="submit"]');
+                const originalBtnText = submitBtn.html();
+                submitBtn.prop('disabled', true).html('<i class="bi bi-arrow-repeat spin"></i> Updating...');
+                
+                // Add spinning animation style if not already present
+                if (!$('style#spin-style').length) {
+                    $('head').append(`
+                        <style id="spin-style">
+                            .spin {
+                                animation: spinner 1s linear infinite;
+                            }
+                            @keyframes spinner {
+                                to { transform: rotate(360deg); }
+                            }
+                        </style>
+                    `);
+                }
+                
+                // Send AJAX request to update status
+                $.ajax({
+                    url: window.location.href,
+                    type: 'POST',
+                    data: {
+                        update_status: true,
+                        order_id: orderId,
+                        new_status: newStatus,
+                        csrf_token: csrfToken
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        try {
+                            // Try to parse response if it's a string
+                            if (typeof response === 'string' && response.trim().startsWith('{')) {
+                                response = JSON.parse(response);
+                            }
+                            
+                            console.log("Status update response:", response);
+                            
+                            if (response.success) {
+                                // Find the status cell and update it
+                                const row = $(`button.update-status[data-order-id="${orderId}"]`).closest('tr');
+                                // Find the status cell - it's the 5th column in the table
+                                let statusCell = row.find('td:nth-child(5)');
+                                
+                                // Fallback in case the structure is different
+                                if (statusCell.find('.status-badge').length === 0) {
+                                    console.log("Status cell not found at 5th column, searching for status badge");
+                                    statusCell = row.find('td .status-badge').parent();
+                                }
+                                
+                                const badgeClass = getStatusBadgeClass(newStatus);
+                                const icon = getStatusIcon(newStatus);
+                                
+                                // Update status cell
+                                statusCell.html(`
+                                    <span class="status-badge status-${badgeClass}">
+                                        <i class="bi bi-${icon} mr-1"></i>
+                                        ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}
+                                    </span>
+                                `);
+                                
+                                // Also update the data attribute on the update button for future status changes
+                                row.find('.update-status').attr('data-current-status', newStatus);
+                                
+                                // Show success message
+                                const alertHtml = `
+                                    <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+                                        <i class="bi bi-check-circle-fill me-2"></i> Order #${orderId} status updated successfully to ${newStatus}
+                                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                    </div>`;
+                                $('.content-wrapper').prepend(alertHtml);
+                                
+                                // Close the modal
+                                $('#updateStatusModal').modal('hide');
+                                
+                                // Auto dismiss the alert after 5 seconds
+                                setTimeout(function() {
+                                    $('.alert').alert('close');
+                                }, 5000);
+                            } else {
+                                // Show error message
+                                showErrorAlert(response.message || "Failed to update order status. Please try again.");
+                                console.error("Status update failed:", response.message);
+                            }
+                        } catch(e) {
+                            console.error("Error processing response:", e);
+                            showErrorAlert("Failed to update order status. Please try again.");
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("AJAX Error:", xhr.responseText);
+                        showErrorAlert("Network error. Please check your connection and try again.");
+                    },
+                    complete: function() {
+                        // Restore button state
+                        submitBtn.prop('disabled', false).html(originalBtnText);
+                    }
+                });
+            });
+            
+            function showErrorAlert(message) {
+                const alertHtml = `
+                    <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> ${message}
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>`;
+                $('.content-wrapper').prepend(alertHtml);
+                
+                // Auto dismiss after 5 seconds
+                setTimeout(function() {
+                    $('.alert').alert('close');
+                }, 5000);
+            }
+            
             // Filter functionality
             const filterOrders = () => {
                 const statusFilter = $('#statusFilter').val().toLowerCase();

@@ -234,86 +234,141 @@ if ($admin_user_id) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        /* Add admin header styling */
+        /* Update admin header styling */
         .admin-header {
             background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
             color: white;
             padding: 10px 0;
         }
+
         .admin-badge {
-            background-color: #6a11cb;
+            background-color: rgba(255,255,255,0.2);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.3);
             color: white;
-            font-size: 0.8rem;
-            padding: 3px 8px;
-            border-radius: 4px;
-            margin-left: 10px;
+            font-size: 0.85rem;
+            padding: 4px 12px;
+            border-radius: 20px;
+            margin-left: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-    
+
+        /* Improve card styling */
+        .pickup-card {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+
+        .pickup-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+
+        .pickup-card .card-header {
+            background: linear-gradient(to right, #f8f9fa, #ffffff);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            padding: 15px;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .status-label {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-completed {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-canceled {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Improve search and filter container */
+        .search-container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+        }
+
+        .search-container .input-group-text {
+            background: transparent;
+            border-right: none;
+        }
+
+        .search-container .form-control {
+            border-left: none;
+            padding-left: 0;
+        }
+
+        .search-container .form-control:focus {
+            box-shadow: none;
+        }
+
+        /* Enhance pagination */
+        .pagination .page-link {
+            border-radius: 8px;
+            margin: 0 3px;
+            border: none;
+            color: #2193b0;
+            padding: 8px 16px;
+        }
+
+        .pagination .page-item.active .page-link {
+            background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(33, 147, 176, 0.3);
+        }
+
+        /* Empty state styling */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+        }
+
+        /* Page header styling for positioning logout button */
         .page-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
-            padding: 0.5rem 0;
-        }
-        /* Card styling */
-        .pickup-card {
-            transition: transform 0.2s;
-            border: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .pickup-card:hover {
-            transform: translateY(-5px);
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
         }
 
-        /* Batch action buttons styling */
-        .batch-actions-bar .btn {
-            height: 36px; /* Fixed height */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 500;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.5px;
-            padding: 0.25rem 0.5rem;
-            margin: 0 4px; /* Even spacing between buttons */
-            min-width: 110px; /* Minimum width to ensure uniformity */
-        }
-        
-        .batch-actions-bar .d-flex {
-            gap: 8px; /* Consistent spacing between flex items */
-        }
-        
-        .batch-actions-bar .bi {
-            margin-right: 6px;
-            font-size: 1rem;
-        }
-        
-        .batch-actions-bar .card {
-            border: none;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-        }
-        
-        .batch-actions-bar .card-body {
-            padding: 1rem;
-        }
-        
-        .batch-actions-bar .card-title {
-            font-size: 1rem;
-            margin-bottom: 0.75rem;
-        }
-        
-        /* Pickup checkbox styling */
-        .custom-control-input:checked ~ .custom-control-label::before {
-            background-color: #28a745;
-            border-color: #28a745;
-        }
-        
-        .custom-checkbox {
-            margin-right: 10px;
+        .page-header .header-content {
+            flex-grow: 1;
         }
 
+        .page-header .logout-container {
+            flex-shrink: 0;
+            margin-left: 20px;
+        }
+
+        /* Modal improvements */
+        .modal-content {
+            border-radius: 12px;
+            border: none;
+        }
     </style>
 </head>
 <body>
@@ -339,11 +394,11 @@ if ($admin_user_id) {
 
                 <!-- Update header section with page-header class -->
                 <div class="page-header">
-                    <div>
+                    <div class="header-content">
                         <h1 class="h2"><i class="bi bi-truck"></i> Pickup Management</h1>
                         <p class="text-muted">Manage and track all product pickups in one place</p>
                     </div>
-                    <form method="POST" onsubmit="return confirm('Are you sure you want to logout?');">
+                    <form method="POST" onsubmit="return confirm('Are you sure you want to logout?');" class="logout-container">
                         <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                         <button type="submit" name="logout" class="btn btn-danger">
                             <i class="bi bi-box-arrow-right"></i> Logout
@@ -566,10 +621,8 @@ if ($admin_user_id) {
 
                                     <div class="form-group">
                                         <label for="pickup_status"><i class="bi bi-tag"></i> Pickup Status</label>
-                                        <select class="form-control" id="pickup_status" name="pickup_status">
-                                            <option value="pending">Pending</option>
-                                            <option value="assigned">Assigned</option>
-                                            <option value="in_transit">In Transit</option>
+                                        <select class="form-control" id="pickup_status" name="pickup_status">                                            <option value="pending">Pending</option>
+                                            <option value="ready">Ready</option>
                                             <option value="completed">Completed</option>
                                             <option value="canceled">Canceled</option>
                                         </select>

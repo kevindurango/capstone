@@ -26,6 +26,7 @@
 .gradient-text {
   background: linear-gradient(to right, #212121, #28a745);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 0.25rem;
 }
@@ -150,4 +151,43 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+/* Alert Notifications Styling */
+main[role="main"] .alert {
+  position: relative;
+  z-index: 1030; /* Higher z-index to ensure it appears above other elements */
+  margin-bottom: 1rem;
+  width: calc(100% - 20px); /* Leave some space on the sides */
+  max-width: 100%;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  right: 0;
+  left: 0;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Animation for alerts */
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+main[role="main"] .alert-success {
+  animation: slideDown 0.3s ease-out forwards;
+  border-left: 4px solid #28a745;
+  background-color: rgba(40, 167, 69, 0.1);
+}
+
+main[role="main"] .alert-danger {
+  animation: slideDown 0.3s ease-out forwards;
+  border-left: 4px solid #dc3545;
+  background-color: rgba(220, 53, 69, 0.1);
 }

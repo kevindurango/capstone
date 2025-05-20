@@ -29,12 +29,20 @@ $startDateFilter = isset($_GET['start_date']) ? $_GET['start_date'] : '';
 $endDateFilter = isset($_GET['end_date']) ? $_GET['end_date'] : '';
 
 // Update Pickup Logic
-if (isset($_POST['update_pickup'])) {
-    $pickup_id = $_POST['pickup_id'];
+if (isset($_POST['update_pickup'])) {    $pickup_id = $_POST['pickup_id'];
     $pickup_status = $_POST['pickup_status'];
     $pickup_date = $_POST['pickup_date'];
     $pickup_notes = $_POST['pickup_notes'];
     $contact_person = $_POST['contact_person'] ?? null;
+      // Validate pickup status
+    $valid_statuses = ['pending', 'ready', 'completed', 'canceled'];
+    $pickup_status = strtolower(trim($pickup_status)); // Normalize the status
+    if (!in_array($pickup_status, $valid_statuses)) {
+        $_SESSION['message'] = "Invalid pickup status. Must be one of: " . implode(', ', $valid_statuses);
+        $_SESSION['message_type'] = 'danger';
+        header("Location: manager-pickup-management.php");
+        exit();
+    }
 
     // Get the old pickup data for logging
     $oldDataQuery = "SELECT * FROM pickups WHERE pickup_id = :pickup_id";
@@ -145,18 +153,17 @@ $todayQuery = "SELECT COUNT(*) FROM pickups WHERE DATE(pickup_date) = CURDATE()"
 $todayStmt = $conn->query($todayQuery);
 $todayPickups = $todayStmt->fetchColumn();
 
-// Count assigned pickups - Update the query to get accurate count
-$assignedQuery = "SELECT COUNT(*) FROM pickups WHERE pickup_status = 'assigned'";
-$assignedStmt = $conn->query($assignedQuery);
-$assignedPickups = $assignedStmt->fetchColumn();
+// Count ready pickups - Update the query to get accurate count
+$readyQuery = "SELECT COUNT(*) FROM pickups WHERE pickup_status = 'ready'";
+$readyStmt = $conn->query($readyQuery);
+$readyPickups = $readyStmt->fetchColumn();
 
 // Get card header colors for different pickup statuses with gradients
 $statusColors = [
     'pending' => 'linear-gradient(135deg, #fff3cd 0%, #ffffff 100%)',    // Light yellow to white gradient
-    'scheduled' => 'linear-gradient(135deg, #d1ecf1 0%, #ffffff 100%)',  // Light blue to white gradient
+    'ready' => 'linear-gradient(135deg, #cce5ff 0%, #ffffff 100%)',      // Light blue to white gradient
     'completed' => 'linear-gradient(135deg, #d4edda 0%, #ffffff 100%)',  // Light green to white gradient
-    'cancelled' => 'linear-gradient(135deg, #f8d7da 0%, #ffffff 100%)',  // Light red to white gradient
-    'assigned' => 'linear-gradient(135deg, #e2e3e5 0%, #ffffff 100%)',   // Light gray to white gradient
+    'canceled' => 'linear-gradient(135deg, #f8d7da 0%, #ffffff 100%)',   // Light red to white gradient
     'default' => 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)'     // Default light gradient
 ];
 
@@ -233,177 +240,480 @@ if (isset($_POST['logout'])) {
     <link rel="stylesheet" href="../../public/style/admin-sidebar.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-    <style>
-        body {
+    <style>        body {
             font-family: 'Poppins', sans-serif;
             background-color: #f8f9fa;
             color: #343a40;
         }
-
-        .manager-header {
+        
+        /* Animation keyframes */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(-10px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        /* Apply animations */
+        .stats-card {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+        
+        .stats-card:nth-child(1) { animation-delay: 0.1s; }
+        .stats-card:nth-child(2) { animation-delay: 0.2s; }
+        .stats-card:nth-child(3) { animation-delay: 0.3s; }
+        .stats-card:nth-child(4) { animation-delay: 0.4s; }
+        
+        .pickup-card {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        
+        .export-card, .filter-card {
+            animation: slideIn 0.5s ease-out forwards;
+        }
+        
+        /* Hover animation for buttons */
+        .btn-primary:hover, .btn-success:hover, .export-btn:hover {
+            animation: pulse 0.5s ease-in-out;
+        }.manager-header {
             background: linear-gradient(135deg, #1a8754 0%, #34c38f 100%);
             color: white;
-            padding: 15px 0;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 18px 0;
+            margin-bottom: 25px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.08);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .manager-header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background: radial-gradient(circle at top right, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 60%);
+            z-index: 1;
+            pointer-events: none;
         }
         
         .manager-badge {
             background-color: #157347;
             color: white;
             font-size: 0.8rem;
-            padding: 3px 8px;
-            border-radius: 4px;
-            margin-left: 10px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            margin-left: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
         .page-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #e9ecef;
+            margin-bottom: 2rem;
+            padding: 0.75rem 0;
+            border-bottom: 2px solid rgba(40, 167, 69, 0.1);
+            position: relative;
+        }
+        
+        .page-header::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 80px;
+            height: 2px;
+            background: linear-gradient(90deg, #28a745, transparent);
         }
         
         .breadcrumb {
             background-color: transparent;
             padding: 0.75rem 0;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
             font-size: 0.9rem;
+            display: flex;
+            align-items: center;
         }
         
         .breadcrumb-item a {
             color: #28a745;
             text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+        }
+        
+        .breadcrumb-item a i {
+            margin-right: 5px;
+            font-size: 1.1em;
         }
         
         .breadcrumb-item a:hover {
-            text-decoration: underline;
+            color: #218838;
+            text-decoration: none;
+            transform: translateX(2px);
         }
         
         .breadcrumb-item.active {
-            color: #6c757d;
+            color: #495057;
+            font-weight: 600;
         }
         
-        /* Card styling fixes */
+        /* Section heading style */
+        .section-heading {
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #343a40;
+            font-weight: 700;
+        }
+        
+        .section-heading::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, #28a745, transparent);
+            border-radius: 3px;
+        }
+        
+        .section-heading i {
+            color: #28a745;
+        }/* Card styling improvements */
         .stats-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07), 0 2px 8px rgba(0, 0, 0, 0.05);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            transition: all 0.3s ease;
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
             height: 100%;
-            border-left: 4px solid #28a745;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+            border: 1px solid rgba(255, 255, 255, 0.8);
         }
-
+        
+        .stats-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 6px;
+            height: 100%;
+            background: linear-gradient(to bottom, #28a745, #20c997);
+            transition: all 0.3s ease;
+            border-top-left-radius: 20px;
+            border-bottom-left-radius: 20px;
+        }
+        
         .stats-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+            transform: translateY(-7px);
+            box-shadow: 0 14px 28px rgba(40, 167, 69, 0.18), 0 5px 10px rgba(40, 167, 69, 0.12);
+        }
+        
+        .stats-card:hover::before {
+            width: 10px;
+            background: linear-gradient(to bottom, #34ce57, #28a745);
+            box-shadow: 0 0 15px rgba(40, 167, 69, 0.5);
         }
         
         .stats-card .icon {
-            font-size: 2.2rem;
+            font-size: 2.4rem;
             color: #28a745;
-            opacity: 0.8;
-            transition: all 0.3s ease;
+            opacity: 0.9;
+            transition: all 0.4s ease;
+            background: linear-gradient(135deg, rgba(40, 167, 69, 0.12) 0%, rgba(40, 167, 69, 0.05) 100%);
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(40, 167, 69, 0.15);
         }
         
         .stats-card:hover .icon {
             opacity: 1;
-            transform: scale(1.1);
-        }
-    
-        .stats-card .count {
-            font-size: 2rem;
-            font-weight: 700;
+            transform: scale(1.15) rotate(8deg);
+            background: linear-gradient(135deg, rgba(40, 167, 69, 0.18) 0%, rgba(40, 167, 69, 0.09) 100%);
+            box-shadow: 0 6px 15px rgba(40, 167, 69, 0.25);
+        }        .stats-card .count {
+            font-size: 2.6rem;
+            font-weight: 800;
             margin: 0;
-            color: #343a40;
+            color: #2d3436;
+            line-height: 1.1;
+            background: linear-gradient(135deg, #212529, #28a745);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            transition: all 0.4s ease;
+            text-shadow: 0px 2px 4px rgba(0, 0, 0, 0.05);
+            letter-spacing: -0.5px;
+        }
+        
+        .stats-card:hover .count {
+            transform: scale(1.08);
+            background: linear-gradient(135deg, #212529, #34ce57);
+            -webkit-background-clip: text;
+            background-clip: text;
         }
         
         .stats-card .title {
             font-size: 0.95rem;
             color: #6c757d;
-            margin: 0;
-            font-weight: 500;
+            margin: 0 0 8px 0;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            position: relative;
+            padding-bottom: 10px;
+            transition: all 0.3s ease;
         }
         
-        /* Status label styling */
+        .stats-card:hover .title {
+            color: #495057;
+        }
+        
+        .stats-card .title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 30px;
+            height: 3px;
+            background: linear-gradient(to right, rgba(40, 167, 69, 0.8), rgba(40, 167, 69, 0.3));
+            border-radius: 6px;
+            transition: all 0.4s ease;
+        }
+        
+        .stats-card:hover .title::after {
+            width: 50px;
+            background: linear-gradient(to right, rgba(52, 206, 87, 0.9), rgba(40, 167, 69, 0.4));
+        }
+          /* Status label styling */
         .status-label {
-            padding: 5px 12px;
-            border-radius: 25px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.7px;
             text-transform: uppercase;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+        
+        .status-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.12);
         }
         
         .status-pending {
-            background-color: #fff3cd;
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
             color: #856404;
+            border: 1px solid rgba(255, 193, 7, 0.2);
         }
         
-        .status-scheduled {
-            background-color: #d1ecf1;
+        .status-ready {
+            background: linear-gradient(135deg, #d1ecf1 0%, #c3e6f5 100%);
             color: #0c5460;
+            border: 1px solid rgba(23, 162, 184, 0.2);
         }
         
         .status-completed {
-            background-color: #d4edda;
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
             color: #155724;
+            border: 1px solid rgba(40, 167, 69, 0.2);
         }
         
-        .status-cancelled {
-            background-color: #f8d7da;
+        .status-canceled {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
             color: #721c24;
+            border: 1px solid rgba(220, 53, 69, 0.2);
         }
         
-        /* Pickup card improvements */
-        .pickup-card {
-            transition: all 0.3s ease;
+        /* Badge styling enhancement */
+        .badge-pill {
+            padding: 0.6em 1em;
+            border-radius: 50rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* Button styling enhancements */
+        .pickup-card .btn {
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-radius: 10px;
+            font-weight: 600;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            letter-spacing: 0.3px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+        }
+        
+        .pickup-card .btn:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.15);
+        }
+        
+        .pickup-card .btn-primary {
+            background: linear-gradient(135deg, #007bff 0%, #0069d9 100%);
             border: none;
-            border-radius: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            margin-bottom: 24px;
+        }
+        
+        .pickup-card .btn-primary:hover {
+            background: linear-gradient(135deg, #0069d9 0%, #0056b3 100%);
+        }
+        
+        .pickup-card .btn-info {
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            border: none;
+        }
+        
+        .pickup-card .btn-info:hover {
+            background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
+        }/* Pickup card improvements */
+        .pickup-card {
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05), 0 6px 10px rgba(0,0,0,0.04);
+            margin-bottom: 30px;
             overflow: hidden;
+            position: relative;
+            background: white;
+            border: 1px solid rgba(0,0,0,0.03);
+            transform-origin: center bottom;
+        }
+        
+        .pickup-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            opacity: 0;
+            transition: all 0.4s ease;
         }
         
         .pickup-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+            transform: translateY(-8px) scale(1.01);
+            box-shadow: 0 16px 32px rgba(0,0,0,0.09), 0 8px 16px rgba(0,0,0,0.06);
+            border-color: rgba(40, 167, 69, 0.1);
+        }
+        
+        .pickup-card:hover::after {
+            opacity: 1;
+            height: 6px;
         }
         
         .pickup-card .card-header {
-            background-color: #f8f9fa;
-            border-bottom: 1px solid #e9ecef;
-            padding: 15px 18px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            padding: 18px 20px;
             font-weight: 600;
+            letter-spacing: 0.3px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .pickup-card .card-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: linear-gradient(to bottom, #28a745, #20c997);
+            opacity: 0.7;
+            transition: all 0.3s ease;
+        }
+        
+        .pickup-card:hover .card-header::before {
+            width: 7px;
+            opacity: 0.9;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.4);
         }
         
         .pickup-card .card-body {
-            padding: 18px;
+            padding: 24px 22px;
+            background: linear-gradient(135deg, #ffffff 0%, #fcfcfc 100%);
         }
         
         .pickup-card .card-body p {
-            margin-bottom: 10px;
+            margin-bottom: 14px;
             display: flex;
             align-items: center;
             font-size: 0.95rem;
+            line-height: 1.6;
+            transition: all 0.2s ease;
+        }
+        
+        .pickup-card:hover .card-body p {
+            transform: translateX(3px);
         }
         
         .pickup-card .card-body p i {
-            width: 24px;
-            margin-right: 10px;
-            color: #28a745;
+            width: 32px;
+            height: 32px;
+            margin-right: 14px;
+            color: white;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.25);
+            transition: all 0.3s ease;
+        }
+        
+        .pickup-card:hover .card-body p i {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 6px 12px rgba(40, 167, 69, 0.3);
         }
         
         .pickup-card .card-footer {
-            background-color: transparent;
-            padding: 12px 18px 18px;
-            border-top: none;
+            background-color: #fafafa;
+            padding: 16px 22px;
+            border-top: 1px dashed rgba(0,0,0,0.06);
+            transition: all 0.3s ease;
+        }
+        
+        .pickup-card:hover .card-footer {
+            background-color: #f0f7f2;
         }
         
         .pickup-card .btn-group .btn {
@@ -420,84 +730,336 @@ if (isset($_POST['logout'])) {
             font-size: 0.92rem;
             margin-top: 12px;
             border-left: 3px solid #dee2e6;
-        }
-        
-        /* Filter card styling */
+        }        /* Filter card styling */
         .filter-card {
             border: none;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+            border-radius: 22px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.05);
             overflow: hidden;
-            margin-bottom: 25px;
+            margin-bottom: 30px;
+            background: linear-gradient(145deg, #ffffff 0%, #fafafa 100%);
+            position: relative;
+            border: 1px solid rgba(0,0,0,0.03);
+            transition: all 0.4s ease;
+        }
+        
+        .filter-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 28px rgba(0,0,0,0.08), 0 6px 16px rgba(0,0,0,0.06);
+        }
+        
+        .filter-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            z-index: -1;
+            border-radius: 22px;
+            background: linear-gradient(to bottom right, #28a745 0%, #20c997 100%);
+            opacity: 0;
+            transition: all 0.4s ease;
+        }
+        
+        .filter-card:hover::before {
+            opacity: 0.05;
         }
         
         .filter-card .card-header {
-            background-color: #f8f9fa;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            padding: 15px 20px;
+            background: linear-gradient(145deg, #f8f9fa 0%, #ffffff 100%);
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+        }
+        
+        .filter-card:hover .card-header {
+            background: linear-gradient(145deg, #f0f9f2 0%, #f8fff9 100%);
+            border-bottom: 1px solid rgba(40, 167, 69, 0.1);
+        }
+        
+        .filter-card .card-header h5 {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 0;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+        
+        .filter-card .card-header h5 i {
+            color: #28a745;
+            font-size: 1.25rem;
+            transition: transform 0.3s ease;
+        }
+        
+        .filter-card:hover .card-header h5 i {
+            transform: rotate(-15deg);
+        }
+        
+        .filter-card .card-body {
+            padding: 24px;
         }
         
         .filter-card label {
-            font-weight: 500;
+            font-weight: 600;
             letter-spacing: 0.5px;
-            color: #495057;
-            margin-bottom: 6px;
+            color: #343a40;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+        
+        .filter-card label i {
+            color: #28a745;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        
+        .filter-card:hover label i {
+            transform: scale(1.1);
         }
         
         .filter-card .form-control {
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            transition: all 0.2s;
-            padding: 10px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            padding: 12px 18px;
+            background-color: #ffffff;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.02);
+            font-size: 0.95rem;
+            height: auto;
         }
         
         .filter-card .form-control:focus {
             border-color: #28a745;
-            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.2);
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.15);
+            transform: translateY(-2px);
         }
         
-        .active-filters {
-            border-top: 1px solid #e9ecef;
-            padding-top: 10px;
+        .filter-card .btn-primary {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 20px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .filter-card .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(40, 167, 69, 0.25);
+            background: linear-gradient(135deg, #34ce57, #2dd4a9);
+        }
+          .active-filters {
+            border-top: 1px dashed rgba(0,0,0,0.08);
+            padding-top: 15px;
+            margin-top: 10px;
+        }
+        
+        /* Pickup info styling enhancements */
+        .pickup-info {
+            padding: 15px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 12px;
+            margin: 10px 0;
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .pickup-card:hover .pickup-info {
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            border-color: rgba(40, 167, 69, 0.1);
+        }
+        
+        .pickup-date-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            position: relative;
+            padding-left: 8px;
+        }
+        
+        .pickup-date-badge i {
+            color: #28a745;
+            font-size: 1.1rem;
+        }
+        
+        .pickup-location {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 8px;
+            position: relative;
+            padding-left: 20px;
+            border-left: 2px dotted #dee2e6;
+            height: 30px;
+        }
+        
+        .pickup-location i {
+            color: #17a2b8;
+            font-size: 1.1rem;
+            position: absolute;
+            left: -10px;
+            background: white;
+            border-radius: 50%;
+            padding: 2px;
+        }
+        
+        /* Avatar circle enhancement */
+        .avatar-circle {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            border: 2px solid white;
+            transition: all 0.3s ease;
+        }
+        
+        .pickup-card:hover .avatar-circle {
+            transform: scale(1.05) rotate(5deg);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+        }
+        
+        /* Notes styling enhancement */
+        .pickup-notes {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 12px;
+            border-left: 4px solid #28a745;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        
+        .pickup-card:hover .pickup-notes {
+            background-color: #f0f9f2;
+            transform: translateX(5px);
+        }
+        
+        .notes-text {
+            color: #495057;
+            font-style: italic;
+            padding-left: 5px;
+        }
+        
+        .view-notes {
+            color: #28a745;
+            font-weight: 600;
         }
         
         .badge-info {
-            background-color: #17a2b8;
-            padding: 6px 10px;
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            padding: 8px 12px;
             border-radius: 25px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 4px rgba(23, 162, 184, 0.2);
+            margin: 4px;
+            transition: all 0.3s ease;
         }
         
-        /* Export section styling */
-        .export-card {
+        .badge-info:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(23, 162, 184, 0.25);
+        }
+        
+        /* Export section styling */        .export-card {
             border: none;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+            border-radius: 22px;
+            box-shadow: 0 8px 20px rgba(40, 167, 69, 0.08), 0 4px 10px rgba(40, 167, 69, 0.08);
             overflow: hidden;
-            margin-bottom: 25px;
-            background-color: #f8fff9;
-            border-left: 5px solid #28a745;
+            margin-bottom: 30px;
+            background: linear-gradient(145deg, #f8fff9 0%, #f0f9f2 100%);
+            position: relative;
+            border: 1px solid rgba(40, 167, 69, 0.08);
+            transition: all 0.4s ease;
+        }
+        
+        .export-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(40, 167, 69, 0.12), 0 6px 12px rgba(40, 167, 69, 0.1);
+            border-color: rgba(40, 167, 69, 0.15);
+        }
+        
+        .export-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 7px;
+            background: linear-gradient(to bottom, #28a745 0%, #20c997 100%);
+            border-radius: 0 3px 3px 0;
+            box-shadow: 2px 0 8px rgba(40, 167, 69, 0.15);
+            transition: all 0.3s ease;
+        }
+        
+        .export-card:hover::before {
+            width: 10px;
+            box-shadow: 3px 0 12px rgba(40, 167, 69, 0.25);
         }
         
         .export-card .card-header {
             background-color: transparent;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            padding: 15px 20px;
+            border-bottom: 1px solid rgba(40, 167, 69, 0.12);
+            padding: 20px 24px;
+            font-weight: 600;
+        }
+        
+        .export-card .card-header h5 {
+            color: #28a745;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0;
+        }
+        
+        .export-card .card-body {
+            padding: 24px;
         }
         
         .export-btn {
-            background-color: #28a745;
-            border-color: #28a745;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border: none;
             color: white;
-            padding: 10px 18px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.2s;
+            padding: 14px 22px;
+            border-radius: 12px;
+            font-weight: 600;
+            letter-spacing: 0.6px;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 12px rgba(40, 167, 69, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            text-transform: uppercase;
+            font-size: 0.9rem;
         }
         
         .export-btn:hover {
-            background-color: #218838;
-            border-color: #1e7e34;
+            background: linear-gradient(135deg, #34ce57 0%, #2dd4a9 100%);
             color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(40, 167, 69, 0.25);
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
@@ -1072,36 +1634,24 @@ if (isset($_POST['logout'])) {
           border-radius: 20px;
           font-size: 0.85rem;
           font-weight: 500;
+        }        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
         }
-
-        .status-pending {
-          background-color: #fff3cd;
-          color: #856404;
-        }
-
-        .status-scheduled {
-          background-color: #d1ecf1;
-          color: #0c5460;
-        }
-
+        
         .status-ready {
-          background-color: #d1ecf1;
-          color: #0c5460;
+            background-color: #cce5ff;
+            color: #004085;
         }
-
-        .status-in-transit {
-          background-color: #cce5ff;
-          color: #004085;
-        }
-
+        
         .status-completed {
-          background-color: #d4edda;
-          color: #155724;
+            background-color: #d4edda;
+            color: #155724;
         }
-
+        
         .status-canceled {
-          background-color: #f8d7da;
-          color: #721c24;
+            background-color: #f8d7da;
+            color: #721c24;
         }
 
         .pickup-notes {
@@ -1213,9 +1763,8 @@ if (isset($_POST['logout'])) {
                     </div>
                     <div class="col-md-3 mb-4">
                         <div class="stats-card">
-                            <div>
-                                <p class="title">Scheduled Pickups</p>
-                                <p class="count"><?= $assignedPickups ?></p>
+                            <div>                                <p class="title">Ready Pickups</p>
+                                <p class="count"><?= $readyPickups ?></p>
                             </div>
                             <div class="icon text-info">
                                 <i class="bi bi-clock-history"></i>
@@ -1380,24 +1929,26 @@ if (isset($_POST['logout'])) {
                             // Determine appropriate status colors and icons
                             $statusClass = 'secondary';
                             $statusIcon = 'question-circle';
-                            
-                            switch(strtolower($pickup['pickup_status'])) {
+                              switch(strtolower($pickup['pickup_status'])) {
                                 case 'pending':
                                     $statusClass = 'warning';
                                     $statusIcon = 'hourglass-split';
                                     break;
-                                case 'scheduled':
+                                case 'ready':
                                     $statusClass = 'info';
-                                    $statusIcon = 'calendar-check';
+                                    $statusIcon = 'check2-square';
                                     break;
                                 case 'completed':
                                     $statusClass = 'success';
                                     $statusIcon = 'check-circle';
                                     break;
-                                case 'cancelled':
+                                case 'canceled':
                                     $statusClass = 'danger';
                                     $statusIcon = 'x-circle';
                                     break;
+                                default:
+                                    $statusClass = 'secondary';
+                                    $statusIcon = 'question-circle';
                             }
                             
                             // Format dates
@@ -1566,15 +2117,14 @@ if (isset($_POST['logout'])) {
                 </div>
                 <div class="modal-body">
                     <form method="POST" action="" class="pickup-form">
-                        <input type="hidden" name="pickup_id" id="pickup_id">
-                        <div class="form-group">
-                            <label for="pickup_status"><i class="bi bi-tag"></i> Pickup Status</label>
-                            <select class="form-control" id="pickup_status" name="pickup_status">
+                        <input type="hidden" name="pickup_id" id="pickup_id">                        <div class="form-group">
+                            <label for="pickup_status"><i class="bi bi-tag"></i> Pickup Status</label>                            <select class="form-control" id="pickup_status" name="pickup_status">
                                 <option value="pending">Pending</option>
-                                <option value="scheduled">Scheduled</option>
+                                <option value="ready">Ready</option>
                                 <option value="completed">Completed</option>
-                                <option value="cancelled">Cancelled</option>
+                                <option value="canceled">Canceled</option>
                             </select>
+                            <small class="form-text text-muted">Valid statuses are: pending, ready, completed, or canceled</small>
                         </div>
                         <div class="form-group">
                             <label for="pickup_date"><i class="bi bi-calendar"></i> Pickup Date</label>

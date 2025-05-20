@@ -1,15 +1,18 @@
 export interface Product {
   id: number;
   name: string;
-  description: string;
+  description?: string;
   price: number;
-  unit: string;
   quantity_available: number;
-  image_url: string | null;
-  category: string;
-  farm_name: string;
-  farmer: string;
-  contact: string;
+  unit: string;
+  category?: string;
+  farm_name?: string;
+  farmer?: string;
+  contact?: string;
+  // Support both image naming conventions that might be used
+  image?: string | null;
+  image_url?: string | null;
+  // Add other properties as needed
 }
 
 export interface CartItem {

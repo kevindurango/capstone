@@ -9,7 +9,10 @@ declare module "expo-linear-gradient" {
     locations?: number[];
   }
 
-  const LinearGradient: ComponentType<LinearGradientProps>;
+  // Support for named import: import { LinearGradient } from "expo-linear-gradient"
+  export const LinearGradient: ComponentType<LinearGradientProps>;
 
-  export default LinearGradient;
+  // Provide proper type support for default import: import LinearGradient from "expo-linear-gradient"
+  declare const LinearGradientComponent: ComponentType<LinearGradientProps>;
+  export default LinearGradientComponent;
 }

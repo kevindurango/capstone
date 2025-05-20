@@ -18,6 +18,9 @@ export interface ProductData {
   image?: string | null;
   status?: string;
   current_image?: string;
+  barangay_id?: number | null;
+  field_id?: number | null;
+  categories?: number[];
 }
 
 /**
@@ -293,10 +296,32 @@ export class ProductService {
 
     if (productData.category_id) {
       formData.append("category_id", productData.category_id.toString());
+
+      // Also add as part of categories array for the backend
+      formData.append("categories[]", productData.category_id.toString());
     }
 
-    // Also add categories array for the backend
-    formData.append("categories[]", productData.category_id?.toString() || "");
+    // If there are additional categories in the product form, add them too
+    if (productData.categories && Array.isArray(productData.categories)) {
+      // Skip the first one if it matches category_id (already added)
+      const additionalCategories = productData.category_id
+        ? productData.categories.filter((c) => c !== productData.category_id)
+        : productData.categories;
+
+      // Add all additional categories
+      additionalCategories.forEach((categoryId) => {
+        formData.append("categories[]", categoryId.toString());
+      });
+    }
+
+    // Add barangay and field IDs if provided
+    if (productData.barangay_id) {
+      formData.append("barangay_id", productData.barangay_id.toString());
+    }
+
+    if (productData.field_id) {
+      formData.append("field_id", productData.field_id.toString());
+    }
 
     // Add the validated unit_type
     formData.append("unit_type", unitType);

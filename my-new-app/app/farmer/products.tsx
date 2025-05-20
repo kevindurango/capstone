@@ -1,29 +1,31 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
-  SafeAreaView,
-  StyleSheet,
-  Text,
   View,
+  Text,
+  StyleSheet,
   FlatList,
   TouchableOpacity,
   Image,
-  TextInput,
-  ActivityIndicator,
   Modal,
-  ScrollView,
+  TextInput,
   Alert,
+  ActivityIndicator,
   RefreshControl,
+  Platform,
+  ScrollView,
+  SafeAreaView,
 } from "react-native";
-import { COLORS } from "@/constants/Colors";
-import { useAuth } from "@/contexts/AuthContext";
-import { Redirect, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { useRouter, Redirect } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import IPConfig from "@/constants/IPConfig";
-import { ThemedText } from "@/components/ThemedText";
-import { Picker } from "@react-native-picker/picker";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "@/contexts/AuthContext";
 import { productService, ProductData } from "@/services/ProductService";
+import { ThemedText } from "@/components/ThemedText";
+import { COLORS } from "@/constants/Colors";
+import IPConfig from "@/constants/IPConfig";
 import { getImageUrl } from "@/constants/Config";
+import ProductImage from "@/components/ui/ProductImage";
+import { Picker } from "@react-native-picker/picker";
 
 // Product type definition based on database schema
 interface Product {
@@ -37,8 +39,17 @@ interface Product {
   image: string | null;
   stock: number;
   unit_type: string;
-  categories: string;
-  category_ids?: string;
+  categories: string; // String representation of categories for display
+  category_ids?: string; // Comma-separated IDs from API
+  category_objects?: Category[]; // Properly typed category objects
+  barangay_id?: number;
+  field_id?: number;
+  // Additional fields for location tracking
+  barangay_name?: string;
+  field_name?: string;
+  // Production metrics
+  estimated_production?: number;
+  production_unit?: string;
 }
 
 // Product statistics type
@@ -55,6 +66,20 @@ interface Category {
   category_name: string;
 }
 
+// Barangay type
+interface Barangay {
+  barangay_id: number;
+  barangay_name: string;
+}
+
+// Field type
+interface Field {
+  field_id: number;
+  field_name: string;
+  barangay_id: number;
+  farmer_id: number;
+}
+
 // Product form for add/edit operations
 interface ProductForm {
   name: string;
@@ -64,7 +89,193 @@ interface ProductForm {
   unit_type: string;
   selectedCategories: number[];
   image: any;
+  barangay_id: number | null;
+  field_id: number | null;
+  // Form validation errors
+  errors?: {
+    name?: string;
+    price?: string;
+    stock?: string;
+    categories?: string;
+    barangay?: string;
+    field?: string;
+    image?: string;
+  };
 }
+
+// Validate product form fields and return errors
+const validateProductForm = (
+  form: ProductForm
+): { isValid: boolean; errors: ProductForm["errors"] } => {
+  const errors: ProductForm["errors"] = {};
+  let isValid = true;
+
+  // Validate name
+  if (!form.name.trim()) {
+    errors.name = "Product name is required";
+    isValid = false;
+  }
+
+  // Validate price
+  if (
+    !form.price ||
+    isNaN(parseFloat(form.price)) ||
+    parseFloat(form.price) <= 0
+  ) {
+    errors.price = "Valid price greater than zero is required";
+    isValid = false;
+  }
+
+  // Validate stock
+  if (!form.stock || isNaN(parseInt(form.stock)) || parseInt(form.stock) < 0) {
+    errors.stock = "Valid stock quantity is required";
+    isValid = false;
+  }
+
+  // Validate categories
+  if (form.selectedCategories.length === 0) {
+    errors.categories = "At least one category must be selected";
+    isValid = false;
+  }
+
+  return { isValid, errors };
+};
+
+/**
+ * Product list item component
+ */
+const ProductListItem = ({
+  item,
+  onEdit,
+  onDelete,
+}: {
+  item: Product;
+  onEdit: (product: Product) => void;
+  onDelete: (productId: number) => void;
+}) => {
+  // Format status for display with appropriate color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "approved":
+        return "#4CAF50";
+      case "rejected":
+        return "#F44336";
+      default:
+        return "#FFC107";
+    }
+  };
+
+  // Format price with proper currency symbol
+  const formatPrice = (price: number) => {
+    return `₱${price.toFixed(2)}`;
+  };
+
+  // Check if this product has location data (formatted as part of ProductListItem component)
+  const hasLocation = item.barangay_id || item.field_id;
+
+  return (
+    <View style={styles.productItemContainer}>
+      <View style={styles.productImageContainer}>
+        <ProductImage
+          imagePath={item.image}
+          style={styles.productImage}
+          productId={item.product_id}
+        />
+      </View>
+
+      <View style={styles.productDetails}>
+        <Text style={styles.productName}>{item.name}</Text>
+        <Text style={styles.productDescription} numberOfLines={2}>
+          {item.description || "No description"}
+        </Text>
+
+        <View style={styles.productMetaRow}>
+          <Text style={styles.productPrice}>{formatPrice(item.price)}</Text>
+          <Text style={styles.productStock}>Stock: {item.stock}</Text>
+        </View>
+
+        <View style={styles.productCategoryRow}>
+          {item.categories &&
+            item.categories.split(",").map((category, index) => (
+              <View key={index} style={styles.categoryTag}>
+                <Text style={styles.categoryText}>{category}</Text>
+              </View>
+            ))}
+          {hasLocation && (
+            <View style={[styles.categoryTag, styles.locationTag]}>
+              <Ionicons name="location" size={12} color={COLORS.primary} />
+              <Text style={styles.locationText}>Location assigned</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.productStatusRow}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: getStatusColor(item.status) },
+            ]}
+          >
+            <Text style={styles.statusText}>
+              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.productActions}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => onEdit(item)}
+        >
+          <Ionicons name="create-outline" size={20} color="#FFF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => onDelete(item.product_id)}
+        >
+          <Ionicons name="trash-outline" size={20} color="#FFF" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+// Add this new component for displaying current location information
+const LocationDisplay = ({
+  barangay_id,
+  field_id,
+  barangays,
+  fields,
+}: {
+  barangay_id: number | null;
+  field_id: number | null;
+  barangays: Barangay[];
+  fields: Field[];
+}) => {
+  const barangayName =
+    barangays.find((b: Barangay) => b.barangay_id === barangay_id)
+      ?.barangay_name || "Not assigned";
+  const fieldName =
+    fields.find((f: Field) => f.field_id === field_id)?.field_name ||
+    "Not assigned";
+
+  return (
+    <View style={styles.locationDisplay}>
+      <Text style={styles.locationTitle}>Current Location:</Text>
+      <View style={styles.locationItemInDisplay}>
+        <Text style={styles.locationLabel}>Barangay:</Text>
+        <Text style={styles.locationValue}>{barangayName}</Text>
+      </View>
+      {field_id && (
+        <View style={styles.locationItemInDisplay}>
+          <Text style={styles.locationLabel}>Field:</Text>
+          <Text style={styles.locationValue}>{fieldName}</Text>
+        </View>
+      )}
+    </View>
+  );
+};
 
 /**
  * Farmer Products Screen
@@ -88,26 +299,12 @@ export default function FarmerProducts() {
   });
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-
-  // Modal states
   const [modalVisible, setModalVisible] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentProductId, setCurrentProductId] = useState<number | null>(null);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-
-  // Form state
-  const [form, setForm] = useState<ProductForm>({
-    name: "",
-    description: "",
-    price: "",
-    stock: "",
-    unit_type: "kilogram",
-    selectedCategories: [],
-    image: null,
-  });
-
-  // Units available for products
-  const unitTypes = [
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [unitTypes, setUnitTypes] = useState([
     "kilogram",
     "gram",
     "piece",
@@ -122,7 +319,33 @@ export default function FarmerProducts() {
     "bottle",
     "dozen",
     "container",
-  ];
+  ]);
+  const [form, setForm] = useState<ProductForm>({
+    name: "",
+    description: "",
+    price: "",
+    stock: "",
+    unit_type: "kilogram",
+    selectedCategories: [],
+    image: null,
+    barangay_id: null,
+    field_id: null,
+  });
+  const [barangays, setBarangays] = useState<Barangay[]>([]);
+  const [fields, setFields] = useState<Field[]>([]);
+  const [filteredFields, setFilteredFields] = useState<Field[]>([]);
+
+  // Format status for display with appropriate color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "approved":
+        return "#4CAF50";
+      case "rejected":
+        return "#F44336";
+      default:
+        return "#FFC107";
+    }
+  };
 
   // Function to fetch products
   const fetchProducts = useCallback(async () => {
@@ -130,8 +353,10 @@ export default function FarmerProducts() {
 
     try {
       setIsLoading(true);
+
+      // Add a parameter to include location data in the response
       const response = await fetch(
-        `${IPConfig.API_BASE_URL}/farmer/farmer_products.php?user_id=${user.user_id}`
+        `${IPConfig.API_BASE_URL}/farmer/farmer_products.php?user_id=${user.user_id}&include_location=true`
       );
       const statsResponse = await fetch(
         `${IPConfig.API_BASE_URL}/farmer/farmer_products.php?user_id=${user.user_id}&stats=true`
@@ -141,8 +366,49 @@ export default function FarmerProducts() {
       const statsData = await statsResponse.json();
 
       if (data.success) {
-        setProducts(data.products || []);
-        setFilteredProducts(data.products || []);
+        const products = data.products || [];
+
+        // Pre-validate image URLs (run in parallel)
+        if (products.length > 0) {
+          console.log(
+            `[FarmerProducts] Pre-validating images for ${products.length} products`
+          );
+
+          // Check each product's image URL
+          const imageChecks = await Promise.all(
+            products
+              .filter((p: Product) => p.image) // Only check products with images
+              .map(async (product: Product) => {
+                const imageUrl = getImageUrl(product.image!);
+                const result = await checkImageUrl(
+                  imageUrl,
+                  product.product_id
+                );
+                return {
+                  productId: product.product_id,
+                  url: imageUrl,
+                  ...result,
+                };
+              })
+          );
+
+          console.log(
+            "[FarmerProducts] Image validation results:",
+            imageChecks.map(
+              (r) => `Product ${r.productId}: ${r.exists ? "OK" : "FAIL"}`
+            )
+          );
+        }
+
+        setProducts(products);
+        setFilteredProducts(products);
+        console.log(
+          "[Products] Products loaded with location data:",
+          products.filter((p: Product) => p.barangay_id || p.field_id).length +
+            " of " +
+            products.length +
+            " have location data"
+        );
       } else {
         console.error("Error fetching products:", data.message);
       }
@@ -176,6 +442,87 @@ export default function FarmerProducts() {
       console.error("Error fetching categories:", error);
     }
   }, []);
+
+  // Fetch barangays and fields
+  useEffect(() => {
+    if (user?.user_id) {
+      fetchBarangays();
+      fetchFields();
+    }
+  }, [user?.user_id]); // Use all farmer's fields directly - each field already has barangay info
+  useEffect(() => {
+    // Set filtered fields to all fields that belong to this farmer
+    // This runs when fields are loaded or when user changes
+    if (fields.length > 0) {
+      console.log(
+        `[Products] Using all ${fields.length} farmer fields for selection`
+      );
+      setFilteredFields(fields);
+    }
+  }, [fields]);
+
+  const fetchBarangays = async () => {
+    try {
+      const response = await fetch(`${IPConfig.API_BASE_URL}/barangays.php`);
+      const data = await response.json();
+
+      if (data.success) {
+        setBarangays(data.barangays || []);
+      } else {
+        console.error("Failed to fetch barangays:", data.message);
+        // Fallback barangay data
+        setBarangays([
+          { barangay_id: 1, barangay_name: "Balayagmanok" },
+          { barangay_id: 2, barangay_name: "Balili" },
+          { barangay_id: 3, barangay_name: "Bongbong Central" },
+          { barangay_id: 4, barangay_name: "Cambucad" },
+          { barangay_id: 5, barangay_name: "Caidiocan" },
+        ]);
+      }
+    } catch (error) {
+      console.error("Error fetching barangays:", error);
+      // Fallback barangay data
+      setBarangays([
+        { barangay_id: 1, barangay_name: "Balayagmanok" },
+        { barangay_id: 2, barangay_name: "Balili" },
+        { barangay_id: 3, barangay_name: "Bongbong Central" },
+        { barangay_id: 4, barangay_name: "Cambucad" },
+        { barangay_id: 5, barangay_name: "Caidiocan" },
+      ]);
+    }
+  };
+
+  // Update the fetchFields function to explicitly filter for the logged-in farmer's fields
+  const fetchFields = async () => {
+    if (!user?.user_id) {
+      console.error("No user ID available");
+      return [];
+    }
+
+    try {
+      const response = await fetch(
+        `${IPConfig.API_BASE_URL}/farmer/farmer_fields.php?farmer_id=${user.user_id}`
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        const fields = data.fields || [];
+        setFields(fields);
+        return fields;
+      } else {
+        console.error("Error fetching fields:", data.message);
+        Alert.alert("Error", "Failed to fetch fields. Please try again.");
+        return [];
+      }
+    } catch (error) {
+      console.error("Error fetching fields:", error);
+      Alert.alert(
+        "Error",
+        "Failed to fetch fields. Please check your connection."
+      );
+      return [];
+    }
+  };
 
   // Load data on component mount
   useEffect(() => {
@@ -228,6 +575,8 @@ export default function FarmerProducts() {
       unit_type: "kilogram",
       selectedCategories: [],
       image: null,
+      barangay_id: null,
+      field_id: null,
     });
     setCurrentProductId(null);
     setSelectedImageUri(null);
@@ -239,34 +588,100 @@ export default function FarmerProducts() {
     resetForm();
     setModalVisible(true);
   };
-
   // Handle edit product data
-  const handleEditProduct = (product: Product) => {
+  const handleEditProduct = async (product: Product) => {
     setIsEditMode(true);
     setCurrentProductId(product.product_id);
 
-    // Parse category IDs if they exist
-    const categoryIds = product.category_ids
-      ? product.category_ids.split(",").map((id) => parseInt(id))
-      : [];
+    try {
+      // Parse category IDs if they exist
+      const categoryIds = product.category_ids
+        ? product.category_ids.split(",").map((id) => parseInt(id))
+        : [];
 
-    // Make sure unit_type is a proper string value, not just "0"
-    const unit =
-      product.unit_type && unitTypes.includes(product.unit_type)
+      // Make sure unit_type is a proper string value
+      const validUnitType = unitTypes.includes(product.unit_type)
         ? product.unit_type
         : "kilogram";
 
-    setForm({
-      name: product.name,
-      description: product.description,
-      price: product.price.toString(),
-      stock: product.stock.toString(),
-      unit_type: unit,
-      selectedCategories: categoryIds,
-      image: product.image,
-    });
+      // First ensure we have the latest fields data that belong to this farmer
+      const currentFields = await fetchFields();
+      console.log(
+        `[Products] Loaded ${currentFields.length} fields for edit from farmer ID: ${user?.user_id}`
+      );
 
-    setModalVisible(true);
+      // Then fetch product's location data
+      const locationInfo = await fetchProductLocation(product.product_id);
+      console.log(`[Products] Product location data:`, locationInfo);
+
+      // Set form state with product data
+      setForm({
+        name: product.name,
+        description: product.description || "",
+        price: product.price.toString(),
+        stock: product.stock.toString(),
+        unit_type: validUnitType,
+        selectedCategories: categoryIds,
+        image: product.image,
+        barangay_id: locationInfo?.barangay_id || null,
+        field_id: locationInfo?.field_id || null,
+      });
+
+      // Set all farmer's fields for selection
+      setFields(currentFields);
+
+      // Set selected image URI if it exists
+      if (product.image) {
+        setSelectedImageUri(getImageUrl(product.image));
+      } else {
+        setSelectedImageUri(null);
+      }
+
+      setModalVisible(true);
+    } catch (error) {
+      console.error("[Products] Error setting up edit form:", error);
+      Alert.alert("Error", "Failed to load product data. Please try again.");
+    }
+  };
+  // Fetch product location info (barangay and field)
+  const fetchProductLocation = async (productId: number) => {
+    try {
+      console.log(`[Products] Fetching location for product ID: ${productId}`);
+
+      // Use full URL for clarity and include farmer_id to ensure we only get fields belonging to this farmer
+      const apiUrl = `${IPConfig.API_BASE_URL}/farmer/product_location.php?product_id=${productId}&farmer_id=${user?.user_id}`;
+      console.log(`[Products] Location API URL: ${apiUrl}`);
+
+      const response = await fetch(apiUrl);
+      const responseText = await response.text();
+      console.log(`[Products] Raw location response: ${responseText}`);
+
+      try {
+        const data = JSON.parse(responseText);
+
+        if (data.success) {
+          console.log(
+            `[Products] Location data: barangay_id=${data.barangay_id}, field_id=${data.field_id}`
+          );
+          return {
+            barangay_id: data.barangay_id ? parseInt(data.barangay_id) : null,
+            field_id: data.field_id ? parseInt(data.field_id) : null,
+          };
+        } else {
+          console.error(`[Products] Failed to fetch location: ${data.message}`);
+        }
+      } catch (parseError) {
+        console.error(
+          "[Products] Error parsing location response:",
+          parseError
+        );
+      }
+
+      return null;
+    } catch (error) {
+      console.error("[Products] Error fetching product location:", error);
+      return null;
+    }
   };
 
   // Handle image picking
@@ -282,9 +697,9 @@ export default function FarmerProducts() {
       return;
     }
 
-    // Update to use the non-deprecated API
+    // Use the non-deprecated API - using string values for mediaTypes
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
@@ -301,106 +716,200 @@ export default function FarmerProducts() {
   const toggleCategory = (categoryId: number) => {
     const { selectedCategories } = form;
 
+    // If already selected, remove it
     if (selectedCategories.includes(categoryId)) {
+      // Update the selected categories, removing the one that was clicked
+      const updatedCategories = selectedCategories.filter(
+        (id) => id !== categoryId
+      );
+
       setForm({
         ...form,
-        selectedCategories: selectedCategories.filter(
-          (id) => id !== categoryId
-        ),
+        selectedCategories: updatedCategories,
       });
     } else {
+      // If this is the first category being selected, it becomes the primary
+      // Otherwise, add it to the end of the list
       setForm({
         ...form,
         selectedCategories: [...selectedCategories, categoryId],
       });
     }
   };
-
   // Submit product form
   const handleSubmitProduct = async () => {
-    // Basic validation
-    if (!form.name.trim()) {
-      Alert.alert("Error", "Please enter a product name");
-      return;
-    }
-
-    if (
-      !form.price.trim() ||
-      isNaN(parseFloat(form.price)) ||
-      parseFloat(form.price) <= 0
-    ) {
-      Alert.alert("Error", "Please enter a valid price");
-      return;
-    }
-
-    if (
-      !form.stock.trim() ||
-      isNaN(parseInt(form.stock)) ||
-      parseInt(form.stock) < 0
-    ) {
-      Alert.alert("Error", "Please enter a valid stock quantity");
-      return;
-    }
-
-    if (form.selectedCategories.length === 0) {
-      Alert.alert("Error", "Please select at least one category");
-      return;
-    }
-
     try {
-      setIsLoading(true);
+      // Validate form using our utility function
+      const { isValid, errors } = validateProductForm(form);
 
-      // Create product data for ProductService
-      const productData: ProductData = {
-        name: form.name,
-        description: form.description,
-        price: parseFloat(form.price),
-        stock: parseInt(form.stock),
-        farmer_id: user?.user_id || 0,
-        category_id: form.selectedCategories[0], // For now using first category
-        unit_type: form.unit_type,
-      };
+      if (!isValid) {
+        // Update form with errors
+        setForm({ ...form, errors });
 
-      // If editing, add current image path
-      if (isEditMode && typeof form.image === "string") {
-        productData.image = form.image;
+        // Show the first error in an alert
+        const firstError = errors
+          ? Object.values(errors).find((error) => error)
+          : undefined;
+        Alert.alert(
+          "Validation Error",
+          firstError || "Please check the form for errors"
+        );
+        return;
       }
 
-      let result;
+      // Clear any previous errors
+      setForm({ ...form, errors: {} });
 
-      // Use the ProductService to add/update the product
+      // Create FormData object
+      const formData = new FormData();
+      formData.append("user_id", user.user_id.toString());
+      formData.append("name", form.name);
+      formData.append("description", form.description || "");
+      formData.append("price", form.price);
+      formData.append("stock", form.stock);
+      formData.append("unit_type", form.unit_type);
+
+      // Add product_id to form data if in edit mode
       if (isEditMode && currentProductId) {
-        result = await productService.updateProduct(
-          currentProductId,
-          productData,
-          selectedImageUri || undefined
-        );
-      } else {
-        result = await productService.addProduct(
-          productData,
-          selectedImageUri || undefined
-        );
+        formData.append("product_id", currentProductId.toString());
       }
 
-      if (result.success) {
-        Alert.alert(
-          "Success",
-          isEditMode
-            ? "Product updated successfully"
-            : "Product added successfully"
-        );
-        setModalVisible(false);
-        fetchProducts();
-      } else {
-        Alert.alert(
-          "Error",
-          result.message || "Failed to process your request"
-        );
+      // Append categories as array
+      form.selectedCategories.forEach((categoryId) => {
+        formData.append("categories[]", categoryId.toString());
+      });
+
+      // Append field and barangay if selected
+      if (form.field_id) {
+        formData.append("field_id", form.field_id.toString());
       }
-    } catch (error) {
-      console.error("Error submitting product:", error);
-      Alert.alert("Error", "Failed to process your request. Please try again.");
-    } finally {
+      if (form.barangay_id) {
+        formData.append("barangay_id", form.barangay_id.toString());
+      }
+
+      // Handle image upload - this needs special attention to align with API
+      if (form.image && typeof form.image !== "string") {
+        // Only upload new image if it's not a string URL (meaning it's a new file)
+        const imageUri = form.image.uri;
+        const imageName = imageUri.split("/").pop() || "image.jpg";
+
+        // Create proper mimetype based on file extension
+        const fileExtension = imageName.split(".").pop()?.toLowerCase() || "";
+        let imageType = "image/jpeg"; // Default
+
+        if (fileExtension === "png") {
+          imageType = "image/png";
+        } else if (fileExtension === "gif") {
+          imageType = "image/gif";
+        }
+
+        // For native, properly format the file object for FormData
+        formData.append("image", {
+          uri: imageUri,
+          name: imageName,
+          type: imageType,
+        } as any);
+      } else if (selectedImageUri && !form.image) {
+        // Handle case where image is selected but not in form
+        const imageUri = selectedImageUri;
+        const imageName = imageUri.split("/").pop() || "image.jpg";
+        const imageType = "image/jpeg"; // Default to JPEG
+
+        formData.append("image", {
+          uri: imageUri,
+          name: imageName,
+          type: imageType,
+        } as any);
+      }
+
+      // Determine endpoint
+      const endpoint =
+        isEditMode && currentProductId
+          ? `${IPConfig.API_BASE_URL}/farmer/update_product.php`
+          : `${IPConfig.API_BASE_URL}/farmer/add_product.php`;
+
+      console.log(`[Products] Submitting to endpoint: ${endpoint}`);
+      // Log FormData contents in a type-safe way
+      const formDataEntries: Record<string, any> = {};
+      formData.forEach((value, key) => {
+        formDataEntries[key] = value;
+      });
+      console.log(`[Products] Form data keys:`, formDataEntries);
+
+      // For better debugging - add more logging
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          body: formData,
+          headers: {
+            Accept: "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          credentials: "same-origin",
+        });
+
+        // Add clearer response parsing
+        const text = await response.text();
+        console.log(
+          `[Products] Raw API response: ${text.substring(0, 200)}...`
+        );
+
+        try {
+          const data = JSON.parse(text);
+          if (data.success) {
+            Alert.alert(
+              "Success",
+              isEditMode
+                ? "Product updated successfully"
+                : "Product added successfully"
+            );
+            setModalVisible(false);
+            fetchProducts();
+          } else {
+            console.error(`[Products] API returned error:`, data);
+            throw new Error(data.message || "Server returned an error");
+          }
+        } catch (parseError) {
+          console.error("[Products] Failed to parse API response:", parseError);
+          throw new Error("Invalid server response");
+        }
+      } catch (err) {
+        console.error("[Products] Error saving product:", err);
+
+        // Show different messages based on error type
+        let errorMessage = "Failed to save product";
+        const error = err as Error;
+
+        if (error.name === "AbortError") {
+          errorMessage =
+            "Request timed out. The server took too long to respond. Your internet connection may be slow or unstable.";
+        } else if (
+          error instanceof TypeError &&
+          error.message === "Network request failed"
+        ) {
+          // Specific handling for network errors
+          errorMessage =
+            "Network connection failed. Please check your internet connection and try again later.";
+        } else if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+
+        Alert.alert("Error", errorMessage, [
+          { text: "OK" },
+          {
+            text: "Try Again",
+            onPress: handleSubmitProduct,
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    } catch (outerError) {
+      console.error("[Products] Fatal error in form submission:", outerError);
+      Alert.alert(
+        "Error",
+        "An unexpected error occurred. Please try again later."
+      );
       setIsLoading(false);
     }
   };
@@ -446,6 +955,45 @@ export default function FarmerProducts() {
     );
   };
 
+  // Helper function to check if image URL is accessible via HTTP request
+  const checkImageUrl = async (url: string, productId: number) => {
+    try {
+      console.log(
+        `[FarmerProducts] Checking image URL for product ${productId}: ${url}`
+      );
+      const response = await fetch(url, {
+        method: "HEAD",
+        headers: {
+          "Cache-Control": "no-store",
+          Pragma: "no-cache",
+        },
+      });
+
+      const status = response.status;
+      const contentType = response.headers.get("content-type") || "";
+
+      console.log(
+        `[FarmerProducts] Image check result for product ${productId}:`,
+        {
+          status,
+          contentType,
+          isImage: contentType.startsWith("image/"),
+        }
+      );
+
+      return {
+        exists: status >= 200 && status < 300,
+        isImage: contentType.startsWith("image/"),
+      };
+    } catch (error) {
+      console.error(
+        `[FarmerProducts] Error checking image URL for product ${productId}:`,
+        error
+      );
+      return { exists: false, isImage: false };
+    }
+  };
+
   // Check authentication
   if (!isAuthenticated) {
     return <Redirect href="/(auth)/login" />;
@@ -457,92 +1005,19 @@ export default function FarmerProducts() {
   }
 
   // Render product item
-  const renderProductItem = ({ item }: { item: Product }) => {
-    // Format status for display with appropriate color
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case "approved":
-          return "#4CAF50";
-        case "rejected":
-          return "#F44336";
-        default:
-          return "#FFC107";
-      }
-    };
+  const renderProductItem = ({ item }: { item: Product }) => (
+    <ProductListItem
+      item={item}
+      onEdit={handleEditProduct}
+      onDelete={handleDeleteProduct}
+    />
+  );
 
-    return (
-      <View style={styles.productCard}>
-        <View style={styles.productImageContainer}>
-          {item.image ? (
-            <Image
-              source={{
-                uri: getImageUrl(item.image), // Use getImageUrl helper function
-              }}
-              style={styles.productImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.placeholderImage}>
-              <Ionicons name="image-outline" size={40} color="#aaa" />
-            </View>
-          )}
-        </View>
-
-        <View style={styles.productDetails}>
-          <Text style={styles.productName}>{item.name}</Text>
-          <Text style={styles.productDescription} numberOfLines={2}>
-            {item.description || "No description"}
-          </Text>
-
-          <View style={styles.productMetaRow}>
-            <Text style={styles.productPrice}>
-              ₱{item.price.toFixed(2)} / {item.unit_type}
-            </Text>
-            <Text style={styles.productStock}>Stock: {item.stock}</Text>
-          </View>
-
-          <View style={styles.productCategoryRow}>
-            {item.categories &&
-              item.categories.split(",").map((category, index) => (
-                <View key={index} style={styles.categoryTag}>
-                  <Text style={styles.categoryText}>{category}</Text>
-                </View>
-              ))}
-          </View>
-
-          <View style={styles.productStatusRow}>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: getStatusColor(item.status) },
-              ]}
-            >
-              <Text style={styles.statusText}>
-                {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-              </Text>
-            </View>
-
-            <View style={styles.productActions}>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.editButton]}
-                onPress={() => handleEditProduct(item)}
-              >
-                <Ionicons name="create-outline" size={18} color="#fff" />
-                <Text style={styles.actionButtonText}>Edit</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionButton, styles.deleteButton]}
-                onPress={() => handleDeleteProduct(item.product_id)}
-              >
-                <Ionicons name="trash-outline" size={18} color="#fff" />
-                <Text style={styles.actionButtonText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </View>
-    );
+  const handleChange = (field: keyof ProductForm, value: any) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   return (
@@ -551,7 +1026,7 @@ export default function FarmerProducts() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => router.replace("/farmer/dashboard")}
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.light} />
         </TouchableOpacity>
@@ -560,7 +1035,6 @@ export default function FarmerProducts() {
           <Ionicons name="add" size={24} color={COLORS.light} />
         </TouchableOpacity>
       </View>
-
       {/* Stats Section */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
@@ -580,7 +1054,6 @@ export default function FarmerProducts() {
           <Text style={styles.statLabel}>Rejected</Text>
         </View>
       </View>
-
       {/* Product List with Search and Filter as Header Component */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -701,7 +1174,6 @@ export default function FarmerProducts() {
           </Text>
         </View>
       )}
-
       {/* Add/Edit Product Modal */}
       <Modal
         animationType="slide"
@@ -730,16 +1202,27 @@ export default function FarmerProducts() {
                     onPress={handlePickImage}
                   >
                     {form.image ? (
-                      <Image
-                        source={{
-                          uri:
-                            typeof form.image === "string"
-                              ? getImageUrl(form.image)
-                              : form.image.uri,
-                        }}
-                        style={styles.formImage}
-                        resizeMode="cover"
-                      />
+                      <View style={styles.imageContainer}>
+                        {typeof form.image === "string" ? (
+                          <ProductImage
+                            imagePath={form.image}
+                            style={styles.formImage}
+                            resizeMode="cover"
+                            productId={currentProductId || undefined}
+                          />
+                        ) : (
+                          <Image
+                            source={{ uri: form.image.uri }}
+                            style={styles.formImage}
+                            resizeMode="cover"
+                          />
+                        )}
+                        {/* Image edit overlay */}
+                        <View style={styles.imageOverlay}>
+                          <Ionicons name="camera" size={24} color="#fff" />
+                          <Text style={styles.imageOverlayText}>Change</Text>
+                        </View>
+                      </View>
                     ) : (
                       <View style={styles.imagePickerPlaceholder}>
                         <Ionicons name="camera" size={40} color="#aaa" />
@@ -749,7 +1232,43 @@ export default function FarmerProducts() {
                       </View>
                     )}
                   </TouchableOpacity>
-
+                  {isEditMode && currentProductId && (
+                    <View style={styles.productStatusInfo}>
+                      <Text style={styles.productIdText}>
+                        Product ID: {currentProductId}
+                      </Text>
+                      {products.find((p) => p.product_id === currentProductId)
+                        ?.status && (
+                        <View
+                          style={[
+                            styles.statusBadgeSmall,
+                            {
+                              backgroundColor: getStatusColor(
+                                products.find(
+                                  (p) => p.product_id === currentProductId
+                                )?.status || "pending"
+                              ),
+                            },
+                          ]}
+                        >
+                          <Text style={styles.statusTextSmall}>
+                            {(
+                              products.find(
+                                (p) => p.product_id === currentProductId
+                              )?.status || ""
+                            )
+                              .charAt(0)
+                              .toUpperCase() +
+                              (
+                                products.find(
+                                  (p) => p.product_id === currentProductId
+                                )?.status || ""
+                              ).slice(1)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
                   {/* Product Name */}
                   <Text style={styles.formLabel}>Product Name *</Text>
                   <TextInput
@@ -758,7 +1277,6 @@ export default function FarmerProducts() {
                     onChangeText={(text) => setForm({ ...form, name: text })}
                     placeholder="Enter product name"
                   />
-
                   {/* Product Description */}
                   <Text style={styles.formLabel}>Description</Text>
                   <TextInput
@@ -771,7 +1289,6 @@ export default function FarmerProducts() {
                     multiline
                     numberOfLines={4}
                   />
-
                   {/* Price and Stock */}
                   <View style={styles.formRow}>
                     <View style={styles.formColumn}>
@@ -799,7 +1316,6 @@ export default function FarmerProducts() {
                       />
                     </View>
                   </View>
-
                   {/* Unit Type */}
                   <Text style={styles.formLabel}>Unit Type *</Text>
                   <View style={styles.pickerContainer}>
@@ -819,7 +1335,6 @@ export default function FarmerProducts() {
                       ))}
                     </Picker>
                   </View>
-
                   {/* Categories */}
                   <Text style={styles.formLabel}>Categories *</Text>
                   <View style={styles.categoriesContainer}>
@@ -842,12 +1357,107 @@ export default function FarmerProducts() {
                             ) && styles.selectedCategoryText,
                           ]}
                         >
-                          {category.category_name}
+                          {category.category_name}{" "}
                         </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
+                  {/* Product Location Section */}
+                  <Text style={styles.formSectionHeader}>Product Location</Text>
+                  <Text style={styles.locationHelpText}>
+                    Assigning your product to a location helps buyers find local
+                    produce from specific areas and helps agricultural officers
+                    track production.
+                  </Text>
+                  {isEditMode && (
+                    <LocationDisplay
+                      barangay_id={form.barangay_id}
+                      field_id={form.field_id}
+                      barangays={barangays}
+                      fields={fields}
+                    />
+                  )}
+                  {/* Field Selection with enhanced UX */}
+                  <Text style={styles.formLabel}>Field</Text>
+                  <View style={styles.formGroup}>
+                    <ThemedText style={styles.label}>
+                      Field (Optional)
+                    </ThemedText>
+                    <View style={styles.pickerContainer}>
+                      <Picker
+                        selectedValue={form.field_id}
+                        style={styles.picker}
+                        onValueChange={(value) => {
+                          // Find the selected field to get its barangay_id
+                          const selectedField = fields.find(
+                            (field) => field.field_id === value
+                          );
 
+                          // Set the form with updated field and barangay
+                          setForm({
+                            ...form,
+                            field_id: value,
+                            // Set the barangay_id automatically based on the selected field
+                            barangay_id: selectedField
+                              ? selectedField.barangay_id
+                              : null,
+                          });
+
+                          // Show feedback to the user about the barangay auto-selection
+                          if (selectedField) {
+                            const barangay = barangays.find(
+                              (b) => b.barangay_id === selectedField.barangay_id
+                            );
+                            if (barangay) {
+                              // Toast notification could be added here in the future
+                              console.log(
+                                `Automatically selected Barangay: ${barangay.barangay_name}`
+                              );
+                            }
+                          }
+                        }}
+                      >
+                        <Picker.Item label="Select a field" value={null} />
+                        {fields
+                          .filter((field) => field.farmer_id === user?.user_id)
+                          .map((field) => {
+                            // Find the barangay name for this field to display in the picker
+                            const fieldBarangay = barangays.find(
+                              (b) => b.barangay_id === field.barangay_id
+                            );
+
+                            // Create a more informative label with both field name and barangay
+                            const label = fieldBarangay
+                              ? `${field.field_name} (${fieldBarangay.barangay_name})`
+                              : field.field_name;
+
+                            return (
+                              <Picker.Item
+                                key={field.field_id}
+                                label={label}
+                                value={field.field_id}
+                              />
+                            );
+                          })}
+                      </Picker>
+                    </View>
+                    {form.errors?.field && (
+                      <Text style={styles.errorText}>{form.errors.field}</Text>
+                    )}
+                  </View>
+                  {/* Display automatically selected barangay if field is chosen */}
+                  {form.field_id && form.barangay_id && (
+                    <View style={styles.autoSelectedBarangay}>
+                      <Ionicons
+                        name="information-circle"
+                        size={16}
+                        color={COLORS.primary}
+                      />
+                      <Text style={styles.autoSelectedText}>
+                        Barangay automatically set based on field selection
+                      </Text>
+                    </View>
+                  )}
                   {/* Submit Button */}
                   <TouchableOpacity
                     style={styles.submitButton}
@@ -981,7 +1591,7 @@ const styles = StyleSheet.create({
   productList: {
     padding: 16,
   },
-  productCard: {
+  productItemContainer: {
     flexDirection: "row",
     backgroundColor: "#fff",
     borderRadius: 8,
@@ -1071,25 +1681,38 @@ const styles = StyleSheet.create({
   },
   productActions: {
     flexDirection: "row",
-  },
-  actionButton: {
-    flexDirection: "row",
+    padding: 8,
+    justifyContent: "flex-end",
     alignItems: "center",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    marginLeft: 8,
   },
   editButton: {
-    backgroundColor: "#2196f3",
+    padding: 8,
+    backgroundColor: "#2196F3", // Blue background color
+    borderRadius: 4,
+    marginRight: 6,
+    ...Platform.select({
+      android: { elevation: 2 },
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 1,
+      },
+    }),
   },
   deleteButton: {
-    backgroundColor: "#f44336",
-  },
-  actionButtonText: {
-    color: "#fff",
-    fontSize: 12,
-    marginLeft: 4,
+    padding: 8,
+    backgroundColor: "#F44336", // Red background color
+    borderRadius: 4,
+    ...Platform.select({
+      android: { elevation: 2 },
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 1,
+      },
+    }),
   },
   emptyContainer: {
     flex: 1,
@@ -1163,6 +1786,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: "#999",
   },
+  infoText: {
+    color: "#666",
+    fontStyle: "italic",
+    marginTop: 4,
+    marginBottom: 16,
+  },
   formLabel: {
     fontSize: 16,
     color: "#333",
@@ -1225,6 +1854,13 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "500",
   },
+  helperText: {
+    fontSize: 12,
+    color: "#666",
+    fontStyle: "italic",
+    marginTop: 4,
+    marginBottom: 16,
+  },
   submitButton: {
     backgroundColor: COLORS.primary,
     paddingVertical: 14,
@@ -1242,8 +1878,205 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
   },
+  errorText: {
+    color: "#f44336",
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 8,
+  },
+  inputError: {
+    borderColor: "#f44336",
+  },
+  autoSelectedBarangay: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#e1f5fe",
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 16,
+  },
+  autoSelectedText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  locationDisplayContainer: {
+    backgroundColor: "#f2f9ff",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  locationDisplayText: {
+    color: "#666",
+    fontStyle: "italic",
+  },
+  locationItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 4,
+  },
+  locationName: {
+    marginLeft: 6,
+    fontSize: 14,
+  },
   modalFormContent: {
     padding: 16,
     paddingBottom: 32,
+  },
+  imageContainer: {
+    position: "relative",
+  },
+  imageOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 8,
+  },
+  imageOverlayText: {
+    color: "#fff",
+    fontSize: 16,
+    marginTop: 4,
+  },
+  productStatusInfo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eaeaea",
+  },
+  productIdText: {
+    fontSize: 14,
+    color: "#666",
+    fontStyle: "italic",
+  },
+  statusBadgeSmall: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  statusTextSmall: {
+    fontSize: 12,
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  dropdownContainer: {
+    backgroundColor: "#f0f0f0",
+    borderRadius: 5,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  formSectionHeader: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginTop: 16,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    paddingBottom: 8,
+  },
+  locationHelpText: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  locationDisplay: {
+    backgroundColor: "#f2f9ff",
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+    marginBottom: 16,
+  },
+  locationTitle: {
+    fontWeight: "bold",
+    marginBottom: 4,
+    color: "#333",
+  },
+  locationItemInDisplay: {
+    flexDirection: "row",
+    marginVertical: 2,
+  },
+  locationLabel: {
+    color: "#555",
+    width: 70,
+  },
+  locationValue: {
+    fontWeight: "500",
+    color: "#333",
+    flex: 1,
+  },
+  addFieldButton: {
+    paddingVertical: 8,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  addFieldButtonText: {
+    color: COLORS.primary,
+    fontWeight: "500",
+  },
+  locationTag: {
+    backgroundColor: "#e1f5fe", // Light blue background for location tag
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  locationText: {
+    fontSize: 12,
+    color: COLORS.primary,
+    marginLeft: 2,
+  },
+  formGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 6,
+  },
+  formGroupContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  formGroupInput: {
+    flex: 1,
+    backgroundColor: "#f8f8f8",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
+  },
+  formGroupPicker: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 12,
+  },
+  formGroupPickerItem: {
+    padding: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+  },
+  formGroupPickerItemSelected: {
+    backgroundColor: COLORS.primary,
+  },
+  formGroupPickerItemText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
   },
 });

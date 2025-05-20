@@ -13,8 +13,6 @@ import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect, useRef } from "react";
 import GetStartedButton from "@/components/GetStartedButton";
-import { useAuth } from "@/contexts/AuthContext";
-import { authService } from "@/services/authService";
 
 // Updated color scheme inspired by agricultural themes and Filipino colors
 const COLORS = {
@@ -25,103 +23,17 @@ const COLORS = {
   dark: "#1B5E20", // Deep green
   text: "#263238", // Dark blue-grey
   muted: "#78909C", // Muted blue-grey
-  gradient: ["#2E7D32", "#1B5E20", "#0D3010"] as const, // Multi-tone green gradient
+  gradient: ["#2E7D32", "#1B5E20", "#0D3010"], // Multi-tone green gradient
   shadow: "#000000",
 };
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const logoScale = useRef(new Animated.Value(0.3)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
-  const [navigationReady, setNavigationReady] = useState(false);
-
-  // Debug logging
-  console.log("[WelcomeScreen] Rendering with auth state:", {
-    isLoading,
-    user,
-  });
-
-  // Add a slight delay before navigation to ensure the navigator is ready
-  useEffect(() => {
-    // Set navigation ready after a short delay to prevent premature navigation
-    const timer = setTimeout(() => {
-      setNavigationReady(true);
-      console.log("[WelcomeScreen] Navigation ready state set to true");
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Check if user is already authenticated and redirect based on role
-  // Only run this effect when navigation is ready
-  useEffect(() => {
-    if (!navigationReady) {
-      console.log(
-        "[WelcomeScreen] Navigation not ready yet, delaying redirect"
-      );
-      return;
-    }
-
-    console.log("[WelcomeScreen] Auth effect running with navigation ready:", {
-      isLoading,
-      user,
-    });
-
-    if (!isLoading && user) {
-      const checkUserRoleAndRedirect = async () => {
-        try {
-          console.log("[WelcomeScreen] Checking user role");
-          const userData = await authService.getUserData();
-          console.log("[WelcomeScreen] User data:", userData);
-
-          if (userData && userData.role_id === 2) {
-            console.log(
-              "[Navigation] Farmer user detected, redirecting to farmer dashboard"
-            );
-            // Use timeout to ensure navigation system is ready
-            setTimeout(() => {
-              router.replace("/farmer/dashboard");
-            }, 100);
-          } else {
-            console.log(
-              "[Navigation] Consumer user detected, redirecting to main"
-            );
-            setTimeout(() => {
-              router.replace("/consumer/dashboard");
-            }, 100);
-          }
-        } catch (error) {
-          console.error("[Navigation] Error checking user role:", error);
-          // Fallback to main screen if there's an error, but with a delay
-          setTimeout(() => {
-            router.push("/(tabs)/main");
-          }, 100);
-        }
-      };
-
-      checkUserRoleAndRedirect();
-    }
-  }, [user, isLoading, router, navigationReady]);
-
-  // Handle back button press to prevent going back to intro screens when logged in
-  useEffect(() => {
-    const backHandler = BackHandler.addEventListener(
-      "hardwareBackPress",
-      () => {
-        if (user) {
-          // If user is logged in, don't allow back navigation from welcome screen
-          return true; // Prevents default back behavior
-        }
-        return false; // Allow default back behavior for guests
-      }
-    );
-
-    return () => backHandler.remove();
-  }, [user]);
 
   useEffect(() => {
     // Pulse animation for the logo
@@ -179,12 +91,8 @@ export default function WelcomeScreen() {
   }, []);
 
   const handleGetStarted = () => {
-    // Check if user is logged in before navigating
-    if (user) {
-      router.push("/(tabs)/main");
-    } else {
-      router.push("/(tabs)/intro");
-    }
+    // Simply navigate to the intro screen without checking authentication
+    router.push("/(tabs)/intro");
   };
 
   // Create interpolated rotation value
@@ -193,28 +101,12 @@ export default function WelcomeScreen() {
     outputRange: ["0deg", "360deg"],
   });
 
-  // If still loading auth state, show a simple loading indicator
-  if (isLoading) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: "#f0f0f0",
-        }}
-      >
-        <Text style={{ fontSize: 18, color: "#333" }}>Loading...</Text>
-      </View>
-    );
-  }
-
   // Render the welcome screen
   return (
     <LinearGradient
       colors={COLORS.gradient}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+      start={[0, 0]}
+      end={[1, 1]}
       style={styles.container}
     >
       {/* Decorative background elements */}

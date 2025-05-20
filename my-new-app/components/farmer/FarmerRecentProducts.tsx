@@ -11,7 +11,9 @@ import {
 import { ThemedText } from "@/components/ThemedText";
 import { COLORS } from "@/constants/Colors";
 import { getImageUrl } from "@/constants/Config";
+import { getImagePaths, validateImageUrl } from "@/constants/ImageUtils";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import ProductImage from "@/components/ui/ProductImage";
 
 interface Product {
   product_id: number;
@@ -33,7 +35,7 @@ interface RecentProductsProps {
   navigateToManageProducts: () => void;
 }
 
-export function FarmerRecentProducts({
+export default function FarmerRecentProducts({
   recentProducts,
   navigateToProductDetails,
   navigateToAddProduct,
@@ -41,19 +43,99 @@ export function FarmerRecentProducts({
 }: RecentProductsProps) {
   const windowWidth = Dimensions.get("window").width;
   const cardWidth = windowWidth * 0.65;
-  // Add state to track image loading errors
-  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+  const [validatedProducts, setValidatedProducts] = useState<
+    Record<number, boolean>
+  >({});
+  const [validUrls, setValidUrls] = useState<Record<number, string>>({});
 
-  // Debug log for image paths - moved outside of render
-  useEffect(() => {
-    if (recentProducts && recentProducts.length > 0) {
-      recentProducts.forEach((product) => {
-        if (product.image) {
-          console.log(
-            `[FarmerDebug] Product ${product.product_id} image path: ${product.image}`
+  // Pre-validate image URLs to improve loading experience
+  const prevalidateImages = async (products: Product[]) => {
+    const validationResults: Record<number, boolean> = {};
+    const bestUrls: Record<number, string> = {};
+
+    // Only validate a few images to avoid too many network requests
+    const productsToValidate = products.slice(0, 3);
+
+    for (const product of productsToValidate) {
+      if (product.image) {
+        try {
+          const url = getImageUrl(product.image);
+          const isValid = await validateImageUrl(url);
+          validationResults[product.product_id] = isValid;
+
+          if (isValid) {
+            bestUrls[product.product_id] = url;
+          } else {
+            // If the primary URL is invalid, try all paths
+            const allPaths = getImagePaths(product.image);
+            for (let i = 0; i < allPaths.length; i++) {
+              const pathValid = await validateImageUrl(allPaths[i]);
+              if (pathValid) {
+                validationResults[product.product_id] = true;
+                bestUrls[product.product_id] = allPaths[i];
+                console.log(
+                  `[FarmerRecentProducts] Found valid alternate URL for product ${product.product_id}: ${allPaths[i]}`
+                );
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          console.error(
+            `[FarmerRecentProducts] Error pre-validating image for product ${product.product_id}:`,
+            e
           );
         }
-      });
+      }
+    }
+
+    setValidatedProducts(validationResults);
+    setValidUrls(bestUrls);
+    return { validationResults, bestUrls };
+  };
+
+  // Enhanced debug logging for image paths
+  useEffect(() => {
+    if (recentProducts && recentProducts.length > 0) {
+      console.log(
+        "[FarmerRecentProducts] Number of products:",
+        recentProducts.length
+      );
+
+      // Log a sample product for debugging
+      const sampleProduct = recentProducts[0];
+      if (sampleProduct && sampleProduct.image) {
+        console.log(
+          `[FarmerRecentProducts] Sample product image path: ${sampleProduct.image}`
+        );
+
+        // Get processed URL and log it
+        const processedUrl = getImageUrl(sampleProduct.image);
+        console.log(`[FarmerRecentProducts] Processed URL: ${processedUrl}`);
+
+        // Pre-validate the image URL
+        validateImageUrl(processedUrl)
+          .then((isValid: boolean) => {
+            console.log(
+              `[FarmerRecentProducts] Image validation result for sample product: ${isValid ? "Valid" : "Invalid"}`
+            );
+          })
+          .catch((error: Error) => {
+            console.error(
+              `[FarmerRecentProducts] Error validating image: ${error}`
+            );
+          });
+
+        // Also get all possible paths for reference
+        const allPaths = getImagePaths(sampleProduct.image);
+        console.log(
+          `[FarmerRecentProducts] All possible image paths for debugging:`,
+          allPaths
+        );
+
+        // Start prevalidation process
+        prevalidateImages(recentProducts);
+      }
     }
   }, [recentProducts]);
 
@@ -105,6 +187,8 @@ export function FarmerRecentProducts({
     index: number;
   }) => {
     const statusDetails = getStatusDetails(item.status);
+    // Check if we have a prevalidated URL for this product
+    const hasValidatedUrl = validUrls[item.product_id] !== undefined;
 
     return (
       <TouchableOpacity
@@ -113,27 +197,20 @@ export function FarmerRecentProducts({
         activeOpacity={0.9}
       >
         <View style={styles.productImageContainer}>
-          {item.image && !imageErrors[item.product_id] ? (
-            <Image
-              source={{ uri: getImageUrl(item.image) }}
-              style={styles.productImage}
-              resizeMode="cover"
-              onError={() => {
-                console.error(
-                  `[Farmer] Failed to load image: ${getImageUrl(item.image)}`
-                );
-                setImageErrors((prev) => ({
-                  ...prev,
-                  [item.product_id]: true,
-                }));
-              }}
-            />
-          ) : (
-            <View style={styles.placeholderImage}>
-              <MaterialIcons name="image" size={36} color="#ccc" />
-              <ThemedText style={styles.placeholderText}>No Image</ThemedText>
-            </View>
-          )}
+          <ProductImage
+            imagePath={
+              hasValidatedUrl ? validUrls[item.product_id] : item.image
+            }
+            productId={item.product_id}
+            style={styles.productImage}
+            fallbackIcon="image-outline"
+            fallbackIconSize={36}
+            fallbackIconColor="#ccc"
+            placeholderColor="#f8f8f8"
+            maxRetries={3}
+            directUrl={hasValidatedUrl} // Use direct URL if we've validated it
+            showDebugInfo={true} // Enable debug info to help diagnose issues
+          />
           <View
             style={[
               styles.statusBadge,
@@ -146,14 +223,12 @@ export function FarmerRecentProducts({
             </ThemedText>
           </View>
         </View>
-
         <View style={styles.productInfo}>
           <View style={styles.productNameRow}>
             <ThemedText style={styles.productName} numberOfLines={1}>
               {item.name}
             </ThemedText>
           </View>
-
           <View style={styles.productDetailsRow}>
             <View style={styles.priceContainer}>
               <ThemedText style={styles.productPrice}>
@@ -180,7 +255,6 @@ export function FarmerRecentProducts({
               </ThemedText>
             </View>
           </View>
-
           <View style={styles.dateContainer}>
             <Ionicons name="calendar-outline" size={12} color={COLORS.muted} />
             <ThemedText style={styles.dateText}>
@@ -306,18 +380,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  placeholderImage: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f8f8f8",
-  },
-  placeholderText: {
-    color: "#ccc",
-    marginTop: 8,
-    fontSize: 12,
-  },
   statusBadge: {
     position: "absolute",
     top: 12,
@@ -327,6 +389,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     flexDirection: "row",
     alignItems: "center",
+    zIndex: 10,
   },
   statusText: {
     color: "#fff",

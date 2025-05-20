@@ -10,10 +10,20 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
 require_once '../../models/Database.php';
 require_once '../../models/Log.php';  // Include Log model for activity logging
+require_once '../../controllers/GeoAnalyticsController.php';  // Include GeoAnalyticsController
 
 // Database Connection
 $database = new Database();
 $conn = $database->connect();
+
+// Initialize GeoAnalyticsController
+$geoAnalytics = new GeoAnalyticsController();
+
+// Fetch Geographical Analytics data using the controller
+$cropsPerBarangay = $geoAnalytics->getCropProductionByBarangay();
+$farmersPerBarangay = $geoAnalytics->getFarmerDistribution();
+$seasonalCrops = $geoAnalytics->getSeasonalCropProduction();
+$baranguayEfficiencyMetrics = $geoAnalytics->getBarangayEfficiencyMetrics();
 
 // Create required database views if they don't exist
 try {
@@ -114,36 +124,6 @@ if ($startDate && $endDate) {
     }
 }
 
-// Fetch Geographical Analytics - Crops Per Barangay
-try {
-    $cropsPerBarangayQuery = "SELECT * FROM view_crops_per_barangay ORDER BY barangay_name, total_production DESC";
-    $cropsPerBarangayStmt = $conn->query($cropsPerBarangayQuery);
-    $cropsPerBarangay = $cropsPerBarangayStmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    error_log("Error fetching crops per barangay: " . $e->getMessage());
-    $cropsPerBarangay = [];
-}
-
-// Fetch Geographical Analytics - Farmers Per Barangay
-try {
-    $farmersPerBarangayQuery = "SELECT * FROM view_farmers_per_barangay ORDER BY farmer_count DESC";
-    $farmersPerBarangayStmt = $conn->query($farmersPerBarangayQuery);
-    $farmersPerBarangay = $farmersPerBarangayStmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    error_log("Error fetching farmers per barangay: " . $e->getMessage());
-    $farmersPerBarangay = [];
-}
-
-// Fetch Geographical Analytics - Seasonal Crops
-try {
-    $seasonalCropsQuery = "SELECT * FROM view_seasonal_crops ORDER BY season_name, total_production DESC";
-    $seasonalCropsStmt = $conn->query($seasonalCropsQuery);
-    $seasonalCrops = $seasonalCropsStmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    error_log("Error fetching seasonal crops: " . $e->getMessage());
-    $seasonalCrops = [];
-}
-
 // Fetch Order Summary with date filter
 $orderSummaryQuery = "SELECT order_status, COUNT(*) AS total FROM orders o";
 $orderSummaryQuery .= $dateFilterCondition;
@@ -160,8 +140,11 @@ $paymentSummaryQuery .= " GROUP BY payment_status";
 $paymentSummaryStmt = $conn->query($paymentSummaryQuery);
 $paymentSummary = $paymentSummaryStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Product Summary (keeping as is since products don't have date ranges)
-$productSummaryQuery = "SELECT status, COUNT(*) AS total FROM products GROUP BY status";
+// Fetch Product Summary with improved status handling
+$productSummaryQuery = "SELECT COALESCE(status, 'pending') as status, COUNT(*) AS total 
+                       FROM products 
+                       GROUP BY status 
+                       ORDER BY FIELD(status, 'active', 'pending', 'out_of_stock', 'discontinued')";
 $productSummaryStmt = $conn->query($productSummaryQuery);
 $productSummary = $productSummaryStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -263,48 +246,86 @@ if (isset($_POST['logout'])) {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        /* Add admin header styling */
-        .admin-header {
-            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-            color: white;
-            padding: 10px 0;
-        }
-        .admin-badge {
-            background-color: #6a11cb;
-            color: white;
-            font-size: 0.8rem;
-            padding: 3px 8px;
-            border-radius: 4px;
-            margin-left: 10px;
-        }
-        /* DataTables Custom Styling */
-        .dataTables_wrapper .dataTables_length, 
-        .dataTables_wrapper .dataTables_filter {
-            margin-bottom: 15px;
-        }
-        .table.dataTable {
-            border-collapse: collapse !important;
-        }
-        .dt-buttons {
-            margin-bottom: 15px;
-        }
-        .dt-button {
-            background-color: #28a745 !important;
-            border-color: #28a745 !important;
-            color: white !important;
-        }
-        .dt-button:hover {
-            background-color: #218838 !important;
-        }
-        .dataTables_info {
-            padding-top: 0.85em !important;
-        }
-        /* Highlight search results */
-        table.dataTable tbody tr.selected {
-            background-color: #e8f5e9;
-        }
-        table.dataTable tbody tr:hover {
-            background-color: #f5f5f5;
+        /* Print Styles */
+        @media print {
+            /* Hide non-printable elements */
+            .no-print, .admin-header, .admin-sidebar, .btn-toolbar, .btn-export, .btn-print, 
+            .date-filter, nav, .breadcrumb, .section-header h3 i {
+                display: none !important;
+            }
+            
+            /* Make sure the main content takes full width when printing */
+            main, .container-fluid, .row, .col-md-9, .col-lg-10 {
+                width: 100% !important;
+                max-width: 100% !important;
+                flex: 0 0 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            
+            /* Add page header and improve layout */
+            body::before {
+                content: "FARMERS MARKET MANAGEMENT SYSTEM";
+                display: block;
+                text-align: center;
+                font-size: 24pt;
+                font-weight: bold;
+                color: #28a745;
+                margin-bottom: 20px;
+            }
+            
+            /* Adjust card and table styling for print */
+            .report-card {
+                break-inside: avoid;
+                border: 1px solid #ddd !important;
+                margin-bottom: 20px !important;
+                page-break-inside: avoid;
+            }
+            
+            .card-header {
+                background-color: #f0f0f0 !important;
+                border-bottom: 1px solid #ddd !important;
+                padding: 10px 15px !important;
+            }
+            
+            table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+            }
+            
+            table th, table td {
+                border: 1px solid #dee2e6 !important;
+            }
+            
+            /* Add page numbers */
+            @page {
+                margin: 0.5in;
+                counter-increment: page;
+                @bottom-center {
+                    content: "Page " counter(page);
+                }
+            }
+            
+            /* Improve chart visibility on print */
+            canvas {
+                max-width: 100% !important;
+                height: auto !important;
+            }
+            
+            /* Summary stats styling */
+            .summary-stats {
+                padding: 15px 10px !important;
+            }
+            
+            /* More spacing between sections */
+            .row {
+                margin-bottom: 20px !important;
+            }
+            
+            /* Remove animations */
+            .animate-card {
+                animation: none !important;
+            }
         }
     </style>
 </head>
@@ -409,37 +430,14 @@ if (isset($_POST['logout'])) {
                     <div class="col-md-3">
                         <div class="summary-stats animate-card" style="animation-delay: 0.3s;">
                             <div class="number">₱<?= number_format($avgOrderValue, 2) ?></div>
-                            <div class="label">Avg. Order Value</div>
+                            <div class="label">Average Order Value</div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Report Summary -->
-                <div class="row mb-4">
-                    <!-- Order Summary -->
-                    <div class="col-md-4 mb-4">
-                        <div class="report-card">
-                            <div class="card-header">
-                                <i class="bi bi-cart me-2"></i> Order Summary
-                            </div>
-                            <div class="card-body">
-                                <div class="chart-container">
-                                    <canvas id="orderChart"></canvas>
-                                </div>
-                                <ul class="list-group mt-3">
-                                    <?php foreach ($orderSummary as $order): ?>
-                                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                                            <?= ucfirst($order['order_status']) ?>
-                                            <span class="status-badge status-<?= $order['order_status'] ?>"><?= $order['total'] ?></span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Payment Summary -->
-                    <div class="col-md-4 mb-4">
+                
+                <!-- Payment Summary -->
+                <div class="row mb-5">
+                    <div class="col-md-4 mt-5">
                         <div class="report-card">
                             <div class="card-header">
                                 <i class="bi bi-credit-card me-2"></i> Payment Summary
@@ -448,20 +446,19 @@ if (isset($_POST['logout'])) {
                                 <div class="chart-container">
                                     <canvas id="paymentChart"></canvas>
                                 </div>
-                                <ul class="list-group mt-3">
+                                <div class="list-group">
                                     <?php foreach ($paymentSummary as $payment): ?>
-                                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                                            <?= ucfirst($payment['payment_status']) ?>
+                                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span><i class="bi bi-circle-fill me-2 text-<?= $payment['payment_status'] === 'paid' ? 'success' : ($payment['payment_status'] === 'pending' ? 'warning' : 'danger') ?>"></i> <?= ucfirst($payment['payment_status']) ?></span>
                                             <span class="status-badge status-<?= $payment['payment_status'] ?>"><?= $payment['total'] ?></span>
-                                        </li>
+                                        </div>
                                     <?php endforeach; ?>
-                                </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
-
                     <!-- Product Summary -->
-                    <div class="col-md-4 mb-4">
+                    <div class="col-md-4 mt-5">
                         <div class="report-card">
                             <div class="card-header">
                                 <i class="bi bi-box me-2"></i> Product Summary
@@ -470,15 +467,55 @@ if (isset($_POST['logout'])) {
                                 <div class="chart-container">
                                     <canvas id="productChart"></canvas>
                                 </div>
-                                <ul class="list-group mt-3">
+                                <div class="list-group">
+                                    <?php 
+                                    $statusColors = [
+                                        'active' => 'success',
+                                        'pending' => 'warning',
+                                        'out_of_stock' => 'danger',
+                                        'discontinued' => 'secondary'
+                                    ];
+                                    ?>
                                     <?php foreach ($productSummary as $product): ?>
-                                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                                            <?= ucfirst($product['status']) ?>
+                                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span><i class="bi bi-circle-fill me-2 text-<?= $statusColors[$product['status']] ?? 'secondary' ?>"></i> <?= ucfirst($product['status']) ?></span>
                                             <span class="status-badge status-<?= $product['status'] ?>"><?= $product['total'] ?></span>
-                                        </li>
+                                        </div>
                                     <?php endforeach; ?>
-                                </ul>
+                                </div>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Order Summary -->
+                    <div class="col-md-4 mt-5">
+                        <div class="report-card">
+                            <div class="card-header">
+                                <i class="bi bi-cart me-2"></i> Order Summary
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="orderChart"></canvas>
+                                </div>
+                                <div class="list-group">
+                                    <?php foreach ($orderSummary as $order): ?>
+                                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span><i class="bi bi-circle-fill me-2 text-<?= $order['order_status'] === 'completed' ? 'success' : ($order['order_status'] === 'pending' ? 'warning' : 'danger') ?>"></i> <?= ucfirst($order['order_status']) ?></span>
+                                            <span class="status-badge status-<?= $order['order_status'] ?>"><?= $order['total'] ?></span>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Geographical Analytics Section Header -->
+                <div class="row mb-4 mt-4">
+                    <div class="col-12">
+                        <div class="section-header">
+                            <h3 class="text-success"><i class="bi bi-geo-alt"></i> Geographical Analytics</h3>
+                            <hr class="separator">
                         </div>
                     </div>
                 </div>
@@ -486,8 +523,8 @@ if (isset($_POST['logout'])) {
                 <!-- Geographical Analytics -->
                 <div class="row mb-4">
                     <!-- Crops Per Barangay -->
-                    <div class="col-md-4 mb-4">
-                        <div class="report-card">
+                    <div class="col-md-6 mb-4">
+                        <div class="report-card h-100">
                             <div class="card-header">
                                 <i class="bi bi-geo-alt me-2"></i> Crops Per Barangay
                             </div>
@@ -500,23 +537,17 @@ if (isset($_POST['logout'])) {
                                                 <th>Crop</th>
                                                 <th>Production</th>
                                                 <th>Planted Area</th>
-                                                <th>Yield Rate</th>
+                                                <th>Category</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <?php foreach ($cropsPerBarangay as $crop): ?>
-                                                <?php 
-                                                    $yieldRate = 0;
-                                                    if ($crop['total_planted_area'] > 0) {
-                                                        $yieldRate = round($crop['total_production'] / $crop['total_planted_area'], 2);
-                                                    }
-                                                ?>
                                                 <tr>
                                                     <td><?= htmlspecialchars($crop['barangay_name']) ?></td>
                                                     <td><?= htmlspecialchars($crop['product_name']) ?></td>
-                                                    <td><span class="badge badge-success"><?= number_format($crop['total_production'], 2) ?> <?= htmlspecialchars($crop['production_unit']) ?></span></td>
-                                                    <td><span class="badge badge-primary"><?= number_format($crop['total_planted_area'], 2) ?> <?= htmlspecialchars($crop['area_unit']) ?></span></td>
-                                                    <td><span class="badge badge-info"><?= $yieldRate ?> <?= htmlspecialchars($crop['production_unit']) ?>/<?= htmlspecialchars($crop['area_unit']) ?></span></td>
+                                                    <td><?= number_format($crop['total_production']) . ' ' . htmlspecialchars($crop['production_unit']) ?></td>
+                                                    <td><?= number_format($crop['total_planted_area']) . ' ' . htmlspecialchars($crop['area_unit']) ?></td>
+                                                    <td><?= htmlspecialchars($crop['category_name'] ?? 'Uncategorized') ?></td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -527,8 +558,8 @@ if (isset($_POST['logout'])) {
                     </div>
 
                     <!-- Farmers Per Barangay -->
-                    <div class="col-md-4 mb-4">
-                        <div class="report-card">
+                    <div class="col-md-6 mb-4">
+                        <div class="report-card h-100">
                             <div class="card-header">
                                 <i class="bi bi-people me-2"></i> Farmers Per Barangay
                             </div>
@@ -538,14 +569,16 @@ if (isset($_POST['logout'])) {
                                         <thead>
                                             <tr>
                                                 <th>Barangay</th>
-                                                <th>Farmers</th>
+                                                <th>Number of Farmers</th>
+                                                <th>Total Farm Area</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <?php foreach ($farmersPerBarangay as $farmer): ?>
                                                 <tr>
                                                     <td><?= htmlspecialchars($farmer['barangay_name']) ?></td>
-                                                    <td><span class="badge badge-primary"><?= htmlspecialchars($farmer['farmer_count']) ?></span></td>
+                                                    <td><?= $farmer['farmer_count'] ?></td>
+                                                    <td><?= number_format($farmer['total_farm_area'], 2) ?> hectares</td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -554,9 +587,53 @@ if (isset($_POST['logout'])) {
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Seasonal Crops -->
-                    <div class="col-md-4 mb-4">
+                <div class="row mb-4">
+                    <!-- Production Insights -->
+                    <div class="col-md-6 mb-4">
+                        <div class="report-card h-100">
+                            <div class="card-header">
+                                <i class="bi bi-graph-up me-2"></i> Production Insights
+                            </div>
+                            <div class="card-body">
+                                <div id="production-insights">
+                                    <!-- Content will be populated by JavaScript -->
+                                    <div class="loading">
+                                        <div class="spinner-border text-success" role="status">
+                                            <span class="sr-only">Loading...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Crop Production Chart -->
+                    <div class="col-md-6 mb-4">
+                        <div class="report-card">
+                            <div class="card-header">
+                                <i class="bi bi-bar-chart me-2"></i> Crop Production Chart
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container" style="height: 300px;">
+                                    <canvas id="cropProductionChart"></canvas>
+                                </div>
+                                <div class="mt-3 text-center">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-success active" data-chart-view="production">By Production</button>
+                                        <button type="button" class="btn btn-outline-primary" data-chart-view="area">By Area</button>
+                                        <button type="button" class="btn btn-outline-info" data-chart-view="yield">By Yield Rate</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Seasonal Crops -->
+                <div class="row mb-5">
+                    <div class="col-12">
                         <div class="report-card">
                             <div class="card-header">
                                 <i class="bi bi-calendar4 me-2"></i> Seasonal Crops
@@ -570,23 +647,17 @@ if (isset($_POST['logout'])) {
                                                 <th>Crop</th>
                                                 <th>Production</th>
                                                 <th>Area</th>
-                                                <th>Season Period</th>
+                                                <th>Period</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <?php foreach ($seasonalCrops as $crop): ?>
-                                                <?php 
-                                                    // Format the month names for display
-                                                    $startMonth = date('F', mktime(0, 0, 0, $crop['start_month'], 1));
-                                                    $endMonth = date('F', mktime(0, 0, 0, $crop['end_month'], 1));
-                                                    $seasonPeriod = $startMonth . ' to ' . $endMonth;
-                                                ?>
                                                 <tr>
                                                     <td><?= htmlspecialchars($crop['season_name']) ?></td>
                                                     <td><?= htmlspecialchars($crop['product_name']) ?></td>
-                                                    <td><span class="badge badge-info"><?= number_format($crop['total_production'], 2) ?> <?= htmlspecialchars($crop['production_unit']) ?></span></td>
-                                                    <td><span class="badge badge-warning"><?= number_format($crop['total_planted_area'], 2) ?> <?= htmlspecialchars($crop['area_unit']) ?></span></td>
-                                                    <td><span class="badge badge-secondary"><?= $seasonPeriod ?></span></td>
+                                                    <td><?= number_format($crop['total_production']) . ' ' . htmlspecialchars($crop['production_unit']) ?></td>
+                                                    <td><?= number_format($crop['total_planted_area']) . ' ' . htmlspecialchars($crop['area_unit']) ?></td>
+                                                    <td><?= htmlspecialchars($crop['start_month']) . ' - ' . htmlspecialchars($crop['end_month']) ?></td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -597,80 +668,71 @@ if (isset($_POST['logout'])) {
                     </div>
                 </div>
 
-                <!-- Crop Production Visualization -->
+                <!-- Orders Section Header -->
                 <div class="row mb-4">
                     <div class="col-12">
-                        <div class="report-card">
-                            <div class="card-header">
-                                <i class="bi bi-bar-chart me-2"></i> Crop Production by Barangay Visualization
-                            </div>
-                            <div class="card-body">
-                                <div class="chart-container" style="height: 400px;">
-                                    <canvas id="cropProductionChart"></canvas>
-                                </div>
-                                <div class="mt-3 text-center">
-                                    <div class="btn-group btn-group-sm" role="group">
-                                        <button type="button" class="btn btn-outline-success active" data-chart-view="production">Production Volume</button>
-                                        <button type="button" class="btn btn-outline-primary" data-chart-view="area">Planted Area</button>
-                                        <button type="button" class="btn btn-outline-info" data-chart-view="yield">Yield Rate</button>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="section-header">
+                            <h3 class="text-success"><i class="bi bi-cart-check"></i> Order Management</h3>
+                            <hr class="separator">
                         </div>
                     </div>
                 </div>
 
                 <!-- Recent Orders Table -->
-                <div class="card shadow-sm">
-                    <div class="card-body">
-                        <h5 class="card-title d-flex align-items-center mb-4">
-                            <i class="bi bi-clock-history me-2"></i>Recent Orders
-                        </h5>
-                        <div class="table-responsive">
-                            <table id="ordersDataTable" class="table table-striped table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Order ID</th>
-                                        <th>Consumer</th>
-                                        <th>Status</th>
-                                        <th>Order Date</th>
-                                        <th>Pickup Details</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php if (count($recentOrders) > 0): ?>
-                                        <?php foreach ($recentOrders as $order): ?>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card shadow-sm">
+                            <div class="card-body">
+                                <h5 class="card-title d-flex align-items-center mb-4">
+                                    <i class="bi bi-clock-history me-2"></i>Recent Orders
+                                </h5>
+                                <div class="table-responsive">
+                                    <table id="ordersDataTable" class="table table-striped table-hover">
+                                        <thead>
                                             <tr>
-                                                <td><?= htmlspecialchars($order['order_id']) ?></td>
-                                                <td><?= htmlspecialchars($order['consumer_name']) ?></td>
-                                                <td>
-                                                    <span class="badge badge-<?= $order['order_status'] === 'completed' ? 'success' : ($order['order_status'] === 'canceled' ? 'danger' : 'warning') ?>">
-                                                        <?= htmlspecialchars(ucfirst($order['order_status'])) ?>
-                                                    </span>
-                                                </td>
-                                                <td><?= htmlspecialchars(date("F j, Y, g:i A", strtotime($order['order_date']))) ?></td>
-                                                <td><?= htmlspecialchars($order['pickup_location'] ?? 'N/A') ?></td>
-                                                <td>
-                                                    <button type="button" class="btn btn-info btn-sm view-pickup-details-btn"
-                                                            data-pickup-id="<?= htmlspecialchars($order['pickup_id'] ?? 'N/A') ?>"
-                                                            data-pickup-date="<?= htmlspecialchars($order['pickup_date'] ?? 'N/A') ?>"
-                                                            data-pickup-location="<?= htmlspecialchars($order['pickup_location'] ?? 'N/A') ?>"
-                                                            data-contact-person="<?= htmlspecialchars($order['contact_person'] ?? 'N/A') ?>"
-                                                            data-pickup-notes="<?= htmlspecialchars($order['pickup_notes'] ?? 'N/A') ?>"
-                                                            data-toggle="modal" data-target="#pickupDetailsModal">
-                                                        View Pickup Details
-                                                    </button>
-                                                </td>
+                                                <th>Order ID</th>
+                                                <th>Consumer</th>
+                                                <th>Status</th>
+                                                <th>Order Date</th>
+                                                <th>Pickup Details</th>
+                                                <th>Actions</th>
                                             </tr>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <tr>
-                                            <td colspan="6" class="text-center">No recent orders found.</td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
+                                        </thead>
+                                        <tbody>
+                                            <?php if (count($recentOrders) > 0): ?>
+                                                <?php foreach ($recentOrders as $order): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($order['order_id']) ?></td>
+                                                        <td><?= htmlspecialchars($order['consumer_name']) ?></td>
+                                                        <td>
+                                                            <span class="badge badge-<?= $order['order_status'] === 'completed' ? 'success' : ($order['order_status'] === 'canceled' ? 'danger' : 'warning') ?>">
+                                                                <?= htmlspecialchars(ucfirst($order['order_status'])) ?>
+                                                            </span>
+                                                        </td>
+                                                        <td><?= htmlspecialchars(date("F j, Y, g:i A", strtotime($order['order_date']))) ?></td>
+                                                        <td><?= htmlspecialchars($order['pickup_location'] ?? 'N/A') ?></td>
+                                                        <td>
+                                                            <button type="button" class="btn btn-info btn-sm view-pickup-details-btn"
+                                                                    data-pickup-id="<?= htmlspecialchars($order['pickup_id'] ?? 'N/A') ?>"
+                                                                    data-pickup-date="<?= htmlspecialchars($order['pickup_date'] ?? 'N/A') ?>"
+                                                                    data-pickup-location="<?= htmlspecialchars($order['pickup_location'] ?? 'N/A') ?>"
+                                                                    data-contact-person="<?= htmlspecialchars($order['contact_person'] ?? 'N/A') ?>"
+                                                                    data-pickup-notes="<?= htmlspecialchars($order['pickup_notes'] ?? 'N/A') ?>"
+                                                                    data-toggle="modal" data-target="#pickupDetailsModal">
+                                                                View Pickup Details
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            <?php else: ?>
+                                                <tr>
+                                                    <td colspan="6" class="text-center">No recent orders found.</td>
+                                                </tr>
+                                            <?php endif; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -859,7 +921,7 @@ if (isset($_POST['logout'])) {
                 datasets: [{
                     label: 'Products',
                     data: <?= json_encode(array_column($productSummary, 'total')) ?>,
-                    backgroundColor: ['#007bff', '#28a745', '#ffc107'],
+                    backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#17a2b8'],
                     borderWidth: 1
                 }]
             },
@@ -872,6 +934,11 @@ if (isset($_POST['logout'])) {
                         ticks: {
                             precision: 0
                         }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
                     }
                 }
             }
@@ -987,64 +1054,24 @@ if (isset($_POST['logout'])) {
                     table.column(2).search(status, true, false).draw();
                 }
             });
-            
-            // Initialize geographical analytics tables with pagination and collapsible sections
+              // Initialize geographical analytics tables with pagination and collapsible sections
             $('#cropsTable').DataTable({
                 responsive: true,
                 pageLength: 10,
                 lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, "All"]],
                 dom: '<"top"<"float-left"l><"float-right"f>><"clear">rt<"bottom"<"float-left"i><"float-right"p>>',
                 language: {
-                    search: "<i class='bi bi-search'></i>",
-                    lengthMenu: "Show _MENU_",
-                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
+                    search: "<i class='bi bi-search'></i> Search:",
+                    lengthMenu: "Show _MENU_ entries",
+                    info: "Showing _START_ to _END_ of _TOTAL_ crops",
+                    infoEmpty: "No crops available",
+                    infoFiltered: "(filtered from _MAX_ total crops)",
+                    zeroRecords: "No matching crops found",
                 },
+                order: [[1, 'desc']],
                 drawCallback: function() {
-                    // Group by Barangay with collapsible sections
-                    let api = this.api();
-                    let rows = api.rows({ page: 'current' }).nodes();
-                    let last = null;
-                    
-                    api.column(0, { page: 'current' }).data().each(function(group, i) {
-                        if (last !== group) {
-                            $(rows).eq(i).before(
-                                '<tr class="group"><td colspan="5"><button class="btn btn-sm btn-outline-success toggle-group" data-group="' + 
-                                group + '"><i class="bi bi-caret-down-fill"></i> ' + group + '</button></td></tr>'
-                            );
-                            last = group;
-                        }
-                    });
-                },
-                // Add export buttons to the crops table
-                buttons: [
-                    {
-                        extend: 'excel',
-                        text: 'Excel',
-                        title: 'Agricultural Production by Barangay',
-                        className: 'btn-sm',
-                        exportOptions: {
-                            columns: [0, 1, 2, 3, 4]
-                        }
-                    },
-                    {
-                        extend: 'csv',
-                        text: 'CSV',
-                        title: 'Agricultural Production by Barangay',
-                        className: 'btn-sm',
-                        exportOptions: {
-                            columns: [0, 1, 2, 3, 4]
-                        }
-                    },
-                    {
-                        extend: 'pdf',
-                        text: 'PDF',
-                        title: 'Agricultural Production by Barangay',
-                        className: 'btn-sm',
-                        exportOptions: {
-                            columns: [0, 1, 2, 3, 4]
-                        }
-                    }
-                ]
+                    updateProductionInsights();
+                }
             });
             
             // Initialize farmers per barangay table
@@ -1303,34 +1330,91 @@ if (isset($_POST['logout'])) {
                 ? `Report Period: ${formatDateForDisplay(startDate)} to ${formatDateForDisplay(endDate)}`
                 : 'Report Period: All Time';
             
-            // Add title
-            doc.setFontSize(18);
-            doc.setTextColor(40, 167, 69); // Green color
-            doc.text('Farmers Market Reports', 105, 15, { align: 'center' });
+            // Add logo placeholder (would be better with an actual logo)
+            doc.setFillColor(40, 167, 69); // Green color
+            doc.rect(14, 10, 15, 15, 'F');
+            doc.setTextColor(255);
+            doc.setFontSize(12);
+            doc.text('FM', 21.5, 19.5, { align: 'center' });
             
-            // Add date range and generation date
+            // Add title with professional formatting
+            doc.setFontSize(22);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(40, 167, 69); // Green color
+            doc.text('FARMERS MARKET MANAGEMENT SYSTEM', 105, 16, { align: 'center' });
+            
+            // Add subtitle
+            doc.setFontSize(16);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(40, 167, 69);
+            doc.text('Agricultural Production Report', 105, 24, { align: 'center' });
+            
+            // Add divider line
+            doc.setDrawColor(40, 167, 69);
+            doc.setLineWidth(0.5);
+            doc.line(14, 28, 196, 28);
+            
+            // Add date range and generation date with better formatting
             doc.setFontSize(10);
             doc.setTextColor(100);
+            doc.setFont(undefined, 'italic');
             const today = new Date();
             const dateStr = today.toLocaleDateString('en-PH', { 
                 year: 'numeric', 
                 month: 'long', 
-                day: 'numeric' 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
             });
-            doc.text(`Generated on: ${dateStr}`, 105, 22, { align: 'center' });
-            doc.text(dateRangeText, 105, 28, { align: 'center' });
+            doc.text(`Generated: ${dateStr}`, 14, 35);
+            doc.setFont(undefined, 'bold');
+            doc.text(dateRangeText, 14, 40);
             
-            // Define the sections to capture
+            // Add page numbers to all pages
+            const totalPages = 3; // Estimate pages
+            const addPageNumber = function(page) {
+                doc.setFont(undefined, 'italic');
+                doc.setFontSize(8);
+                doc.setTextColor(100);
+                doc.text(`Page ${page} of ${totalPages}`, 196, 285, { align: 'right' });
+            };
+            
+            // Define the sections to capture with improved layout
             const sectionsToCapture = [
-                { selector: '.row:nth-child(3)', title: 'Summary Statistics', y: 35 },
-                { selector: '.row.mb-4', title: 'Detailed Reports', y: 95 },
-                { selector: '.card.shadow-sm', title: 'Recent Orders', y: 185 }
+                { selector: '.row:nth-child(3)', title: 'Summary Statistics', y: 50, addHeader: true },
+                { selector: '.row.mb-5:first-of-type', title: 'Sales & Inventory Analytics', y: 110, addHeader: true, pageBreak: true },
+                { selector: '.row.mb-4:nth-of-type(3)', title: 'Geographical Analytics', y: 50, addHeader: true },
+                { selector: '.row.mb-5:nth-of-type(2)', title: 'Crop Production Data', y: 110, addHeader: true, pageBreak: true },
+                { selector: '.row.mb-4:nth-of-type(5)', title: 'Order Management', y: 50, addHeader: true },
+                { selector: '.card.shadow-sm', title: 'Recent Orders', y: 85, addHeader: true }
             ];
+            
+            // Function to add section header
+            const addSectionHeader = function(title, y) {
+                // Add section header background
+                doc.setFillColor(240, 250, 240);
+                doc.rect(14, y - 8, 182, 10, 'F');
+                
+                // Add section icon placeholder
+                doc.setFillColor(40, 167, 69);
+                doc.circle(20, y - 3, 3, 'F');
+                
+                // Add section title
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(12);
+                doc.setTextColor(40, 100, 40);
+                doc.text(title, 26, y - 3);
+            };
+            
+            // Track current page
+            let currentPage = 1;
             
             // Function to process each section
             const captureSection = (index) => {
                 if (index >= sectionsToCapture.length) {
-                    // All sections processed, save the PDF
+                    // All sections processed, add final page number and save the PDF
+                    addPageNumber(currentPage);
+                    
                     let filename = `FarmersMarketReport_`;
                     
                     // Include date range in filename if available
@@ -1353,11 +1437,27 @@ if (isset($_POST['logout'])) {
                 const section = sectionsToCapture[index];
                 const element = document.querySelector(section.selector);
                 
+                // Check for page break
+                if (section.pageBreak) {
+                    addPageNumber(currentPage);
+                    doc.addPage();
+                    currentPage++;
+                    
+                    // Add header to new page
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(100);
+                    doc.text('FARMERS MARKET MANAGEMENT SYSTEM', 105, 10, { align: 'center' });
+                    doc.setDrawColor(200, 200, 200);
+                    doc.setLineWidth(0.1);
+                    doc.line(14, 12, 196, 12);
+                }
+                
                 if (element) {
-                    // Add section title
-                    doc.setFontSize(14);
-                    doc.setTextColor(0);
-                    doc.text(section.title, 14, section.y - 5);
+                    // Add section header if needed
+                    if (section.addHeader) {
+                        addSectionHeader(section.title, section.y);
+                    }
                     
                     // Capture the section
                     html2canvas(element, {
@@ -1395,25 +1495,63 @@ if (isset($_POST['logout'])) {
                 month: 'short',
                 day: 'numeric'
             });
-        }
-
-        // Date filter function
+        }        // Enhanced date filter function with validation
         function applyDateFilter() {
-            const startDate = document.getElementById('start-date').value;
-            const endDate = document.getElementById('end-date').value;
+            const startDateInput = document.getElementById('start-date');
+            const endDateInput = document.getElementById('end-date');
+            const startDate = startDateInput.value;
+            const endDate = endDateInput.value;
             
+            // Clear previous error styling
+            startDateInput.classList.remove('is-invalid');
+            endDateInput.classList.remove('is-invalid');
+            document.getElementById('date-error').innerHTML = '';
+            
+            // Validate date inputs
             if (!startDate || !endDate) {
-                alert('Please select both start and end dates');
+                document.getElementById('date-error').innerHTML = 
+                    '<div class="alert alert-danger">Please select both start and end dates</div>';
+                if (!startDate) startDateInput.classList.add('is-invalid');
+                if (!endDate) endDateInput.classList.add('is-invalid');
                 return;
             }
             
-            if (new Date(startDate) > new Date(endDate)) {
-                alert('Start date cannot be after end date');
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const today = new Date();
+            
+            // Validate date range
+            if (start > end) {
+                document.getElementById('date-error').innerHTML = 
+                    '<div class="alert alert-danger">Start date cannot be after end date</div>';
+                startDateInput.classList.add('is-invalid');
+                endDateInput.classList.add('is-invalid');
                 return;
             }
+            
+            // Validate against future dates
+            if (start > today || end > today) {
+                document.getElementById('date-error').innerHTML = 
+                    '<div class="alert alert-danger">Cannot select future dates</div>';
+                if (start > today) startDateInput.classList.add('is-invalid');
+                if (end > today) endDateInput.classList.add('is-invalid');
+                return;
+            }
+            
+            // Validate maximum date range (e.g., 1 year)
+            const oneYear = 365 * 24 * 60 * 60 * 1000; // milliseconds in a year
+            if (end - start > oneYear) {
+                document.getElementById('date-error').innerHTML = 
+                    '<div class="alert alert-warning">Date range cannot exceed 1 year. Adjusting to last 365 days.</div>';
+                startDateInput.value = new Date(end.getTime() - oneYear).toISOString().split('T')[0];
+            }
+            
+            // Show loading indicator
+            document.getElementById('date-error').innerHTML = 
+                '<div class="alert alert-info">Loading data...</div>';
             
             // Redirect to the same page with date parameters
-            window.location.href = `?start_date=${startDate}&end_date=${endDate}`;
+            window.location.href = `?start_date=${startDateInput.value}&end_date=${endDateInput.value}`;
         }
         
         // Preset date range function
@@ -1517,15 +1655,18 @@ if (isset($_POST['logout'])) {
                     };
                 }
                 
-                // Add production values
-                barangayData[item.barangay_name].production += parseFloat(item.total_production || 0);
-                barangayData[item.barangay_name].area += parseFloat(item.total_planted_area || 0);
+                // Add production values - ensure we're using numbers, not strings
+                const production = parseFloat(item.total_production) || 0;
+                const area = parseFloat(item.total_planted_area) || 0;
+                
+                barangayData[item.barangay_name].production += production;
+                barangayData[item.barangay_name].area += area;
                 
                 // Store crop info for tooltip
                 barangayData[item.barangay_name].crops.push({
                     name: item.product_name,
-                    production: item.total_production,
-                    area: item.total_planted_area,
+                    production: production,
+                    area: area,
                     unit: item.production_unit,
                     areaUnit: item.area_unit
                 });
@@ -1541,7 +1682,11 @@ if (isset($_POST['logout'])) {
             
             // Sort barangays by the selected view type
             const sortedBarangays = Object.keys(barangayData).sort((a, b) => {
-                return barangayData[b][viewType] - barangayData[a][viewType];
+                if (viewType === 'yield') {
+                    return barangayData[b].yieldRate - barangayData[a].yieldRate;
+                } else {
+                    return barangayData[b][viewType] - barangayData[a][viewType];
+                }
             });
             
             // Prepare chart data based on view type
@@ -1550,7 +1695,8 @@ if (isset($_POST['logout'])) {
                 datasets: [{
                     label: viewType === 'production' ? 'Production Volume' : 
                            viewType === 'area' ? 'Planted Area' : 'Yield Rate',
-                    data: sortedBarangays.map(b => barangayData[b][viewType]),
+                    data: sortedBarangays.map(b => viewType === 'yield' ? 
+                           barangayData[b].yieldRate : barangayData[b][viewType]),
                     backgroundColor: viewType === 'production' ? '#28a745' : 
                                     viewType === 'area' ? '#007bff' : '#17a2b8',
                     borderColor: viewType === 'production' ? '#1e7e34' : 
@@ -1564,6 +1710,11 @@ if (isset($_POST['logout'])) {
                 cropProductionChart.destroy();
             }
             
+            // Get unit for display
+            const unitType = viewType === 'yield' ? 'Yield Rate (production/area)' :
+                             viewType === 'area' ? 'Planted Area (hectares)' : 
+                             'Production Volume';
+            
             // Create new chart
             cropProductionChart = new Chart(cropProductionCtx, {
                 type: 'bar',
@@ -1576,8 +1727,7 @@ if (isset($_POST['logout'])) {
                             beginAtZero: true,
                             title: {
                                 display: true,
-                                text: viewType === 'production' ? 'Production Volume' : 
-                                    viewType === 'area' ? 'Planted Area (hectares)' : 'Yield Rate (production/area)'
+                                text: unitType
                             }
                         },
                         x: {
@@ -1600,6 +1750,13 @@ if (isset($_POST['logout'])) {
                                     const topCrops = barangayData[barangay].crops
                                         .sort((a, b) => b.production - a.production)
                                         .slice(0, 3);
+                                    
+                                    if (viewType === 'yield') {
+                                        return [`Yield Rate: ${barangayData[barangay].yieldRate.toFixed(2)}`,
+                                               `Production: ${barangayData[barangay].production.toLocaleString()}`,
+                                               `Area: ${barangayData[barangay].area.toLocaleString()}`]
+                                               .concat(topCrops.map(crop => `${crop.name}: ${crop.production} ${crop.unit}`));
+                                    }
                                     
                                     return topCrops.map(crop => 
                                         `${crop.name}: ${crop.production} ${crop.unit}`);
@@ -1634,6 +1791,1088 @@ if (isset($_POST['logout'])) {
                 // Update chart
                 initCropProductionChart(viewType);
             });
+        });
+
+        // Make sure this executes after all other script loads
+        $(document).ready(function() {
+            // Check if Chart.js is loaded
+            if (typeof Chart === 'undefined') {
+                console.error("Chart.js is not loaded!");
+                return;
+            }
+            
+            // Define cropProductionChart globally if it doesn't exist
+            if (typeof cropProductionChart === 'undefined') {
+                window.cropProductionChart = null;
+            }
+            
+            // Initialize crop production data from PHP
+            const cropProductionData = <?= json_encode($cropsPerBarangay) ?>;
+            
+            // Custom function to properly initialize the crop chart
+            function initializeCropProductionChart(viewType = 'production') {
+                console.log("Initializing crop production chart with view type:", viewType);
+                
+                // Get the canvas context
+                const cropProductionCtx = document.getElementById('cropProductionChart');
+                
+                if (!cropProductionCtx) {
+                    console.error("Cannot find crop production chart canvas element");
+                    return;
+                }
+                
+                // Process data for the chart
+                const barangayData = {};
+                
+                // Group data by barangay
+                cropProductionData.forEach(item => {
+                    if (!barangayData[item.barangay_name]) {
+                        barangayData[item.barangay_name] = {
+                            production: 0,
+                            area: 0,
+                            yieldRate: 0,
+                            crops: [],
+                            units: new Set(),
+                            areaUnits: new Set()
+                        };
+                    }
+                    
+                    // Add production values
+                    const production = parseFloat(item.total_production || 0);
+                    const area = parseFloat(item.total_planted_area || 0);
+                    
+                    barangayData[item.barangay_name].production += production;
+                    barangayData[item.barangay_name].area += area;
+                    barangayData[item.barangay_name].units.add(item.production_unit);
+                    barangayData[item.barangay_name].areaUnits.add(item.area_unit);
+                    
+                    // Store crop info for tooltip
+                    barangayData[item.barangay_name].crops.push({
+                        name: item.product_name,
+                        production: production,
+                        area: area,
+                        unit: item.production_unit,
+                        areaUnit: item.area_unit
+                    });
+                });
+                
+                // Calculate yield rates
+                Object.keys(barangayData).forEach(barangay => {
+                    if (barangayData[barangay].area > 0) {
+                        barangayData[barangay].yieldRate = 
+                            barangayData[barangay].production / barangayData[barangay].area;
+                    }
+                });
+                
+                // Sort barangays by the selected view type
+                const sortedBarangays = Object.keys(barangayData).sort((a, b) => {
+                    return barangayData[b][viewType === 'yield' ? 'yieldRate' : viewType] - 
+                           barangayData[a][viewType === 'yield' ? 'yieldRate' : viewType];
+                });
+                
+                // Get unit labels based on the first item for each barangay
+                const unitLabels = {
+                    production: Array.from(new Set(cropProductionData.map(item => item.production_unit)))[0] || '',
+                    area: Array.from(new Set(cropProductionData.map(item => item.area_unit)))[0] || ''
+                };
+                
+                // Prepare chart data based on view type
+                const chartData = {
+                    labels: sortedBarangays,
+                    datasets: [{
+                        label: viewType === 'production' ? 'Production Volume' : 
+                               viewType === 'area' ? 'Planted Area' : 'Yield Rate',
+                        data: sortedBarangays.map(b => viewType === 'yield' ? 
+                            barangayData[b].yieldRate : barangayData[b][viewType]),
+                        backgroundColor: viewType === 'production' ? '#28a745' : 
+                                         viewType === 'area' ? '#007bff' : '#17a2b8',
+                        borderColor: viewType === 'production' ? '#1e7e34' : 
+                                    viewType === 'area' ? '#0056b3' : '#117a8b',
+                        borderWidth: 1
+                    }]
+                };
+                
+                // Destroy previous chart instance if it exists
+                if (window.cropProductionChart instanceof Chart) {
+                    window.cropProductionChart.destroy();
+                }
+                
+                // Create new chart
+                window.cropProductionChart = new Chart(cropProductionCtx, {
+                    type: 'bar',
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        onClick: function(event, elements) {
+                            if (elements && elements.length > 0) {
+                                const index = elements[0].index;
+                                const barangay = this.data.labels[index];
+                                highlightBarangay(barangay);
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: viewType === 'production' ? `Production Volume (${unitLabels.production})` : 
+                                          viewType === 'area' ? `Planted Area (${unitLabels.area})` : 
+                                          `Yield Rate (${unitLabels.production}/${unitLabels.area})`
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Barangays'
+                                },
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    afterTitle: function(tooltipItems) {
+                                        return 'Top Crops:';
+                                    },
+                                    afterBody: function(tooltipItems) {
+                                        const barangay = tooltipItems[0].label;
+                                        // Get top 3 crops by production for this barangay
+                                        if (barangayData[barangay]) {
+                                            const topCrops = barangayData[barangay].crops
+                                                .sort((a, b) => b.production - a.production)
+                                                .slice(0, 3);
+                                            
+                                            return topCrops.map(crop => 
+                                                `${crop.name}: ${crop.production} ${crop.unit}`);
+                                        }
+                                        return ['No crop data available'];
+                                    }
+                                }
+                            },
+                            legend: {
+                                display: false
+                            },
+                            title: {
+                                display: true,
+                                text: viewType === 'production' ? 'Crop Production by Barangay' : 
+                                      viewType === 'area' ? 'Planted Area by Barangay' : 'Agricultural Yield Rate by Barangay',
+                                font: {
+                                    size: 16
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // Update the production insights based on current data
+                updateProductionInsights();
+                
+                console.log("Crop production chart initialized successfully");
+            }
+            
+            function highlightBarangay(barangayName) {
+                // Find the barangay in the table and highlight it
+                const cropsTable = document.getElementById('cropsTable');
+                if (cropsTable) {
+                    // If DataTable is initialized
+                    if ($.fn.DataTable.isDataTable('#cropsTable')) {
+                        const dataTable = $('#cropsTable').DataTable();
+                        
+                        // Clear any existing search
+                        dataTable.search('').draw();
+                        
+                        // Apply search for this barangay
+                        dataTable.search(barangayName).draw();
+                    }
+                    
+                    // Scroll to the table
+                    cropsTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    
+                    // Visual feedback - add highlight class to matching rows
+                    $(`#cropsTable tbody tr:contains('${barangayName}')`).addClass('highlight-row');
+                    setTimeout(() => {
+                        $(`#cropsTable tbody tr`).removeClass('highlight-row');
+                    }, 3000);
+                }
+            }
+            
+            // Function to update production insights based on crop data
+            function updateProductionInsights() {
+                try {
+                    // Get crop data from the table
+                    let cropData = [];
+                    if ($.fn.DataTable.isDataTable('#cropsTable')) {
+                        const table = $('#cropsTable').DataTable();
+                        table.rows().every(function() {
+                            const rowData = this.data();
+                            if (rowData && rowData.length >= 5) {
+                                const productionParts = typeof rowData[2] === 'string' ? 
+                                    rowData[2].split(' ') : ['0', ''];
+                                
+                                cropData.push({
+                                    barangay: typeof rowData[0] === 'string' ? rowData[0] : '',
+                                    crop: typeof rowData[1] === 'string' ? rowData[1] : '',
+                                    production: parseFloat(productionParts[0].replace(/,/g, '')) || 0,
+                                    unit: productionParts[1] || '',
+                                    category: typeof rowData[4] === 'string' ? rowData[4] : 'Uncategorized'
+                                });
+                            }
+                        });
+                    } else {
+                        $('#cropsTable tbody tr').each(function() {
+                            const cells = $(this).find('td');
+                            if (cells.length >= 5) {
+                                const productionText = $(cells[2]).text();
+                                const productionParts = productionText.trim().split(' ');
+                                
+                                cropData.push({
+                                    barangay: $(cells[0]).text().trim(),
+                                    crop: $(cells[1]).text().trim(),
+                                    production: parseFloat(productionParts[0].replace(/,/g, '')) || 0,
+                                    unit: productionParts[1] || '',
+                                    category: $(cells[4]).text().trim()
+                                });
+                            }
+                        });
+                    }
+                    
+                    if (cropData.length === 0) {
+                        $('#production-insights').html('<p class="text-center">No crop data available</p>');
+                        return;
+                    }
+                    
+                    // Calculate insights
+                    const insights = calculateCropInsights(cropData);
+                    
+                    // Build insights HTML
+                    let insightsHtml = `
+                        <div class="list-group">
+                            <div class="list-group-item bg-light font-weight-bold">
+                                <i class="bi bi-award"></i> Top Producing Barangay
+                            </div>
+                            <div class="list-group-item">
+                                <h5 class="mb-1">${insights.topBarangay.name}</h5>
+                                <p class="mb-1">Total Production: ${insights.topBarangay.production.toLocaleString()} ${insights.topBarangay.unit}</p>
+                                <p class="mb-1">Top Crop: ${insights.topBarangay.topCrop}</p>
+                                <div class="progress mt-2" style="height: 5px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: 100%"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="list-group-item bg-light font-weight-bold mt-3">
+                                <i class="bi bi-star"></i> Top Crop
+                            </div>
+                            <div class="list-group-item">
+                                <h5 class="mb-1">${insights.topCrop.name}</h5>
+                                <p class="mb-1">Total Production: ${insights.topCrop.production.toLocaleString()} ${insights.topCrop.unit}</p>
+                                <p class="mb-1">Category: ${insights.topCrop.category}</p>
+                                <div class="progress mt-2" style="height: 5px;">
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: 100%"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="list-group-item bg-light font-weight-bold mt-3">
+                                <i class="bi bi-pie-chart"></i> Production by Category
+                            </div>
+                            <div class="list-group-item">
+                                <ul class="list-unstyled">
+                    `;
+                    
+                    insights.categories.forEach(category => {
+                        const percentage = (category.production / insights.totalProduction * 100).toFixed(1);
+                        insightsHtml += `
+                            <li class="mb-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>${category.name}: ${category.production.toLocaleString()} ${category.unit}</span>
+                                    <span>${percentage}%</span>
+                                </div>
+                                <div class="progress" style="height: 5px;">
+                                    <div class="progress-bar" role="progressbar" 
+                                        style="width: ${percentage}%; background-color: ${getColorForCategory(category.name)}" 
+                                        aria-valuenow="${percentage}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </li>
+                        `;
+                    });
+                    
+                    insightsHtml += `
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Update the insights container
+                    $('#production-insights').html(insightsHtml);
+                    
+                } catch (error) {
+                    console.error("Error updating production insights:", error);
+                    $('#production-insights').html(`
+                        <div class="alert alert-danger">
+                            <p>Error generating production insights. Please try again.</p>
+                        </div>
+                    `);
+                }
+            }
+            
+            // Helper function to calculate crop insights
+            function calculateCropInsights(cropData) {
+                // Calculate top barangay by production
+                const barangayProduction = {};
+                const barangayCrops = {};
+                
+                // Calculate top crop
+                const cropProduction = {};
+                const cropCategories = {};
+                
+                // Calculate category totals
+                const categoryProduction = {};
+                
+                // Get common unit
+                const units = cropData.map(item => item.unit);
+                const commonUnit = units.length > 0 ? 
+                    units.reduce((acc, curr, i, arr) => 
+                        arr.filter(v => v === acc).length >= arr.filter(v => v === curr).length ? acc : curr
+                    ) : '';
+                
+                let totalProduction = 0;
+                
+                // Process crop data
+                cropData.forEach(item => {
+                    // Barangay calculations
+                    if (!barangayProduction[item.barangay]) {
+                        barangayProduction[item.barangay] = 0;
+                        barangayCrops[item.barangay] = {};
+                    }
+                    barangayProduction[item.barangay] += item.production;
+                    
+                    if (!barangayCrops[item.barangay][item.crop]) {
+                        barangayCrops[item.barangay][item.crop] = 0;
+                    }
+                    barangayCrops[item.barangay][item.crop] += item.production;
+                    
+                    // Crop calculations
+                    if (!cropProduction[item.crop]) {
+                        cropProduction[item.crop] = 0;
+                        cropCategories[item.crop] = item.category;
+                    }
+                    cropProduction[item.crop] += item.production;
+                    
+                    // Category calculations
+                    if (!categoryProduction[item.category]) {
+                        categoryProduction[item.category] = 0;
+                    }
+                    categoryProduction[item.category] += item.production;
+                    
+                    totalProduction += item.production;
+                });
+                
+                // Find top barangay
+                let topBarangayName = '';
+                let topBarangayProduction = 0;
+                
+                for (const barangay in barangayProduction) {
+                    if (barangayProduction[barangay] > topBarangayProduction) {
+                        topBarangayName = barangay;
+                        topBarangayProduction = barangayProduction[barangay];
+                    }
+                }
+                
+                // Find top crop for top barangay
+                let topBarangayCrop = '';
+                let topBarangayCropProduction = 0;
+                
+                for (const crop in barangayCrops[topBarangayName]) {
+                    if (barangayCrops[topBarangayName][crop] > topBarangayCropProduction) {
+                        topBarangayCrop = crop;
+                        topBarangayCropProduction = barangayCrops[topBarangayName][crop];
+                    }
+                }
+                
+                // Find top crop overall
+                let topCropName = '';
+                let topCropProduction = 0;
+                
+                for (const crop in cropProduction) {
+                    if (cropProduction[crop] > topCropProduction) {
+                        topCropName = crop;
+                        topCropProduction = cropProduction[crop];
+                    }
+                }
+                
+                // Prepare category data
+                const categories = Object.keys(categoryProduction).map(name => ({
+                    name,
+                    production: categoryProduction[name],
+                    unit: commonUnit
+                })).sort((a, b) => b.production - a.production);
+                
+                return {
+                    topBarangay: {
+                        name: topBarangayName,
+                        production: topBarangayProduction,
+                        unit: commonUnit,
+                        topCrop: topBarangayCrop
+                    },
+                    topCrop: {
+                        name: topCropName,
+                        production: topCropProduction,
+                        unit: commonUnit,
+                        category: cropCategories[topCropName] || 'Uncategorized'
+                    },
+                    categories,
+                    totalProduction
+                };
+            }
+            
+            // Helper function to get colors for categories
+            function getColorForCategory(category) {
+                const categoryColors = {
+                    'Vegetables': '#28a745',
+                    'Fruits': '#fd7e14',
+                    'Grains': '#ffc107',
+                    'Root Crops': '#6f42c1',
+                    'Legumes': '#20c997',
+                    'Herbs': '#17a2b8',
+                    'Uncategorized': '#6c757d'
+                };
+                
+                return categoryColors[category] || '#007bff';
+            }
+            
+            // Call updateProductionInsights when page loads
+            updateProductionInsights();
+            
+            // Update insights when crops table changes
+            $('#cropsTable').on('draw.dt', function() {
+                updateProductionInsights();
+            });
+        });
+    </script>
+
+    <!-- Add this JavaScript code after the existing script sections in views/admin/reports.php -->
+
+    <script>
+        // Initialize crop production chart with controller data
+        $(document).ready(function() {
+            // Get crop data from PHP
+            const cropProductionData = <?= json_encode($cropsPerBarangay) ?>;
+            
+            // Initialize chart when page loads
+            initCropProductionChart('production', cropProductionData);
+            
+            // Listen for chart view changes
+            $('[data-chart-view]').click(function() {
+                const viewType = $(this).data('chart-view');
+                
+                // Update active button
+                $('[data-chart-view]').removeClass('active');
+                $(this).addClass('active');
+                
+                // Update chart with new view
+                initCropProductionChart(viewType, cropProductionData);
+            });
+            
+            // Initialize crop production chart
+            function initCropProductionChart(viewType, cropData) {
+                if (!cropData || cropData.length === 0) {
+                    console.log("No crop production data available");
+                    return;
+                }
+                
+                // Process data for the chart
+                const barangayData = processBarangayData(cropData);
+                
+                // Sort barangays by the selected view type
+                const sortedBarangays = Object.keys(barangayData).sort((a, b) => {
+                    if (viewType === 'yield') {
+                        return barangayData[b].yieldRate - barangayData[a].yieldRate;
+                    } else if (viewType === 'area') {
+                        return barangayData[b].area - barangayData[a].area;
+                    } else {
+                        return barangayData[b].production - barangayData[a].production;
+                    }
+                });
+                
+                // Limit to top 10 barangays for better visualization
+                const topBarangays = sortedBarangays.slice(0, 10);
+                
+                // Set chart colors based on view type
+                let primaryColor = '#28a745'; // Default - green for production
+                if (viewType === 'area') {
+                    primaryColor = '#007bff'; // Blue for area
+                } else if (viewType === 'yield') {
+                    primaryColor = '#17a2b8'; // Cyan for yield rate
+                }
+                
+                // Get the canvas context
+                const cropProductionCtx = document.getElementById('cropProductionChart');
+                if (!cropProductionCtx) {
+                    console.error("Cannot find cropProductionChart canvas");
+                    return;
+                }
+                
+                // Destroy previous chart if it exists
+                if (window.cropProductionChart) {
+                    window.cropProductionChart.destroy();
+                }
+                
+                // Determine label based on view type
+                let yAxisLabel = 'Production Volume';
+                let dataValues = topBarangays.map(b => barangayData[b].production);
+                
+                if (viewType === 'area') {
+                    yAxisLabel = 'Planted Area (hectares)';
+                    dataValues = topBarangays.map(b => barangayData[b].area);
+                } else if (viewType === 'yield') {
+                    yAxisLabel = 'Yield Rate (production/area)';
+                    dataValues = topBarangays.map(b => barangayData[b].yieldRate);
+                }
+                
+                // Create new chart
+                window.cropProductionChart = new Chart(cropProductionCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: topBarangays,
+                        datasets: [{
+                            label: yAxisLabel,
+                            data: dataValues,
+                            backgroundColor: primaryColor,
+                            borderColor: primaryColor,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: yAxisLabel
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Barangays'
+                                },
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    afterTitle: function(tooltipItems) {
+                                        return 'Top Crops:';
+                                    },
+                                    afterBody: function(tooltipItems) {
+                                        const barangay = tooltipItems[0].label;
+                                        const topCrops = barangayData[barangay].topCrops;
+                                        return topCrops.map(crop => 
+                                            `${crop.name}: ${crop.production.toLocaleString()} ${crop.unit}`);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // Update production insights based on the processed data
+                updateProductionInsights(barangayData);
+            }
+            
+            // Process barangay data for chart visualization
+            function processBarangayData(cropData) {
+                const barangayData = {};
+                
+                // Group data by barangay
+                cropData.forEach(item => {
+                    const barangayName = item.barangay_name;
+                    
+                    if (!barangayData[barangayName]) {
+                        barangayData[barangayName] = {
+                            production: 0,
+                            area: 0,
+                            yieldRate: 0,
+                            crops: {},
+                            topCrops: [],
+                            productionUnit: item.production_unit || '',
+                            areaUnit: item.area_unit || ''
+                        };
+                    }
+                    
+                    // Add production values
+                    const production = parseFloat(item.total_production) || 0;
+                    const area = parseFloat(item.total_planted_area) || 0;
+                    
+                    barangayData[barangayName].production += production;
+                    barangayData[barangayName].area += area;
+                    
+                    // Track individual crops
+                    if (!barangayData[barangayName].crops[item.product_name]) {
+                        barangayData[barangayName].crops[item.product_name] = {
+                            name: item.product_name,
+                            production: 0,
+                            area: 0,
+                            unit: item.production_unit || '',
+                            category: item.category_name || 'Uncategorized'
+                        };
+                    }
+                    
+                    barangayData[barangayName].crops[item.product_name].production += production;
+                    barangayData[barangayName].crops[item.product_name].area += area;
+                });
+                
+                // Calculate yield rates and get top crops for each barangay
+                Object.keys(barangayData).forEach(barangay => {
+                    // Calculate yield rate
+                    if (barangayData[barangay].area > 0) {
+                        barangayData[barangay].yieldRate = 
+                            barangayData[barangay].production / barangayData[barangay].area;
+                    }
+                    
+                    // Get top 3 crops by production
+                    const cropArray = Object.values(barangayData[barangay].crops);
+                    barangayData[barangay].topCrops = cropArray
+                        .sort((a, b) => b.production - a.production)
+                        .slice(0, 3);
+                });
+                
+                return barangayData;
+            }
+            
+            // Update production insights based on the provided data
+            function updateProductionInsights(barangayData) {
+                try {
+                    // Find top producing barangay
+                    let topBarangayName = '';
+                    let topBarangayProduction = 0;
+                    
+                    Object.keys(barangayData).forEach(barangay => {
+                        if (barangayData[barangay].production > topBarangayProduction) {
+                            topBarangayName = barangay;
+                            topBarangayProduction = barangayData[barangay].production;
+                        }
+                    });
+                    
+                    // Find top crop overall
+                    const allCrops = {};
+                    Object.keys(barangayData).forEach(barangay => {
+                        Object.keys(barangayData[barangay].crops).forEach(crop => {
+                            if (!allCrops[crop]) {
+                                allCrops[crop] = {
+                                    name: crop,
+                                    production: 0,
+                                    category: barangayData[barangay].crops[crop].category,
+                                    unit: barangayData[barangay].crops[crop].unit
+                                };
+                            }
+                            allCrops[crop].production += barangayData[barangay].crops[crop].production;
+                        });
+                    });
+                    
+                    let topCropName = '';
+                    let topCropProduction = 0;
+                    let topCropCategory = '';
+                    let topCropUnit = '';
+                    
+                    Object.keys(allCrops).forEach(crop => {
+                        if (allCrops[crop].production > topCropProduction) {
+                            topCropName = crop;
+                            topCropProduction = allCrops[crop].production;
+                            topCropCategory = allCrops[crop].category;
+                            topCropUnit = allCrops[crop].unit;
+                        }
+                    });
+                    
+                    // Calculate production by category
+                    const categories = {};
+                    let totalProduction = 0;
+                    
+                    Object.keys(allCrops).forEach(crop => {
+                        const category = allCrops[crop].category;
+                        if (!categories[category]) {
+                            categories[category] = {
+                                name: category,
+                                production: 0,
+                                unit: allCrops[crop].unit
+                            };
+                        }
+                        categories[category].production += allCrops[crop].production;
+                        totalProduction += allCrops[crop].production;
+                    });
+                    
+                    // Convert to array and sort
+                    const categoryArray = Object.values(categories).sort((a, b) => 
+                        b.production - a.production);
+                    
+                    // Build insights HTML
+                    let insightsHtml = '';
+                    
+                    if (topBarangayName) {
+                        const topBarangay = barangayData[topBarangayName];
+                        const topCrop = topBarangay.topCrops.length > 0 ? 
+                            topBarangay.topCrops[0].name : 'None';
+                        
+                        insightsHtml = `
+                            <div class="list-group">
+                                <div class="list-group-item bg-light font-weight-bold">
+                                    <i class="bi bi-award"></i> Top Producing Barangay
+                                </div>
+                                <div class="list-group-item">
+                                    <h5 class="mb-1">${topBarangayName}</h5>
+                                    <p class="mb-1">Total Production: ${topBarangay.production.toLocaleString()} ${topBarangay.productionUnit}</p>
+                                    <p class="mb-1">Top Crop: ${topCrop}</p>
+                                    <div class="progress mt-2" style="height: 5px;">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: 100%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="list-group-item bg-light font-weight-bold mt-3">
+                                    <i class="bi bi-star"></i> Top Crop
+                                </div>
+                                <div class="list-group-item">
+                                    <h5 class="mb-1">${topCropName}</h5>
+                                    <p class="mb-1">Total Production: ${topCropProduction.toLocaleString()} ${topCropUnit}</p>
+                                    <p class="mb-1">Category: ${topCropCategory}</p>
+                                    <div class="progress mt-2" style="height: 5px;">
+                                        <div class="progress-bar bg-primary" role="progressbar" style="width: 100%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="list-group-item bg-light font-weight-bold mt-3">
+                                    <i class="bi bi-pie-chart"></i> Production by Category
+                                </div>
+                                <div class="list-group-item">
+                                    <ul class="list-unstyled">`;
+                    
+                        // Add category breakdown
+                        categoryArray.forEach(category => {
+                            const percentage = totalProduction > 0 ? 
+                                (category.production / totalProduction * 100).toFixed(1) : 0;
+                                
+                            insightsHtml += `
+                                <li class="mb-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span>${category.name}: ${category.production.toLocaleString()} ${category.unit}</span>
+                                        <span>${percentage}%</span>
+                                    </div>
+                                    <div class="progress" style="height: 5px;">
+                                        <div class="progress-bar" role="progressbar" 
+                                            style="width: ${percentage}%; background-color: ${getColorForCategory(category.name)}" 
+                                            aria-valuenow="${percentage}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </li>`;
+                        });
+                        
+                        insightsHtml += `
+                                    </ul>
+                                </div>
+                            </div>`;
+                    } else {
+                        insightsHtml = '<p class="text-center">No crop data available</p>';
+                    }
+                    
+                    // Update the insights container
+                    $('#production-insights').html(insightsHtml);
+                } catch (error) {
+                    console.error("Error updating production insights:", error);
+                    $('#production-insights').html(`
+                        <div class="alert alert-danger">
+                            <p>Error generating production insights. Please try again.</p>
+                        </div>
+                    `);
+                }
+            }
+            
+            // Helper function to get colors for categories
+            function getColorForCategory(category) {
+                const categoryColors = {
+                    'Vegetables': '#28a745',
+                    'Fruits': '#fd7e14',
+                    'Grains': '#ffc107',
+                    'Root Crops': '#6f42c1',
+                    'Legumes': '#20c997',
+                    'Herbs': '#17a2b8',
+                    'Uncategorized': '#6c757d'
+                };
+                
+                return categoryColors[category] || '#007bff';
+            }
+        });
+    </script>
+
+    <!-- Enhanced season details handler -->
+    <script>
+        // Enhanced season details handler
+        $(document).ready(function() {
+            // Handle clicking on season rows
+            $('#seasonalTable').on('click', 'tbody tr', function() {
+                const seasonName = $(this).find('td:first').text().trim();
+                const seasonPeriod = $(this).find('td:last').text().trim();
+                
+                // Show loading indicator in modal
+                $('#seasonDetailsModal .modal-body').html(
+                    '<div class="d-flex justify-content-center">' +
+                        '<div class="spinner-border text-primary" role="status">' +
+                            '<span class="sr-only">Loading...</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<p class="text-center mt-2">Loading season details...</p>'
+                );
+                
+                // Show the modal
+                $('#seasonDetailsModal').modal('show');
+                
+                // Fetch season details from GeoAnalyticsController
+                $.ajax({
+                    url: '../../controllers/GeoAnalyticsController.php',
+                    type: 'GET',
+                    data: {
+                        action: 'getSeasonDetails',
+                        seasonName: seasonName
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            // Update modal content with season details
+                            updateSeasonModalContent(response);
+                        } else {
+                            // Show error message
+                            $('#seasonDetailsModal .modal-body').html(
+                                '<div class="alert alert-danger">' +
+                                    '<i class="bi bi-exclamation-triangle"></i> ' +
+                                    'Error: ' + response.message +
+                                '</div>'
+                            );
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        // Show error message
+                        $('#seasonDetailsModal .modal-body').html(
+                            '<div class="alert alert-danger">' +
+                                '<i class="bi bi-exclamation-triangle"></i> ' +
+                                'Error connecting to server. Please try again later.' +
+                            '</div>'
+                        );
+                        console.error('AJAX Error:', error);
+                    }
+                });
+            });
+            
+            // Handle print button in season details modal
+            $('#print-season-details').click(function() {
+                const seasonName = $('#season-name').text();
+                const seasonContent = $('#seasonDetailsModal .modal-body').html();
+                
+                // Open print window
+                const printWindow = window.open('', '_blank');
+                
+                // Generate print content
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Season Details: ${seasonName}</title>
+                        <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+                        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+                        <style>
+                            body { 
+                                font-family: 'Poppins', Arial, sans-serif;
+                                padding: 20px; 
+                            }
+                            h1 { 
+                                color: #28a745; 
+                                margin-bottom: 20px; 
+                                border-bottom: 2px solid #28a745;
+                                padding-bottom: 10px;
+                            }
+                            .header {
+                                text-align: center;
+                                margin-bottom: 30px;
+                            }
+                            .logo {
+                                background-color: #28a745;
+                                color: white;
+                                width: 60px;
+                                height: 60px;
+                                line-height: 60px;
+                                border-radius: 50%;
+                                font-size: 24px;
+                                font-weight: bold;
+                                display: inline-block;
+                                margin-bottom: 15px;
+                            }
+                            .section { 
+                                margin-bottom: 30px;
+                                break-inside: avoid;
+                            }
+                            .section-title {
+                                background-color: #f8f9fa;
+                                padding: 10px;
+                                border-left: 4px solid #28a745;
+                                margin-bottom: 15px;
+                            }
+                            table { 
+                                width: 100%; 
+                                border-collapse: collapse; 
+                                margin-bottom: 20px;
+                            }
+                            th, td { 
+                                padding: 8px; 
+                                border: 1px solid #dee2e6; 
+                            }
+                            th { 
+                                background-color: #f8f9fa; 
+                            }
+                            .footer {
+                                margin-top: 30px;
+                                border-top: 1px solid #dee2e6;
+                                padding-top: 10px;
+                                font-size: 12px;
+                                color: #6c757d;
+                                text-align: center;
+                            }
+                            @media print {
+                                body { padding: 0; }
+                                .no-print { display: none; }
+                                @page {
+                                    margin: 0.5in;
+                                }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="header">
+                                <div class="logo">FM</div>
+                                <h1>Season Details: ${seasonName}</h1>
+                                <p class="text-muted">Farmers Market Management System - Agricultural Report</p>
+                            </div>
+                            
+                            <div class="no-print mb-3">
+                                <button onclick="window.print()" class="btn btn-success">
+                                    <i class="bi bi-printer"></i> Print
+                                </button>
+                                <button onclick="window.close()" class="btn btn-secondary ml-2">
+                                    <i class="bi bi-x"></i> Close
+                                </button>
+                            </div>
+                            
+                            ${seasonContent}
+                            
+                            <div class="footer">
+                                Report generated on ${new Date().toLocaleString()}
+                                <br>
+                                &copy; Farmers Market Management System
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                `);
+                
+                // Finalize the print window
+                printWindow.document.close();
+                setTimeout(function() {
+                    printWindow.focus();
+                }, 500);
+            });
+            
+            // Function to update season modal content
+            function updateSeasonModalContent(data) {
+                // Build the modal content
+                let modalContent = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <strong><i class="bi bi-info-circle"></i> Season Information</strong>
+                                </div>
+                                <div class="card-body">
+                                    <h4 class="text-info" id="season-name">${data.seasonName}</h4>
+                                    <p><strong>Period:</strong> <span id="season-period">${data.startMonth} - ${data.endMonth}</span></p>
+                                    <p><strong>Description:</strong> <span id="season-description">${data.description || 'No description available'}</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <strong><i class="bi bi-plant"></i> Planting Recommendations</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p id="season-recommendations">${data.recommendations || 'No recommendations available'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                    
+                // Add top crops section if available
+                if (data.topCrops && data.topCrops.length > 0) {
+                    modalContent += `
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-light">
+                                        <strong><i class="bi bi-bar-chart"></i> Top Crops for this Season</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover" id="season-crops-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Crop</th>
+                                                        <th>Barangay</th>
+                                                        <th>Production</th>
+                                                        <th>Area</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="season-crops-data">`;
+                
+                    // Add rows for each crop
+                    data.topCrops.forEach(crop => {
+                        modalContent += `
+                            <tr>
+                                <td>${crop.product_name}</td>
+                                <td>${crop.barangay_name}</td>
+                                <td>${parseFloat(crop.total_production).toLocaleString()} ${crop.production_unit}</td>
+                                <td>${parseFloat(crop.total_planted_area).toLocaleString()} ${crop.area_unit}</td>
+                            </tr>`;
+                    });
+                    
+                    modalContent += `
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                } else {
+                    modalContent += `
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i> No crop data available for this season.
+                                </div>
+                            </div>
+                        </div>`;
+                }
+                
+                // Update the modal content
+                $('#seasonDetailsModal .modal-body').html(modalContent);
+            }
         });
     </script>
 </body>

@@ -193,15 +193,38 @@ export default function LoginScreen() {
       console.error("[Login] Error:", error);
 
       // Show appropriate error message based on error details
-      if (error.message?.includes("credentials")) {
+      if (error.message?.toLowerCase().includes("password")) {
+        // Specific error for password issues
+        Alert.alert(
+          "Invalid Password",
+          "The password you entered is incorrect. Please try again."
+        );
+      } else if (
+        error.message?.toLowerCase().includes("user") ||
+        error.message?.toLowerCase().includes("email")
+      ) {
+        // Error for email not found
+        Alert.alert(
+          "Account Not Found",
+          "No account exists with this email. Please check your email or register."
+        );
+      } else if (error.message?.includes("credentials")) {
         Alert.alert(
           "Login Failed",
           "Invalid email or password. Please try again."
         );
+      } else if (
+        error.message?.includes("network") ||
+        error.message?.includes("connect")
+      ) {
+        Alert.alert(
+          "Connection Error",
+          "Unable to connect to the server. Please check your internet connection."
+        );
       } else {
         Alert.alert(
           "Login Error",
-          error.message || "Connection error. Please try again later."
+          "An error occurred during login. Please try again later."
         );
       }
     } finally {
@@ -369,7 +392,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.push("/")}
+              onPress={() => router.push("/(tabs)")}
               style={styles.backButton}
             >
               <Ionicons

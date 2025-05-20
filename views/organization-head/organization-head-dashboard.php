@@ -875,12 +875,11 @@ function getPickupStatusColor($status) {
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <?php if (!empty($orders)): ?>
+                                <tbody>                                    <?php if (!empty($orders)): ?>
                                         <?php foreach ($orders as $order): ?>
                                             <tr>
                                                 <td><?= htmlspecialchars($order['order_id']) ?></td>
-                                                <td><?= htmlspecialchars($order['consumer_name']) ?></td>
+                                                <td><?= htmlspecialchars($order['customer_name'] ?? 'Unknown') ?></td>
                                                 <td>
                                                     <span class="badge badge-<?= 
                                                         $order['order_status'] === 'completed' ? 'success' : 
@@ -1016,24 +1015,132 @@ function getPickupStatusColor($status) {
             $('.view-order-btn').click(function() {
                 const orderId = $(this).data('order-id');
                 $('#orderDetailsContent').html('<div class="text-center py-4"><i class="bi bi-hourglass-split fa-spin"></i> Loading order details...</div>');
-                
-                // Fetch order details via AJAX
+                  // Fetch order details via AJAX
                 $.ajax({
-                    url: '../../controllers/AjaxController.php',
-                    method: 'POST',
+                    url: '../../ajax/get-order-details.php',
+                    method: 'GET',
                     data: {
-                        action: 'getOrderDetails',
-                        order_id: orderId,
-                        csrf_token: '<?= $_SESSION['csrf_token'] ?>'
+                        order_id: orderId
                     },
                     success: function(response) {
-                        $('#orderDetailsContent').html(response);
+                        try {
+                            if (typeof response === 'string') {
+                                response = JSON.parse(response);
+                            }
+                            
+                            if (response.success) {
+                                const order = response.order;
+                                const items = response.items || [];
+                                const payment = response.payment || {};
+                                const pickup = response.pickup || {};
+                                
+                                const html = `
+                                    <div class="order-details p-3">
+                                        <div class="row mb-4">
+                                            <div class="col-md-6">
+                                                <h6 class="font-weight-bold">Order Information</h6>
+                                                <p><strong>Order ID:</strong> #${order.order_id}</p>
+                                                <p><strong>Date:</strong> ${order.order_date}</p>
+                                                <p><strong>Status:</strong> <span class="badge badge-${getStatusBadgeClass(order.order_status)}">${order.order_status}</span></p>
+                                                <p><strong>Customer:</strong> ${order.customer_name || 'N/A'}</p>
+                                                <p><strong>Email:</strong> ${order.email || 'N/A'}</p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6 class="font-weight-bold">Pickup Information</h6>
+                                                <p><strong>Status:</strong> <span class="badge badge-${getStatusBadgeClass(pickup.status)}">${pickup.status}</span></p>
+                                                <p><strong>Location:</strong> ${pickup.location || 'Not specified'}</p>
+                                                <p><strong>Scheduled for:</strong> ${pickup.date || 'Not scheduled'}</p>
+                                                <p><strong>Contact Person:</strong> ${pickup.contact_person || 'Not specified'}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Payment Information -->
+                                        <div class="row mb-4">
+                                            <div class="col-md-12">
+                                                <h6 class="font-weight-bold">Payment Information</h6>
+                                                <div class="payment-info p-3 bg-light border rounded">
+                                                    <p><strong>Status:</strong> <span class="badge badge-${getStatusBadgeClass(payment.status)}">${payment.status}</span></p>
+                                                    <p><strong>Amount:</strong> ₱${Number(payment.amount).toFixed(2)}</p>
+                                                    <p><strong>Date:</strong> ${payment.date || 'Not processed'}</p>
+                                                    <p><strong>Method:</strong> ${payment.method || 'Not specified'}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        ${items.length > 0 ? `
+                                            <h6 class="mt-4 font-weight-bold">Order Items</h6>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-bordered">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Product</th>
+                                                            <th>Price</th>
+                                                            <th>Quantity</th>
+                                                            <th>Total</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        ${items.map(item => `
+                                                            <tr>
+                                                                <td>${item.product_name}</td>
+                                                                <td>₱${Number(item.price).toFixed(2)}</td>
+                                                                <td>${item.quantity}</td>
+                                                                <td>₱${Number(item.price * item.quantity).toFixed(2)}</td>
+                                                            </tr>
+                                                        `).join('')}
+                                                    </tbody>
+                                                    <tfoot>
+                                                        <tr>
+                                                            <th colspan="3" class="text-right">Total Amount:</th>
+                                                            <th>₱${Number(response.subtotal).toFixed(2)}</th>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        ` : '<div class="alert alert-info mt-4">No order items found.</div>'}
+                                        ${pickup.notes ? `
+                                            <div class="mt-3">
+                                                <h6 class="font-weight-bold">Pickup Notes:</h6>
+                                                <p>${pickup.notes}</p>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                                $('#orderDetailsContent').html(html);
+                            } else {
+                                $('#orderDetailsContent').html(`
+                                    <div class="alert alert-danger">
+                                        ${response.error || 'Failed to load order details. Please try again.'}
+                                    </div>
+                                `);
+                            }
+                        } catch(e) {
+                            console.error("Error processing response:", e);
+                            $('#orderDetailsContent').html('<div class="alert alert-danger">Error processing order details. Please try again.</div>');
+                        }
                     },
-                    error: function() {
+                    error: function(xhr, status, error) {
+                        console.error("AJAX Error:", status, error);
                         $('#orderDetailsContent').html('<div class="alert alert-danger">Failed to load order details. Please try again.</div>');
                     }
                 });
             });
+
+                        // Helper function to get badge class based on status
+            function getStatusBadgeClass(status) {
+                status = status.toLowerCase();
+                switch(status) {
+                    case 'pending': return 'warning';
+                    case 'processing': return 'info';
+                    case 'ready': return 'primary';
+                    case 'completed': return 'success';
+                    case 'cancelled': 
+                    case 'canceled': return 'danger';
+                    case 'assigned': return 'info';
+                    case 'in_transit': return 'primary';
+                    default: return 'secondary';
+                }
+            }
 
             // Initialize Calendar
             var calendarEl = document.getElementById('calendar');

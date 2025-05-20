@@ -22,6 +22,9 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 // Get order statistics with debug info
+$allOrders = $orderClass->getOrdersByStatus('all'); // Get all orders regardless of status
+error_log("All orders count: " . count($allOrders));
+
 $pendingOrders = $orderClass->getOrdersByStatus('pending'); // Note: case matters - use 'pending' not 'PENDING'
 error_log("Pending orders count: " . count($pendingOrders));
 
@@ -35,8 +38,8 @@ $totalRevenue = $orderClass->getTotalRevenue();
 error_log("Total revenue: " . $totalRevenue);
 
 // Add error checking for empty results
-if (empty($pendingOrders)) {
-    error_log("No pending orders found - verify database connection and data");
+if (empty($allOrders)) {
+    error_log("No orders found - verify database connection and data");
 }
 
 // Handle status updates
@@ -48,9 +51,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Add debug logging
         error_log("Attempting to update order #$orderId to status: $newStatus");
         
+        // Initialize response array
+        $response = array();
+        
         // Check for valid order ID
         if (!is_numeric($orderId) || $orderId <= 0) {
-            $error = "Invalid order ID";
+            $response = array(
+                'success' => false,
+                'message' => 'Invalid order ID'
+            );
             error_log("Invalid order ID: $orderId");
         } else {
             // Fix: Add proper error handling and result checking for updateOrderStatus
@@ -58,16 +67,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             if ($result) {
                 $logClass->logActivity($_SESSION['user_id'], "Updated order #$orderId status to $newStatus");
-                // Add success message
-                $success = "Order #$orderId status updated to $newStatus";
+                $response = array(
+                    'success' => true,
+                    'message' => "Order #$orderId status updated to $newStatus",
+                    'newStatus' => $newStatus
+                );
                 error_log("Successfully updated order #$orderId to status: $newStatus");
             } else {
-                $error = "Failed to update order status: " . $orderClass->getLastError();
+                $response = array(
+                    'success' => false,
+                    'message' => "Failed to update order status: " . $orderClass->getLastError()
+                );
                 error_log("Failed to update order #$orderId status. Error: " . $orderClass->getLastError());
             }
-            
-            // Don't redirect - show the success/error message instead
-            // This will prevent form resubmission issues
+        }
+        
+        // If this is an AJAX request, return JSON
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+            header('Content-Type: application/json');
+            echo json_encode($response);
+            exit;
+        } else {
+            // For non-AJAX requests, set messages for the next page load
+            if ($response['success']) {
+                $success = $response['message'];
+            } else {
+                $error = $response['message'];
+            }
         }
     }
     
@@ -171,9 +198,7 @@ function exportOrdersToCSV($orders, $startDate, $endDate) {
                         <li class="breadcrumb-item"><a href="manager-dashboard.php">Dashboard</a></li>
                         <li class="breadcrumb-item active">Order Management</li>
                     </ol>
-                </nav>
-    
-                <!-- Success/Error Messages -->
+                </nav>                <!-- Success/Error Messages -->
                 <?php if (isset($success)): ?>
                     <div class="alert alert-success alert-dismissible fade show" role="alert">
                         <i class="bi bi-check-circle-fill"></i> <?= htmlspecialchars($success) ?>
@@ -209,17 +234,7 @@ function exportOrdersToCSV($orders, $startDate, $endDate) {
                                 <i class="bi bi-box-arrow-right"></i> Logout
                             </button>
                         </form>
-                    </div>
-                </div>
-
-                <?php if (isset($error)): ?>
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="bi bi-exclamation-triangle-fill"></i> <?= htmlspecialchars($error) ?>
-                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                <?php endif; ?>
+                    </div>                </div>
 
                 <!-- Order Statistics Cards -->
                 <div class="row mb-4">
@@ -233,8 +248,7 @@ function exportOrdersToCSV($orders, $startDate, $endDate) {
                                 <p>Total Orders</p>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
+                    </div>                    <div class="col-md-3">
                         <div class="order-stat-card">
                             <div class="stat-icon text-warning">
                                 <i class="bi bi-clock"></i>
@@ -284,6 +298,8 @@ function exportOrdersToCSV($orders, $startDate, $endDate) {
                                 <select id="statusFilter" class="form-control">
                                     <option value="">All Statuses</option>
                                     <option value="pending">Pending</option>
+                                    <option value="processing">Processing</option>
+                                    <option value="ready">Ready</option>
                                     <option value="completed">Completed</option>
                                     <option value="canceled">Canceled</option>
                                 </select>
@@ -324,8 +340,7 @@ function exportOrdersToCSV($orders, $startDate, $endDate) {
                                     <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <?php if (empty($pendingOrders)): ?>
+                            <tbody>                                <?php if (empty($allOrders)): ?>
                                     <tr>
                                         <td colspan="7" class="text-center">
                                             <div class="alert alert-info">
@@ -338,7 +353,7 @@ function exportOrdersToCSV($orders, $startDate, $endDate) {
                                         </td>
                                     </tr>
                                 <?php else: ?>
-                                    <?php foreach ($pendingOrders as $order): ?>
+                                    <?php foreach ($allOrders as $order): ?>
                                     <tr>
                                         <td>#<?= $order['order_id'] ?></td>
                                         <td>
@@ -356,21 +371,19 @@ function exportOrdersToCSV($orders, $startDate, $endDate) {
                                         </td>
                                         <td><?= intval($order['item_count']) ?> items</td>
                                         <td>₱<?= number_format(floatval($order['total_amount']), 2) ?></td>
-                                        <td><?= date('M d, Y H:i', strtotime($order['order_date'])) ?></td>
-                                        <td>
-                                            <span class="badge badge-<?= getStatusBadgeClass($order['status'] ?? 'pending') ?>">
-                                                <?= ucfirst(htmlspecialchars($order['status'] ?? 'pending')) ?>
+                                        <td><?= date('M d, Y H:i', strtotime($order['order_date'])) ?></td>                                        <td>
+                                            <span class="badge badge-<?= getStatusBadgeClass($order['order_status'] ?? 'pending') ?>">
+                                                <?= ucfirst(htmlspecialchars($order['order_status'] ?? 'pending')) ?>
                                             </span>
-                                        </td>
-                                        <td>
+                                        </td>                                        <td>
                                             <div class="btn-group">
                                                 <button class="btn btn-sm btn-info view-order" 
                                                         data-id="<?= $order['order_id'] ?>"
                                                         title="View Order Details">
                                                     <i class="bi bi-eye"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-success update-status" 
+                                                </button>                                                <button class="btn btn-sm btn-success update-status" 
                                                         data-id="<?= $order['order_id'] ?>"
+                                                        data-status="<?= $order['order_status'] ?>"
                                                         title="Update Status">
                                                     <i class="bi bi-arrow-up-circle"></i>
                                                 </button>
@@ -430,9 +443,7 @@ function exportOrdersToCSV($orders, $startDate, $endDate) {
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Update Status Modal -->
+    </div>    <!-- Update Status Modal -->
     <div class="modal fade" id="updateStatusModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -440,22 +451,29 @@ function exportOrdersToCSV($orders, $startDate, $endDate) {
                     <h5 class="modal-title"><i class="bi bi-arrow-up-circle"></i> Update Order Status</h5>
                     <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
-                <form method="POST" action="manager-order-oversight.php">
-                    <div class="modal-body">
+                <form id="updateStatusForm">                    <div class="modal-body">
                         <input type="hidden" name="order_id" id="status_order_id">
                         <div class="form-group">
-                            <label>New Status</label>
-                            <select name="new_status" class="form-control" required>
-                                <!-- Removed the "processing" option as it's not in the database enum values -->
+                            <label for="current_status_display">Current Status</label>
+                            <div id="current_status_display" class="form-control bg-light"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="new_status">Update Status To</label>
+                            <select name="new_status" id="new_status" class="form-control" required>
                                 <option value="pending">Pending</option>
+                                <option value="processing">Processing</option>
+                                <option value="ready">Ready</option>
                                 <option value="completed">Completed</option>
                                 <option value="canceled">Canceled</option>
                             </select>
                         </div>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> Please review carefully before updating the order status.
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                        <button type="submit" name="update_status" class="btn btn-primary">Update Status</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Update Status</button>
                     </div>
                 </form>
             </div>
@@ -465,9 +483,14 @@ function exportOrdersToCSV($orders, $startDate, $endDate) {
     <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
-    <script src="../../public/js/manager-orders.js"></script>
-    <script>
+    <script src="../../public/js/manager-orders.js"></script>    <script>
         $(document).ready(function() {
+            // View order details button handler
+            $('.view-order').click(function() {
+                const orderId = $(this).data('id');
+                viewOrder(orderId);
+            });
+            
             // Set default dates (current month)
             const today = new Date();
             const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -476,51 +499,80 @@ function exportOrdersToCSV($orders, $startDate, $endDate) {
             const formatDate = (date) => {
                 return date.toISOString().split('T')[0];
             };
-            
-            // Set default date values
+              // Set default date values
             $('#export_start_date').val(formatDate(firstDay));
             $('#export_end_date').val(formatDate(today));
-            
-            // Ensure end date is not before start date
+
+            // Ensure date range validity
             $('#export_start_date').on('change', function() {
                 const startDate = new Date($(this).val());
                 const endDateInput = $('#export_end_date');
                 const endDate = new Date(endDateInput.val());
-                
                 if (endDate < startDate) {
                     endDateInput.val($(this).val());
                 }
             });
-            
+
             $('#export_end_date').on('change', function() {
                 const endDate = new Date($(this).val());
                 const startDateInput = $('#export_start_date');
                 const startDate = new Date(startDateInput.val());
-                
                 if (startDate > endDate) {
                     startDateInput.val($(this).val());
                 }
-            });
-
-            // Update status button handler
+            });            // Update status button handler
             $('.update-status').click(function() {
                 const orderId = $(this).data('id');
+                const currentStatus = $(this).data('status');
+                
+                // Set values in the modal
                 $('#status_order_id').val(orderId);
+                $('#new_status').val(currentStatus); // Set the current status as the selected value
+                
+                // Display current status with proper styling
+                let badgeClass = getStatusBadgeClass(currentStatus);
+                $('#current_status_display').html(
+                    `<span class="badge badge-${badgeClass}">${currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}</span>`
+                );
+                
                 $('#updateStatusModal').modal('show');
             });
         });
     </script>
 </body>
 </html>
-
 <?php
 function getStatusBadgeClass($status) {
     switch ($status) {
         case 'pending': return 'warning';
         case 'processing': return 'info';
+        case 'ready': return 'primary';
         case 'completed': return 'success';
-        case 'cancelled': return 'danger';
+        case 'canceled': return 'danger';
         default: return 'secondary';
     }
 }
 ?>
+
+<script>
+    // Handle alert positioning and auto-dismissal
+    $(document).ready(function() {
+        // Auto-dismiss alerts after 5 seconds
+        setTimeout(function() {
+            $('.alert').alert('close');
+        }, 5000);
+        
+        // Position alerts properly when created dynamically
+        $(document).on('DOMNodeInserted', '.alert', function() {
+            // Make sure alerts are stacked properly if there are multiple
+            var alertsCount = $('main[role="main"] .alert').length;
+            if (alertsCount > 1) {
+                var topPosition = 0;
+                $('main[role="main"] .alert').each(function(index) {
+                    $(this).css('top', topPosition + 'px');
+                    topPosition += $(this).outerHeight() + 10;
+                });
+            }
+        });
+    });
+</script>

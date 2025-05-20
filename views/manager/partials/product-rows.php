@@ -15,7 +15,9 @@ foreach ($filteredProducts as $product):
 ?>
 <tr class="product-row" 
     data-status="<?= htmlspecialchars($product['status'] ?? 'pending') ?>"
-    data-category="<?= htmlspecialchars($product['category_id'] ?? '') ?>">
+    data-category="<?= htmlspecialchars($product['category_id'] ?? '') ?>"
+    data-barangay="<?= htmlspecialchars($product['barangay_ids'] ?? '') ?>"
+    data-product-id="<?= htmlspecialchars($product['product_id']) ?>">
     <td>#<?= $product['product_id'] ?></td>
     <td>
         <?php if (!empty($product['image'])): ?>

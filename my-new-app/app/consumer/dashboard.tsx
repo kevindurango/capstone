@@ -213,9 +213,8 @@ export default function MainScreen() {
           router.push("/consumer/market");
           break;
         case "home":
-        default:
-          // Stay on the current dashboard
-          router.push("/consumer/dashboard");
+        default: // Stay on the current dashboard - use replace to avoid stacking screens
+          router.replace("/consumer/dashboard");
           break;
       }
     },
@@ -549,7 +548,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: 20,
-    paddingTop: 60,
+    paddingTop: 25, // Reduced from 60 to 40 to decrease space at the top
     backgroundColor: COLORS.primary,
     elevation: 4,
     shadowColor: COLORS.shadow,

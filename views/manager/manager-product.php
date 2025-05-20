@@ -474,10 +474,11 @@ function exportProductsToCSV($products) {
                                     // Display initial set of products (paginated)
                                     $displayProducts = array_slice($products, 0, $productsPerPage);
                                     foreach ($displayProducts as $product): 
-                                    ?>
-                                    <tr class="product-row" 
+                                    ?>                                    <tr class="product-row" 
                                         data-status="<?= htmlspecialchars($product['status'] ?? 'pending') ?>"
-                                        data-category="<?= htmlspecialchars($product['category_id'] ?? '') ?>">
+                                        data-category="<?= htmlspecialchars($product['category_id'] ?? '') ?>"
+                                        data-barangay="<?= htmlspecialchars($product['barangay_ids'] ?? '') ?>"
+                                        data-product-id="<?= htmlspecialchars($product['product_id']) ?>">
                                         <td>#<?= $product['product_id'] ?></td>
                                         <td>
                                             <?php if (!empty($product['image'])): ?>
@@ -777,6 +778,7 @@ function exportProductsToCSV($products) {
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+    <script src="refreshPlantedAreaData.js"></script>
     <script>
         $(document).ready(function() {
             // Initialize daterangepicker
@@ -796,57 +798,69 @@ function exportProductsToCSV($products) {
             $('#export_date_range').on('cancel.daterangepicker', function(ev, picker) {
                 $(this).val('');
             });
-            
-            // Product search functionality
-            $("#searchProduct").on("keyup", function() {
-                var value = $(this).val().toLowerCase();
-                $(".product-row").filter(function() {
-                    $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+              // Combined filter function to prevent duplicates
+            function applyFilters() {
+                var searchText = $("#searchProduct").val().toLowerCase();
+                var statusFilter = $("#statusFilter").val().toLowerCase();
+                var categoryFilter = $("#categoryFilter").val();
+                var barangayFilter = $("#barangayFilter").val();
+                
+                // Create a dictionary to track seen product IDs to avoid duplicates
+                var seenProductIds = {};
+                
+                $(".product-row").each(function() {
+                    var $row = $(this);
+                    var rowText = $row.text().toLowerCase();
+                    var rowStatus = $row.data('status');
+                    var rowCategory = $row.data('category');
+                    var rowBarangay = $row.data('barangay');
+                    var productId = $row.data('product-id');
+                    
+                    // Skip if we've already processed this product ID
+                    if (seenProductIds[productId]) {
+                        $row.hide();
+                        return;
+                    }
+                      // Check all filter conditions
+                    var matchesSearch = searchText === '' || rowText.indexOf(searchText) > -1;
+                    var matchesStatus = statusFilter === '' || rowStatus === statusFilter;
+                    var matchesCategory = categoryFilter === '' || rowCategory == categoryFilter;
+                      // Fix for barangay filtering - handle comma-separated barangay IDs
+                    var matchesBarangay = barangayFilter === '';
+                    if (!matchesBarangay && rowBarangay) {
+                        // Split the comma-separated IDs and check if the filter value is in the list
+                        var barangayIdsStr = '' + rowBarangay; // Ensure it's a string
+                        var barangayIds = barangayIdsStr.split(',');
+                        
+                        // Compare as strings to avoid type issues
+                        for (var i = 0; i < barangayIds.length; i++) {
+                            if (barangayIds[i] === barangayFilter) {
+                                matchesBarangay = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Show/hide based on all filters combined
+                    if (matchesSearch && matchesStatus && matchesCategory && matchesBarangay) {
+                        $row.show();
+                        seenProductIds[productId] = true;
+                    } else {
+                        $row.hide();
+                    }
                 });
                 
-                // Hide load more button if search is active
-                if (value) {
+                // Show/hide load more button
+                if (searchText || statusFilter || categoryFilter || barangayFilter) {
                     $("#loadMoreBtn").hide();
                 } else {
                     $("#loadMoreBtn").show();
                 }
-            });
+            }
             
-            // Status filter functionality
-            $("#statusFilter").on("change", function() {
-                var value = $(this).val().toLowerCase();
-                if (value === "") {
-                    $(".product-row").show();
-                } else {
-                    $(".product-row").hide();
-                    $(".product-row[data-status='" + value + "']").show();
-                }
-                
-                // Hide load more button if filter is active
-                if (value) {
-                    $("#loadMoreBtn").hide();
-                } else {
-                    $("#loadMoreBtn").show();
-                }
-            });
-            
-            // Category filter functionality
-            $("#categoryFilter").on("change", function() {
-                var value = $(this).val();
-                if (value === "") {
-                    $(".product-row").show();
-                } else {
-                    $(".product-row").hide();
-                    $(".product-row[data-category='" + value + "']").show();
-                }
-                
-                // Hide load more button if filter is active
-                if (value) {
-                    $("#loadMoreBtn").hide();
-                } else {
-                    $("#loadMoreBtn").show();
-                }
-            });
+            // Attach the filter function to all filter controls
+            $("#searchProduct").on("keyup", applyFilters);
+            $("#statusFilter, #categoryFilter, #barangayFilter").on("change", applyFilters);
             
             // Sort functionality
             $("#sortFilter").on("change", function() {
@@ -889,10 +903,12 @@ function exportProductsToCSV($products) {
                             return A - B;
                     }
                 });
-                
-                $.each(rows, function(index, row) {
+                  $.each(rows, function(index, row) {
                     tbody.append(row);
                 });
+                
+                // After sorting, re-apply filters to prevent any duplicates
+                applyFilters();
             });
 
             // View product details
@@ -969,8 +985,7 @@ function exportProductsToCSV($products) {
                     data: { 
                         loadMore: true, 
                         offset: offset
-                    },
-                    success: function(response) {
+                    },                    success: function(response) {
                         // Append new rows to the table
                         $("#productsTableBody").append(response);
                         
@@ -986,6 +1001,9 @@ function exportProductsToCSV($products) {
                         // Reset button state
                         button.prop('disabled', false);
                         button.find('.loading-spinner').hide();
+                        
+                        // Re-apply filters to prevent duplicates with newly loaded products
+                        applyFilters();
                     },
                     error: function() {
                         alert('Failed to load more products. Please try again.');
@@ -993,9 +1011,7 @@ function exportProductsToCSV($products) {
                         button.find('.loading-spinner').hide();
                     }
                 });
-            });
-
-            // Manage Planted Area button handler
+            });            // Manage Planted Area button handler
             $(document).on('click', '.manage-planted-area', function() {
                 const productId = $(this).data('id');
                 const productName = $(this).data('name');
@@ -1003,99 +1019,11 @@ function exportProductsToCSV($products) {
                 // Set product name in the modal header
                 $('#productNameHeader').text(productName);
                 
-                // Clear previous data
-                $('#plantedAreaTableBody').empty();
-                $('#plantedAreaAlert').hide();
+                // Use our helper function to refresh the data
+                refreshPlantedAreaData(productId);
                 
-                // Show loading state
-                $('#plantedAreaTableBody').html('<tr><td colspan="6" class="text-center"><div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></td></tr>');
-                
-                console.log("Fetching planted area data for product ID:", productId);
-                
-                // Fetch planted area data via AJAX
-                $.ajax({
-                    url: '../../ajax/get-planted-area.php',
-                    type: 'GET',
-                    data: { product_id: productId },
-                    dataType: 'json',
-                    success: function(response) {
-                        $('#plantedAreaTableBody').empty();
-                        
-                        // Debug: Log the response from the server
-                        console.log("AJAX Response:", response);
-
-                        if (response.success) {
-                            if (response.data && response.data.length > 0) {
-                                // Debug: Log the first row of data
-                                console.log("First row of data:", response.data[0]);
-
-                                // Populate the table with the data
-                                $.each(response.data, function(index, item) {
-                                    // Parse numeric strings to actual numbers
-                                    const estimatedProduction = parseFloat(item.estimated_production);
-                                    const plantedArea = parseFloat(item.planted_area);
-
-                                    // Ensure valid numeric values or default to 0.00
-                                    const validEstimatedProduction = isNaN(estimatedProduction) ? '0.00' : estimatedProduction.toFixed(2);
-                                    const validPlantedArea = isNaN(plantedArea) ? '0.00' : plantedArea.toFixed(2);
-
-                                    console.log(`Row ${index} parsed values:`, {
-                                        estimatedProduction: validEstimatedProduction,
-                                        plantedArea: validPlantedArea
-                                    });
-
-                                    let row = `
-                                        <tr>
-                                            <td>${item.barangay_name || 'N/A'}</td>
-                                            <td>${item.season_name || 'N/A'}</td>
-                                            <td>${validEstimatedProduction}</td>
-                                            <td>${item.production_unit || 'kilogram'}</td>
-                                            <td>${validPlantedArea}</td>
-                                            <td>
-                                                <button class="btn btn-sm btn-primary edit-planted-area" 
-                                                        data-id="${item.id}"
-                                                        data-product-id="${productId}"
-                                                        data-barangay="${item.barangay_name || ''}"
-                                                        data-season="${item.season_name || ''}"
-                                                        data-production="${validEstimatedProduction}"
-                                                        data-unit="${item.production_unit || 'kilogram'}"
-                                                        data-area="${validPlantedArea}">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    `;
-                                    $('#plantedAreaTableBody').append(row);
-                                });
-                            } else {
-                                // No data found
-                                $('#plantedAreaTableBody').html('<tr><td colspan="6" class="text-center">No planted area data found for this product.</td></tr>');
-                                $('#plantedAreaAlert').removeClass('alert-danger').addClass('alert-info')
-                                    .html('<strong>Info:</strong> No planted area data exists for this product yet. Click Edit to create new entries.')
-                                    .show();
-                            }
-                        } else {
-                            // Error message
-                            $('#plantedAreaAlert').removeClass('alert-success').addClass('alert-danger')
-                                .html('<strong>Error:</strong> ' + (response.message || 'Failed to load planted area data.'))
-                                .show();
-                            $('#plantedAreaTableBody').html('<tr><td colspan="6" class="text-center">Failed to fetch planted area data.</td></tr>');
-                        }
-                        
-                        // Show the modal
-                        $('#plantedAreaModal').modal('show');
-                    },
-                    error: function(xhr, status, error) {
-                        console.error("AJAX Error:", status, error);
-                        console.log("Response:", xhr.responseText);
-                        
-                        $('#plantedAreaAlert').removeClass('alert-success').addClass('alert-danger')
-                            .html('<strong>Error:</strong> Failed to load planted area data. Please check the console for details.')
-                            .show();
-                        $('#plantedAreaTableBody').html('<tr><td colspan="6" class="text-center">Error loading data. Please try again later.</td></tr>');
-                        $('#plantedAreaModal').modal('show');
-                    }
-                });
+                // Show the modal
+                $('#plantedAreaModal').modal('show');
             });
 
             // Edit planted area button click handler
@@ -1120,12 +1048,14 @@ function exportProductsToCSV($products) {
                 // Show the edit modal
                 $('#plantedAreaModal').modal('hide');
                 $('#editPlantedAreaModal').modal('show');
-            });
-
-            // Handle edit planted area form submission
+            });            // Handle edit planted area form submission
             $('#editPlantedAreaForm').on('submit', function(e) {
                 e.preventDefault();
                 const formData = $(this).serialize();
+                
+                // Disable the submit button to prevent multiple submissions
+                const $submitBtn = $(this).find('button[type="submit"]');
+                $submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
                 
                 $.ajax({
                     url: '../../ajax/update-planted-area.php',
@@ -1138,61 +1068,42 @@ function exportProductsToCSV($products) {
                             $('#editPlantedAreaModal').modal('hide');
                             
                             // Show success message
-                            $('#plantedAreaAlert').removeClass('alert-danger').addClass('alert-success').text(response.message).show();
+                            $('#plantedAreaAlert').removeClass('alert-danger').addClass('alert-success')
+                                .html('<strong>Success:</strong> ' + response.message)
+                                .show();
                             
                             // Re-fetch the planted area data to refresh the table
                             const productId = $('#edit_product_id').val();
+                              // Use the helper function to refresh data
+                            refreshPlantedAreaData(productId);
                             
-                            // Fetch updated data
-                            $.ajax({
-                                url: '../../ajax/get-planted-area.php',
-                                type: 'GET',
-                                data: { product_id: productId },
-                                dataType: 'json',
-                                success: function(dataResponse) {
-                                    $('#plantedAreaTableBody').empty();
-                                    
-                                    if (dataResponse.success && dataResponse.data.length > 0) {
-                                        // Populate the table with the updated data
-                                        $.each(dataResponse.data, function(index, item) {
-                                            let row = `
-                                                <tr>
-                                                    <td>${item.barangay_name}</td>
-                                                    <td>${item.season_name}</td>
-                                                    <td>${item.estimated_production}</td>
-                                                    <td>${item.production_unit}</td>
-                                                    <td>${item.planted_area}</td>
-                                                    <td>
-                                                        <button class="btn btn-sm btn-primary edit-planted-area" 
-                                                                data-id="${item.id}"
-                                                                data-product-id="${productId}"
-                                                                data-barangay="${item.barangay_name}"
-                                                                data-season="${item.season_name}"
-                                                                data-production="${item.estimated_production}"
-                                                                data-unit="${item.production_unit}"
-                                                                data-area="${item.planted_area}">
-                                                            <i class="bi bi-pencil"></i>
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            `;
-                                            $('#plantedAreaTableBody').append(row);
-                                        });
-                                    } else {
-                                        $('#plantedAreaTableBody').html('<tr><td colspan="6" class="text-center">No planted area data found for this product.</td></tr>');
-                                    }
-                                    
-                                    // Show the planted area modal again
-                                    $('#plantedAreaModal').modal('show');
-                                }
-                            });
-                        } else {
-                            // Show error message
-                            alert(response.message);
+                            // Show the planted area modal again
+                            $('#plantedAreaModal').modal('show');                        } else {
+                            // Show error message in modal
+                            $('#plantedAreaAlert').removeClass('alert-success').addClass('alert-danger')
+                                .html('<strong>Error:</strong> ' + (response.message || 'Failed to update planted area data.'))
+                                .show();
+                            
+                            // Return to main modal
+                            $('#editPlantedAreaModal').modal('hide');
+                            $('#plantedAreaModal').modal('show');
                         }
                     },
-                    error: function() {
-                        alert('Failed to update planted area. Please try again.');
+                    error: function(xhr, status, error) {
+                        console.error("AJAX Error:", status, error);
+                        
+                        // Show error message
+                        $('#plantedAreaAlert').removeClass('alert-success').addClass('alert-danger')
+                            .html('<strong>Error:</strong> Failed to connect to server. Please try again.')
+                            .show();
+                        
+                        // Return to main modal
+                        $('#editPlantedAreaModal').modal('hide');
+                        $('#plantedAreaModal').modal('show');
+                    },
+                    complete: function() {
+                        // Re-enable the submit button
+                        $submitBtn.prop('disabled', false).html('Save Changes');
                     }
                 });
             });

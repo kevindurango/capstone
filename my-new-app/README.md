@@ -67,3 +67,31 @@ The app uses a smart server discovery mechanism:
 - `/app` - React Native frontend screens
 - `/components` - Reusable React components
 - `/services` - JavaScript services for API communication and business logic
+
+## Image Loading Optimization
+
+The app uses optimized image loading through the `OptimizedImage` component that leverages:
+
+- **expo-image**: A high-performance image component with advanced caching
+- Memory and disk caching for faster loading times
+- Automatic error handling and fallbacks
+- Progressive loading with smooth transitions
+
+To use the optimized image component:
+
+```jsx
+import OptimizedImage from '@/components/ui/OptimizedImage';
+
+// Basic usage
+<OptimizedImage source={imageUrl} />
+
+// With advanced options
+<OptimizedImage
+  source={imageUrl}
+  cachePolicy="memory-disk"
+  transition={300}
+  contentFit="cover"
+/>
+```
+
+This provides better performance than the standard React Native Image component.

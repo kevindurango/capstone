@@ -18,6 +18,7 @@ type AuthContextType = {
   login: (credentials: LoginCredentials) => Promise<any>;
   logout: () => Promise<void>;
   register: (userData: RegisterData) => Promise<any>;
+  updateUserContext: (userData: any) => void;
 };
 
 // Storage keys
@@ -42,6 +43,7 @@ export const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   logout: async () => {},
   register: async () => {},
+  updateUserContext: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -202,6 +204,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const updateUserContext = useCallback((userData: any) => {
+    setUser(userData);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -214,6 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isFarmer,
         isConsumer,
         userRole, // Expose userRole directly in the context
+        updateUserContext,
       }}
     >
       {children}

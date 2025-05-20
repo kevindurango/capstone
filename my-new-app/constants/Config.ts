@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { LOCAL_IP_ADDRESS } from "./IPConfig";
+import { getImagePaths } from "./ImageUtils";
 
 // Development flag and network timeout
 const DEV_MODE = true;
@@ -70,31 +71,48 @@ export const getApiUrl = (endpoint: string): string => {
 export const getImageUrl = (imagePath: string | null | undefined): string => {
   if (!imagePath) return "";
 
-  // If the image path already contains a URL, return it as is
-  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
-    return imagePath;
+  try {
+    // Debug log to see what paths we're receiving
+    console.log(`[Config] Processing image path: ${imagePath}`);
+
+    // Handle case where path contains encoded query parameters (like %3ft%3d)
+    let cleanedPath = imagePath;
+    if (cleanedPath.includes("%3f") || cleanedPath.includes("%3F")) {
+      // Extract the base path without the encoded query string
+      cleanedPath = cleanedPath.split("%3f")[0].split("%3F")[0];
+      console.log(`[Config] Cleaned encoded path: ${cleanedPath}`);
+    }
+
+    // Special case for problematic product 75 image
+    if (cleanedPath.includes("product_6829ff66d0bac.jpeg")) {
+      console.log(`[Config] Using direct API path for problematic image`);
+      return `http://${LOCAL_IP_ADDRESS}/capstone/api/image.php?path=product_6829ff66d0bac.jpeg&t=${Date.now()}`;
+    }
+
+    // Check if path is already a capstone URL pattern from logs (most common pattern)
+    if (
+      cleanedPath?.startsWith("http") &&
+      cleanedPath.includes("capstone/public/uploads")
+    ) {
+      // Add timestamp to prevent caching
+      const timestamp = `t=${Date.now()}`;
+      return `${cleanedPath}${cleanedPath.includes("?") ? "&" : "?"}${timestamp}`;
+    }
+
+    // Use our getImagePaths utility to get the primary URL
+    const possiblePaths = getImagePaths(cleanedPath);
+
+    // Return the primary URL if available
+    if (possiblePaths.length > 0) {
+      return possiblePaths[0];
+    }
+
+    // Fallback to empty string if no path could be generated
+    return "";
+  } catch (error) {
+    console.error("[Config] Error processing image URL:", error, imagePath);
+    return ""; // Return empty string on error
   }
-
-  // Remove any leading slashes for consistency
-  const cleanPath = imagePath.startsWith("/") ? imagePath.substring(1) : imagePath;
-
-  // For paths like 'uploads/products/...' - direct path from xampp root
-  if (cleanPath.includes("uploads/products/")) {
-    return `${rootUrl}/${cleanPath}`;
-  }
-
-  // If it's just a filename without path, assume it's in uploads/products
-  if (!cleanPath.includes("/")) {
-    return `${rootUrl}/uploads/products/${cleanPath}`;
-  }
-
-  // If it has 'public/' prefix, strip that out as it's likely not in URL path
-  if (cleanPath.startsWith("public/")) {
-    return `${rootUrl}/${cleanPath.substring(7)}`;
-  }
-
-  // As a fallback, return the cleaned path with root URL
-  return `${rootUrl}/${cleanPath}`;
 };
 
 export const Config = {
