@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 20, 2025 at 10:30 AM
+-- Generation Time: May 23, 2025 at 09:04 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -503,7 +503,63 @@ INSERT INTO `activitylogs` (`log_id`, `user_id`, `action`, `action_date`) VALUES
 (452, 21, 'Approved product with ID: 77', '2025-05-19 03:52:51'),
 (453, 45, 'User logged out', '2025-05-19 03:52:57'),
 (454, 40, 'User logged in.', '2025-05-19 03:53:10'),
-(455, 40, 'Payment processed for order #20 using cash_on_pickup. Status: pending', '2025-05-19 03:54:16');
+(455, 40, 'Payment processed for order #20 using cash_on_pickup. Status: pending', '2025-05-19 03:54:16'),
+(456, 40, 'Payment processed for order #21 using gcash. Status: completed', '2025-05-20 08:37:15'),
+(457, 40, 'Payment processed for order #22 using gcash. Status: completed', '2025-05-20 08:51:03'),
+(458, 23, 'Manager logged in.', '2025-05-20 09:46:17'),
+(459, 40, 'User logged out', '2025-05-20 09:48:53'),
+(460, 45, 'Farmer logged in.', '2025-05-20 09:50:45'),
+(461, 45, 'Farmer logged in.', '2025-05-20 09:51:07'),
+(462, 45, 'Farmer ID: 45 updated product ID: 65 details - Name: Tagabang (Winged Bean), Price: 40, Stock: 500, Unit: kilogram', '2025-05-20 09:54:31'),
+(463, 45, 'User logged out', '2025-05-20 09:55:13'),
+(464, 40, 'User logged in.', '2025-05-20 09:55:46'),
+(465, 40, 'User logged out', '2025-05-20 10:10:20'),
+(466, 46, 'User registered: dayn', '2025-05-21 03:09:52'),
+(467, 46, 'User logged in.', '2025-05-21 03:10:10'),
+(468, 46, 'User logged out', '2025-05-21 03:10:14'),
+(469, 46, 'User logged in.', '2025-05-21 03:57:09'),
+(470, 46, 'User logged out', '2025-05-21 04:16:38'),
+(471, 46, 'Password reset completed for user ID: 46', '2025-05-21 07:31:27'),
+(472, 46, 'User logged in.', '2025-05-21 07:31:39'),
+(473, 24, 'Organization Head logged in successfully', '2025-05-22 05:04:14'),
+(474, 24, 'Organization Head logged in.', '2025-05-22 05:04:14'),
+(475, 24, 'Organization Head logged out.', '2025-05-22 05:05:55'),
+(476, 23, 'Manager logged in.', '2025-05-22 05:06:14'),
+(477, 23, 'Unauthorized access attempt to product management', '2025-05-22 05:46:50'),
+(478, 46, 'User logged out', '2025-05-22 09:56:20'),
+(479, 40, 'User logged in.', '2025-05-22 09:56:34'),
+(480, 40, 'User logged out', '2025-05-22 09:57:10'),
+(481, 45, 'Farmer logged in.', '2025-05-22 09:57:23'),
+(482, 45, 'Farmer ID: 45 viewed their orders', '2025-05-22 10:15:29'),
+(483, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-22 10:15:29'),
+(484, 21, 'Admin logged in', '2025-05-22 19:31:38'),
+(485, 23, 'Manager logged in.', '2025-05-22 19:31:54'),
+(486, 24, 'Organization Head logged in successfully', '2025-05-22 19:32:15'),
+(487, 24, 'Organization Head logged in.', '2025-05-22 19:32:16'),
+(488, 45, 'Farmer ID: 45 deleted product ID: 76', '2025-05-22 20:35:07'),
+(489, 45, 'User logged out', '2025-05-22 20:35:18'),
+(490, 40, 'User logged in.', '2025-05-22 20:35:31'),
+(491, 40, 'User logged in.', '2025-05-22 20:57:58'),
+(492, 40, 'User logged out', '2025-05-22 20:59:49'),
+(493, 45, 'Farmer logged in.', '2025-05-22 20:59:59'),
+(494, 45, 'Farmer ID: 45 viewed their orders', '2025-05-22 21:00:03'),
+(495, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-22 21:00:03'),
+(496, 45, 'Farmer ID: 45 viewed their orders', '2025-05-22 21:02:41'),
+(497, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-22 21:02:41'),
+(498, 45, 'Farmer ID: 45 viewed their orders', '2025-05-23 06:55:20'),
+(499, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-23 06:55:20'),
+(500, 45, 'User logged out', '2025-05-23 06:56:12'),
+(501, 40, 'User logged in.', '2025-05-23 06:56:22'),
+(502, 40, 'User logged out', '2025-05-23 06:57:00'),
+(503, 40, 'User logged in.', '2025-05-23 06:57:11'),
+(504, 40, 'User logged out', '2025-05-23 06:57:29'),
+(505, 40, 'User logged in.', '2025-05-23 06:58:30'),
+(506, 40, 'User logged out', '2025-05-23 07:01:15'),
+(507, 45, 'Farmer logged in.', '2025-05-23 07:01:32'),
+(508, 45, 'Farmer ID: 45 updated product ID: 77 details - Name: Test, Price: 50, Stock: 99, Unit: piece', '2025-05-23 07:03:24'),
+(509, 45, 'Farmer ID: 45 deleted product ID: 65', '2025-05-23 07:03:28'),
+(510, 45, 'User logged out', '2025-05-23 07:03:45'),
+(511, 40, 'User logged in.', '2025-05-23 07:04:00');
 
 -- --------------------------------------------------------
 
@@ -718,7 +774,6 @@ INSERT INTO `barangay_products` (`id`, `barangay_id`, `product_id`, `estimated_p
 (125, 1, 71, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
 (126, 1, 68, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
 (127, 1, 64, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
-(128, 7, 65, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', 13),
 (129, 1, 66, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
 (131, 1, 46, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
 (132, 1, 44, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
@@ -732,8 +787,6 @@ INSERT INTO `barangay_products` (`id`, `barangay_id`, `product_id`, `estimated_p
 (143, 1, 64, 850.00, 'bunch', 2025, 1, 1.70, 'hectare', NULL),
 (144, 12, 64, 780.00, 'bunch', 2025, 2, 1.50, 'hectare', 12),
 (145, 14, 64, 660.00, 'bunch', 2025, 4, 1.30, 'hectare', NULL),
-(146, 4, 65, 280.00, 'kilogram', 2025, 2, 0.60, 'hectare', NULL),
-(147, 11, 65, 320.00, 'kilogram', 2025, 3, 0.70, 'hectare', NULL),
 (148, 8, 66, 180.00, 'bunch', 2025, 1, 0.40, 'hectare', NULL),
 (149, 15, 66, 210.00, 'bunch', 2025, 2, 0.50, 'hectare', 7),
 (150, 2, 67, 260.00, 'kilogram', 2025, 3, 0.60, 'hectare', NULL),
@@ -759,8 +812,6 @@ INSERT INTO `barangay_products` (`id`, `barangay_id`, `product_id`, `estimated_p
 (170, 12, 47, 620.00, 'bunch', 2025, 3, 1.30, 'hectare', NULL),
 (171, 8, 49, 390.00, 'kilogram', 2025, 3, 0.95, 'hectare', NULL),
 (172, 15, 49, 420.00, 'kilogram', 2025, 3, 1.05, 'hectare', NULL),
-(177, 7, 65, 0.00, 'kilogram', 2025, 1, 0.00, '0', 15),
-(178, 7, 76, 0.00, 'bag', 2025, 1, 0.00, 'hectare', 15),
 (179, 7, 77, 0.00, 'box', 2025, 1, 0.00, 'hectare', 13);
 
 -- --------------------------------------------------------
@@ -1045,7 +1096,9 @@ INSERT INTO `orderitems` (`order_item_id`, `order_id`, `product_id`, `quantity`,
 (64, 19, 48, 2, 75.00),
 (65, 19, 49, 2, 120.00),
 (66, 20, 77, 1, 50.00),
-(67, 21, 62, 1, 120.00);
+(67, 21, 62, 1, 120.00),
+(68, 22, 62, 1, 120.00),
+(69, 23, 64, 1, 65.00);
 
 -- --------------------------------------------------------
 
@@ -1086,7 +1139,9 @@ INSERT INTO `orders` (`order_id`, `consumer_id`, `order_status`, `order_date`, `
 (18, 40, 'pending', '2025-05-19 03:08:10', 'Municipal Agriculture Office'),
 (19, 40, 'pending', '2025-05-19 03:17:49', 'Municipal Agriculture Office'),
 (20, 40, 'pending', '2025-05-19 03:54:12', 'Municipal Agriculture Office'),
-(21, 40, 'pending', '2025-05-20 08:14:03', 'Municipal Agriculture Office');
+(21, 40, 'completed', '2025-05-20 08:14:03', 'Municipal Agriculture Office'),
+(22, 40, 'completed', '2025-05-20 08:50:41', 'Municipal Agriculture Office'),
+(23, 40, 'pending', '2025-05-20 08:54:41', 'Municipal Agriculture Office');
 
 --
 -- Triggers `orders`
@@ -1124,6 +1179,39 @@ CREATE TABLE `organizations` (
 
 INSERT INTO `organizations` (`organization_id`, `name`, `description`, `address`, `contact_number`, `email`, `created_at`, `updated_at`) VALUES
 (1, 'Default Organization', 'Default organization for the system', NULL, NULL, NULL, '2025-03-23 14:30:06', '2025-03-23 14:30:06');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `password_reset_tokens`
+--
+
+CREATE TABLE `password_reset_tokens` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `token` varchar(255) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `expires_at` timestamp NOT NULL DEFAULT (current_timestamp() + interval 24 hour),
+  `used` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `password_reset_tokens`
+--
+
+INSERT INTO `password_reset_tokens` (`id`, `user_id`, `token`, `created_at`, `expires_at`, `used`) VALUES
+(1, 46, 'ab5681ae75baf468a13aa5e25b0d63435a187e226e4395deef4d150f6f46e3da', '2025-05-21 07:13:23', '2025-05-22 01:13:23', 1),
+(2, 46, '9d8e2c74add70462ae95c5db038d6df92e025d30745bb1d0190b733d51e934ba', '2025-05-21 07:13:26', '2025-05-22 01:13:26', 1),
+(3, 46, '62e67cddc38482e0e29cdbb88660b7e18a6a0e47b66891408fab8dd566d43732', '2025-05-21 07:13:27', '2025-05-22 01:13:27', 1),
+(4, 46, '4e4944fb52547e7672f0987bc75e3b2e24f59d3e8cd1f1cca6a02eb577ac9a6b', '2025-05-21 07:17:46', '2025-05-22 01:17:46', 1),
+(5, 46, '62d2893eca97bea8cf0adf162bfb36d27140b34a5bdb493618fd8a104715b372', '2025-05-21 07:17:49', '2025-05-22 01:17:49', 1),
+(6, 46, '2066f10ae495b0f21b54dcdd04a7e10ebdc8512e0f2c29e66d6552cd7a3d6ae2', '2025-05-21 07:19:30', '2025-05-22 01:19:30', 1),
+(7, 46, '3013820fbe5787f3507a84894747182bcff3bbc5593e4f3d851f1df2e62e0e2f', '2025-05-21 07:20:07', '2025-05-22 01:20:07', 1),
+(8, 46, '623d33f839c8ed7fc639e47188f6c2c46c6f79b26cc95abc3870b932fe7a9987', '2025-05-21 07:21:03', '2025-05-22 01:21:03', 1),
+(9, 46, 'e09ed58823cf3138d863a154069a89477510df4ffa4e48016e96c8dc49b9e0eb', '2025-05-21 07:23:10', '2025-05-22 01:23:10', 1),
+(10, 46, '87e9d32eb4a817f290559641d9eeb665b5c8423e7c83ca62c5373bfba970e61d', '2025-05-21 07:25:38', '2025-05-22 01:25:38', 1),
+(11, 46, '43eda822a31d659ed7b9f6a7797d3499f13c329ec18fc1f72d7f44b0e1859ae5', '2025-05-21 07:27:32', '2025-05-22 01:27:32', 1),
+(12, 46, '00e32a5d4289019d08bae94ed5a024ad0b5c7c5ad37031643c2973658b47c1bd', '2025-05-21 07:30:36', '2025-05-22 01:30:36', 1);
 
 -- --------------------------------------------------------
 
@@ -1171,7 +1259,9 @@ INSERT INTO `payments` (`payment_id`, `order_id`, `payment_method`, `method_id`,
 (18, 17, 'cash_on_pickup', 4, 'pending', '2025-05-19 02:16:46', 40, 165.00, 'CP-17-20250519-C003', NULL, 0, NULL),
 (19, 18, 'cash_on_pickup', 4, 'pending', '2025-05-19 03:08:15', 40, 97.00, 'CP-18-20250519-82A7', NULL, 0, NULL),
 (20, 19, 'cash_on_pickup', 4, 'pending', '2025-05-19 03:17:56', 40, 390.00, 'CP-19-20250519-A362', NULL, 0, NULL),
-(21, 20, 'cash_on_pickup', 4, 'pending', '2025-05-19 03:54:16', 40, 50.00, 'CP-20-20250519-3E73', NULL, 0, NULL);
+(21, 20, 'cash_on_pickup', 4, 'pending', '2025-05-19 03:54:16', 40, 50.00, 'CP-20-20250519-3E73', NULL, 0, NULL),
+(22, 21, 'gcash', 5, 'completed', '2025-05-20 08:37:15', 40, 120.00, '68890075456890', NULL, 0, NULL),
+(23, 22, 'gcash', 5, 'completed', '2025-05-20 08:51:03', 40, 120.00, '6282819191', NULL, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -1202,6 +1292,14 @@ CREATE TABLE `payment_gcash` (
   `reference_id` varchar(100) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `payment_gcash`
+--
+
+INSERT INTO `payment_gcash` (`id`, `payment_id`, `phone_number`, `reference_id`, `created_at`) VALUES
+(1, 22, '09658852335', '68890075456890', '2025-05-20 08:37:15'),
+(2, 23, '09653365523', '6282819191', '2025-05-20 08:51:03');
 
 -- --------------------------------------------------------
 
@@ -1281,7 +1379,9 @@ INSERT INTO `payment_status_history` (`history_id`, `payment_id`, `status`, `not
 (18, 18, 'pending', NULL, '2025-05-19 02:16:46'),
 (19, 19, 'pending', NULL, '2025-05-19 03:08:15'),
 (20, 20, 'pending', NULL, '2025-05-19 03:17:56'),
-(21, 21, 'pending', NULL, '2025-05-19 03:54:16');
+(21, 21, 'pending', NULL, '2025-05-19 03:54:16'),
+(22, 22, 'completed', NULL, '2025-05-20 08:37:15'),
+(23, 23, 'completed', NULL, '2025-05-20 08:51:03');
 
 -- --------------------------------------------------------
 
@@ -1321,12 +1421,14 @@ INSERT INTO `pickups` (`pickup_id`, `order_id`, `payment_id`, `pickup_status`, `
 (13, 13, 15, 'pending', '2025-05-16 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
 (14, 14, 16, 'ready', '2025-05-26 16:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', ''),
 (15, 15, 17, 'pending', '2025-05-18 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
-(16, 16, NULL, 'pending', NULL, 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(16, 16, NULL, 'pending', '1970-01-01 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
 (17, 17, 18, 'pending', '2025-05-20 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
 (18, 18, 19, 'pending', '2025-05-29 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
 (19, 19, 20, 'pending', '2025-05-29 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
 (20, 20, 21, 'pending', '2025-05-22 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
-(21, 21, NULL, 'pending', NULL, 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL);
+(21, 21, 22, 'pending', '2025-05-21 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(22, 22, 23, 'pending', '2025-05-21 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(23, 23, NULL, 'pending', NULL, 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL);
 
 --
 -- Triggers `pickups`
@@ -1426,8 +1528,6 @@ INSERT INTO `productcategorymapping` (`product_id`, `category_id`) VALUES
 (63, 17),
 (64, 1),
 (64, 20),
-(65, 2),
-(65, 27),
 (66, 6),
 (66, 12),
 (67, 16),
@@ -1437,7 +1537,6 @@ INSERT INTO `productcategorymapping` (`product_id`, `category_id`) VALUES
 (71, 18),
 (72, 21),
 (73, 21),
-(76, 20),
 (77, 14);
 
 -- --------------------------------------------------------
@@ -1479,10 +1578,9 @@ INSERT INTO `products` (`product_id`, `name`, `description`, `price`, `farmer_id
 (56, 'Sayote (Chayote)', 'Crisp, pale green squash grown in the cooler highland regions of Valencia. These versatile vegetables have a mild flavor that absorbs the taste of whatever they&#039;re cooked with. Popular in soups, stir-fries, and Filipino vegetable dishes.', 35.00, 20, 'approved', '2025-04-09 15:39:55', '2025-05-05 03:35:38', 'uploads/products/680ae57d79969_sayote.png', 230, 'kilogram'),
 (57, 'Repolyo (Cabbage)', 'Fresh, compact cabbage heads grown in the cool mountain farms of Sagbang. These cabbages have tightly packed, crisp leaves perfect for salads, soups, and traditional Filipino dishes like lumpia and pancit. Grown by local farmers in Valencia, Negros Oriental.', 50.00, 20, 'approved', '2025-04-09 15:39:55', '2025-05-05 03:35:38', 'uploads/products/680ae4e249743_cabbage.png', 180, 'kilogram'),
 (58, 'Organic Carrots', 'Sweet, crunchy carrots organically grown in nutrient-rich soil from the highland farms of Jawa. These bright orange root vegetables have exceptional flavor and are perfect for soups, stews, and salads. Grown by local farmers in Valencia, Negros Oriental.', 65.00, 20, 'approved', '2025-04-09 15:39:55', '2025-05-02 10:05:33', 'uploads/products/67ff9240ab00e_67f9cdf83a9bf_carrots.png', 210, 'kilogram'),
-(62, 'Lanzones (Lansium)', 'Sweet and juicy lanzones grown in the highlands of Valencia. These yellow-brown skinned fruits have translucent, sweet flesh arranged in segments. Seasonally available during late summer to early fall.', 120.00, 42, 'approved', '2025-05-02 10:05:33', '2025-05-20 08:14:03', NULL, 78, 'kilogram'),
+(62, 'Lanzones (Lansium)', 'Sweet and juicy lanzones grown in the highlands of Valencia. These yellow-brown skinned fruits have translucent, sweet flesh arranged in segments. Seasonally available during late summer to early fall.', 120.00, 42, 'approved', '2025-05-02 10:05:33', '2025-05-20 08:50:41', NULL, 77, 'kilogram'),
 (63, 'Duhat (Java Plum)', 'Dark purple to black berries with sweet-tart flesh harvested from trees in Dobdob. Rich in antioxidants and has cooling properties according to traditional medicine. Available seasonally from May to July.', 90.00, 43, 'approved', '2025-05-02 10:05:33', '2025-05-17 07:20:14', NULL, 57, 'kilogram'),
-(64, 'Lakatan Banana', 'Sweet, aromatic Lakatan bananas grown in Palinpinon. These golden yellow bananas have firmer flesh than regular varieties with a distinct sweet flavor and aroma. Harvested at optimal ripeness.', 65.00, 44, 'approved', '2025-05-02 10:05:33', '2025-05-05 03:35:38', NULL, 150, 'bunch'),
-(65, 'Tagabang (Winged Bean)', 'Locally grown winged beans with distinctive four-angled edges. The entire plant is edible - young pods, mature seeds, shoots, flowers, and tubers. Rich in protein and commonly used in local dishes.', 40.00, 45, 'approved', '2025-05-02 10:05:33', '2025-05-18 16:22:46', 'public/uploads/products/product_682a08d901ccc.jpeg', 500, 'kilogram'),
+(64, 'Lakatan Banana', 'Sweet, aromatic Lakatan bananas grown in Palinpinon. These golden yellow bananas have firmer flesh than regular varieties with a distinct sweet flavor and aroma. Harvested at optimal ripeness.', 65.00, 44, 'approved', '2025-05-02 10:05:33', '2025-05-20 08:54:41', NULL, 149, 'bunch'),
 (66, 'Alugbati (Malabar Spinach)', 'Glossy, thick leaves with a mild flavor harvested from vines in West Balabag. This heat-loving green vegetable is rich in vitamins and minerals. Used in soups, stir-fries, and blanched as a side dish.', 30.00, 42, 'approved', '2025-05-02 10:05:33', '2025-05-02 10:05:33', NULL, 120, 'bunch'),
 (67, 'Bataw (Hyacinth Bean)', 'Purple-tinged flat bean pods grown in Balili area. Young pods are tender and delicious while mature seeds can be dried and used in soups and stews. A traditional vegetable in local cuisine.', 35.00, 43, 'approved', '2025-05-02 10:05:33', '2025-05-16 06:03:11', 'uploads/products/6819a071b685c_bataw.png', 87, 'kilogram'),
 (68, 'Gabi (Taro)', 'Starchy taro corms with nutty flavor harvested in Lunga. The underground corm has brown skin and white to lavender flesh. Used in both savory dishes and desserts like ginataang gabi.', 55.00, 44, 'approved', '2025-05-02 10:05:33', '2025-05-19 02:16:39', 'uploads/products/681994a72affe_gabi.png', 96, 'kilogram'),
@@ -1491,8 +1589,7 @@ INSERT INTO `products` (`product_id`, `name`, `description`, `price`, `farmer_id
 (71, 'Luyang Dilaw (Turmeric)', 'Fresh turmeric rhizomes with bright orange flesh grown in Caidiocan. This aromatic spice has earthy, peppery flavor and powerful anti-inflammatory properties. Used in cooking and traditional medicine.', 70.00, 43, 'approved', '2025-05-02 10:05:33', '2025-05-19 03:08:10', 'uploads/products/68199357e5de2_turmeric.png', 56, 'kilogram'),
 (72, 'Arabica Coffee Beans', 'Shade-grown Arabica coffee beans from the highlands of Valencia. These carefully processed beans have complex flavor notes of chocolate, citrus, and caramel. Grown at higher elevations for superior quality.', 350.00, 44, 'approved', '2025-05-02 10:05:33', '2025-05-17 07:20:14', 'uploads/products/6819930fd9d75_arabica.png', 39, 'kilogram'),
 (73, 'Cacao Beans', 'Fermented and dried cacao beans from Balayagmanok farms. These premium beans have rich chocolate flavor with fruity notes. Perfect for making artisanal chocolate or traditional tablea for hot chocolate.', 280.00, 45, 'approved', '2025-05-02 10:05:33', '2025-05-16 06:03:11', 'uploads/products/681992bf5de22_cacao.png', 54, 'kilogram'),
-(76, 'Test product upload', 'Test', 20.00, 45, 'pending', '2025-05-18 16:29:03', '2025-05-18 16:30:04', 'public/uploads/products/product_682a0b0cb808f.jpeg', 50, 'bag'),
-(77, 'Pastil', 'Test', 50.00, 45, 'approved', '2025-05-19 03:50:36', '2025-05-19 03:54:12', 'public/uploads/products/product_682aaa8cee035.jpeg', 99, 'piece');
+(77, 'Test', 'Test', 50.00, 45, 'approved', '2025-05-19 03:50:36', '2025-05-23 07:03:24', 'public/uploads/products/product_68301dbc82b40.jpeg', 99, 'piece');
 
 -- --------------------------------------------------------
 
@@ -1595,7 +1692,8 @@ INSERT INTO `users` (`user_id`, `username`, `password`, `email`, `role_id`, `cre
 (42, 'maria_santos', '$2y$10$qscTdRvuJJ9bMZ/jAOoPU.wtrwelRlG0FslV1VbDkleQ6IYrXgqGy', 'maria.santos@example.com', 2, '2025-05-02 02:13:08', '2025-05-09 06:34:59', 'Maria', 'Santos', '09123456789', 'Valencia'),
 (43, 'pedro_reyes', '$2y$10$YojLIxMejrv/2ahwh48qcuVku5DciDYko1mhClXG9/YOQcJ43nSoS', 'pedro.reyes@example.com', 2, '2025-05-02 02:13:08', '2025-05-02 02:13:08', 'Pedro', 'Reyes', '09234567890', 'Valencia'),
 (44, 'juan_dela_cruz', '$2y$10$fBvQ2NwLTeBndzQpPKs.S.9kK8Y9Nbw2980bS7xyLZ8AjIKIEOxCe', 'juan.cruz@example.com', 2, '2025-05-02 02:13:08', '2025-05-06 04:52:32', 'Juan', 'Dela Cruz', '09345678901', 'Valencia'),
-(45, 'teresa_gomez', '$2y$10$dUelFxuSwUuQgaqRITDyKuy3a/S.Nnsww9uWI0Lg7WbzrqWHcJsfK', 'teresa.gomez@example.com', 2, '2025-05-02 02:13:08', '2025-05-06 16:12:36', 'Teresa', 'Gomez', '09456789012', 'Valencia');
+(45, 'teresa_gomez', '$2y$10$dUelFxuSwUuQgaqRITDyKuy3a/S.Nnsww9uWI0Lg7WbzrqWHcJsfK', 'teresa.gomez@example.com', 2, '2025-05-02 02:13:08', '2025-05-06 16:12:36', 'Teresa', 'Gomez', '09456789012', 'Valencia'),
+(46, 'dayn', '$2y$10$VOmW.qsgEzo9dzL3a3wwqe/luWHGdPg3xk9RrJGMKQDGspzsFQdjy', 'dayn@gmail.com', 1, '2025-05-21 03:09:52', '2025-05-21 07:31:27', 'Dayn', '', '9658853312', 'Maslog');
 
 -- --------------------------------------------------------
 
@@ -1799,6 +1897,13 @@ ALTER TABLE `organizations`
   ADD PRIMARY KEY (`organization_id`);
 
 --
+-- Indexes for table `password_reset_tokens`
+--
+ALTER TABLE `password_reset_tokens`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
+
+--
 -- Indexes for table `payments`
 --
 ALTER TABLE `payments`
@@ -1919,7 +2024,7 @@ ALTER TABLE `user_organizations`
 -- AUTO_INCREMENT for table `activitylogs`
 --
 ALTER TABLE `activitylogs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=456;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=512;
 
 --
 -- AUTO_INCREMENT for table `audittrail`
@@ -1979,13 +2084,13 @@ ALTER TABLE `notifications`
 -- AUTO_INCREMENT for table `orderitems`
 --
 ALTER TABLE `orderitems`
-  MODIFY `order_item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=68;
+  MODIFY `order_item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=70;
 
 --
 -- AUTO_INCREMENT for table `orders`
 --
 ALTER TABLE `orders`
-  MODIFY `order_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `order_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
 -- AUTO_INCREMENT for table `organizations`
@@ -1994,10 +2099,16 @@ ALTER TABLE `organizations`
   MODIFY `organization_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
+-- AUTO_INCREMENT for table `password_reset_tokens`
+--
+ALTER TABLE `password_reset_tokens`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+
+--
 -- AUTO_INCREMENT for table `payments`
 --
 ALTER TABLE `payments`
-  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
 -- AUTO_INCREMENT for table `payment_credit_cards`
@@ -2009,7 +2120,7 @@ ALTER TABLE `payment_credit_cards`
 -- AUTO_INCREMENT for table `payment_gcash`
 --
 ALTER TABLE `payment_gcash`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `payment_methods`
@@ -2027,13 +2138,13 @@ ALTER TABLE `payment_retries`
 -- AUTO_INCREMENT for table `payment_status_history`
 --
 ALTER TABLE `payment_status_history`
-  MODIFY `history_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `history_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
 -- AUTO_INCREMENT for table `pickups`
 --
 ALTER TABLE `pickups`
-  MODIFY `pickup_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `pickup_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
 -- AUTO_INCREMENT for table `productcategories`
@@ -2063,7 +2174,7 @@ ALTER TABLE `roles`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=46;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
 
 --
 -- AUTO_INCREMENT for table `user_organizations`
@@ -2145,6 +2256,12 @@ ALTER TABLE `orderitems`
 --
 ALTER TABLE `orders`
   ADD CONSTRAINT `orders_ibfk_1` FOREIGN KEY (`consumer_id`) REFERENCES `users` (`user_id`);
+
+--
+-- Constraints for table `password_reset_tokens`
+--
+ALTER TABLE `password_reset_tokens`
+  ADD CONSTRAINT `password_reset_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `payments`

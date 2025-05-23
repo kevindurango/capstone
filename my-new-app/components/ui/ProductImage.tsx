@@ -11,11 +11,12 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { getImageUrl } from "@/constants/Config";
 import { COLORS } from "@/constants/Colors";
+
 interface ProductImageProps {
   imagePath: string | null;
   style?: ViewStyle;
   resizeMode?: ImageResizeMode;
-  productId?: number; // Optional product ID for logging
+  productId?: number;
 }
 
 const ProductImage: React.FC<ProductImageProps> = ({
@@ -27,32 +28,75 @@ const ProductImage: React.FC<ProductImageProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 2;
 
   useEffect(() => {
-    setLoading(true);
-    setError(false);
-
     if (!imagePath) {
       setError(true);
       setLoading(false);
       return;
     }
 
-    try {
-      const url = getImageUrl(imagePath);
-      setImageUrl(url);
-      console.log(
-        `[ProductImage] Image URL for product ${productId || "unknown"}: ${url}`
-      );
-    } catch (err) {
-      console.error(
-        `[ProductImage] Error getting image URL for product ${productId || "unknown"}:`,
-        err
-      );
-      setError(true);
-      setLoading(false);
-    }
-  }, [imagePath, productId]);
+    const loadImage = async () => {
+      try {
+        setLoading(true);
+        setError(false);
+
+        // Get the processed URL
+        const timestamp = Date.now();
+        let url = getImageUrl(imagePath);
+
+        if (!url) {
+          throw new Error("Invalid image URL");
+        }
+
+        // Clean the URL and add cache busting
+        url = url.replace(/\/+/g, "/").replace(":/", "://").trim();
+        url = `${url}${url.includes("?") ? "&" : "?"}t=${timestamp}`;
+
+        // Pre-validate the image URL with a HEAD request
+        const response = await fetch(url, {
+          method: "HEAD",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        });
+
+        if (
+          !response.ok ||
+          !response.headers.get("content-type")?.startsWith("image/")
+        ) {
+          throw new Error("Invalid image response");
+        }
+
+        setImageUrl(url);
+        console.log(
+          `[ProductImage] Image URL validated for product ${productId || "unknown"}: ${url}`
+        );
+      } catch (err) {
+        console.error(
+          `[ProductImage] Error loading image for product ${productId || "unknown"}:`,
+          err
+        );
+
+        if (retryCount < maxRetries) {
+          console.log(
+            `[ProductImage] Retrying (${retryCount + 1}/${maxRetries})`
+          );
+          setRetryCount((prev) => prev + 1);
+          return;
+        }
+
+        setError(true);
+        setLoading(false);
+      }
+    };
+
+    loadImage();
+  }, [imagePath, productId, retryCount]);
 
   const handleLoad = () => {
     console.log(
@@ -65,6 +109,12 @@ const ProductImage: React.FC<ProductImageProps> = ({
     console.log(
       `[ProductImage] Image failed to load for product ${productId || "unknown"}`
     );
+
+    if (retryCount < maxRetries) {
+      setRetryCount((prev) => prev + 1);
+      return;
+    }
+
     setError(true);
     setLoading(false);
   };

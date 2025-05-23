@@ -57,9 +57,7 @@ export const getImagePaths = (imagePath: string | null): string[] => {
 
     // Extract just the filename
     const filename = cleanedPath.split("/").pop();
-    if (!filename) return [];
-
-    // Clean the path from any potential issues
+    if (!filename) return []; // Clean the path from any potential issues
     let cleanPath = cleanedPath;
     if (cleanPath.startsWith("/")) {
       cleanPath = cleanPath.substring(1);
@@ -68,12 +66,28 @@ export const getImagePaths = (imagePath: string | null): string[] => {
       cleanPath = cleanPath.substring(7);
     }
 
+    // Check if this is just a simple filename without any path
+    // This might happen if database just stores the filename rather than full path
+    if (!cleanPath.includes("/") && !cleanPath.startsWith("uploads")) {
+      console.log(
+        `[ImageUtils] Found simple filename without path: ${cleanPath}`
+      );
+      // If it looks like a product image filename (has hash prefix)
+      if (/^[a-f0-9]+_[\w.]+$/i.test(cleanPath)) {
+        console.log(
+          `[ImageUtils] Adding uploads/products/ prefix to ${cleanPath}`
+        );
+        cleanPath = `uploads/products/${cleanPath}`;
+      }
+    }
+
     // Analyze the path to determine the best patterns to try
     const isProductImage =
       cleanPath.includes("product_") ||
       cleanPath.includes("/products/") ||
       filename.includes("_") ||
-      cleanPath.includes("uploads/products");
+      cleanPath.includes("uploads/products") ||
+      /^[a-f0-9]+_[\w.]+$/i.test(filename); // Detect hash-prefixed filenames
 
     // Using observed patterns from logs in priority order
 

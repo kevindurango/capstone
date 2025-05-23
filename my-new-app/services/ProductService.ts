@@ -170,40 +170,135 @@ export class ProductService {
       throw error;
     }
   }
-
   /**
    * Delete a product
    *
    * @param productId Product ID
+   * @param userId User ID (farmer_id)
    * @returns Promise with the API response
    */
-  async deleteProduct(productId: number): Promise<any> {
+  async deleteProduct(
+    productId: number,
+    userId: number
+  ): Promise<{ success: boolean; message?: string }> {
     try {
-      console.log("[ProductService] Deleting product:", productId);
-
-      const response = await fetch(
-        `${this.apiBaseUrl}/farmer/delete_product.php?id=${productId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-        }
+      console.log(
+        "[ProductService] Deleting product:",
+        productId,
+        "by user:",
+        userId
       );
 
-      const responseText = await response.text();
-      console.log("[ProductService] Delete product response:", responseText);
+      // Use a timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
       try {
-        return JSON.parse(responseText);
-      } catch (error) {
-        console.error("[ProductService] Error parsing response:", error);
-        throw new ApiError(500, "Invalid server response");
+        // Make the API request with error handling
+        const response = await fetch(
+          `${IPConfig.API_BASE_URL}/farmer/delete_product.php`,
+          {
+            method: "POST", // Use POST instead of DELETE for better compatibility
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            body: JSON.stringify({
+              product_id: productId,
+              user_id: userId,
+            }),
+            signal: controller.signal,
+          }
+        );
+
+        clearTimeout(timeoutId);
+
+        // Check if response is ok before trying to parse it
+        if (!response.ok) {
+          const text = await response.text();
+          console.error(
+            "[ProductService] Server error response:",
+            text.substring(0, 200)
+          );
+          return {
+            success: false,
+            message: `Server returned error: ${response.status} ${response.statusText}`,
+          };
+        }
+
+        // Check content type to ensure we have JSON
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await response.text();
+          console.error(
+            "[ProductService] Non-JSON response:",
+            text.substring(0, 200)
+          );
+
+          if (text.includes("success") && text.includes("true")) {
+            // If text contains success indicators even though content-type is wrong
+            return { success: true, message: "Product deleted successfully" };
+          }
+
+          return {
+            success: false,
+            message: "Invalid server response format",
+          };
+        }
+
+        // Try to parse the JSON response
+        const data = await response.json();
+        console.log("[ProductService] Delete product response:", data);
+
+        return {
+          success: data.success || false,
+          message: data.message || "Operation completed",
+        };
+      } catch (fetchError: unknown) {
+        clearTimeout(timeoutId);
+
+        if (fetchError instanceof Error && fetchError.name === "AbortError") {
+          console.error("[ProductService] Request timed out");
+          return {
+            success: false,
+            message: "Request timed out. Please try again later.",
+          };
+        }
+
+        if (
+          fetchError instanceof Error &&
+          fetchError.message === "Network request failed"
+        ) {
+          console.error("[ProductService] Network connection issue");
+          return {
+            success: false,
+            message:
+              "Network connection failed. Please check your internet connection.",
+          };
+        }
+        console.error("[ProductService] Fetch error:", fetchError);
+
+        // Convert unknown error to a properly formatted error response
+        return {
+          success: false,
+          message:
+            fetchError instanceof Error
+              ? fetchError.message
+              : "An unknown error occurred",
+        };
       }
     } catch (error) {
       console.error("[ProductService] Delete product error:", error);
-      throw error;
+
+      // Return a formatted error response
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "An unknown error occurred while deleting the product",
+      };
     }
   }
 

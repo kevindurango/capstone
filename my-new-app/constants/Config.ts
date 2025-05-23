@@ -48,6 +48,11 @@ export const API_URLS = {
   BASE: baseUrl,
   REGISTER: `${baseUrl}/register.php`,
   LOGIN: `${baseUrl}/login.php`,
+  LOGOUT: `${baseUrl}/logout.php`,
+  FORGOT_PASSWORD: `${baseUrl}/forgot-password.php`,
+  RESET_PASSWORD: `${baseUrl}/reset-password.php`,
+  USER_PROFILE: `${baseUrl}/user_profile.php`,
+  UPDATE_PROFILE: `${baseUrl}/update_profile.php`,
   PAYMENT: `${baseUrl}/payment.php`,
   ORDER: `${baseUrl}/order.php`,
   PAYMENT_METHODS: `${baseUrl}/payment.php?action=methods`,
@@ -99,6 +104,28 @@ export const getImageUrl = (imagePath: string | null | undefined): string => {
       return `${cleanedPath}${cleanedPath.includes("?") ? "&" : "?"}${timestamp}`;
     }
 
+    // Look for common filename patterns from database (e.g., 67ff925ccd2bf_kalamunggay.png)
+    // This is the likely format when uploading from the farmer product screen
+    if (cleanedPath && /[a-f0-9]+_[\w.]+$/i.test(cleanedPath)) {
+      console.log(
+        `[Config] Detected filename with hash pattern: ${cleanedPath}`
+      );
+
+      // If the path doesn't have uploads/products/ prefix but looks like a product image,
+      // add the correct prefix
+      if (
+        !cleanedPath.includes("uploads/products/") &&
+        !cleanedPath.startsWith("http")
+      ) {
+        // Check if we just need to add the prefix or extract the filename
+        const filename = cleanedPath.includes("/")
+          ? cleanedPath.split("/").pop()
+          : cleanedPath;
+        cleanedPath = `uploads/products/${filename}`;
+        console.log(`[Config] Normalized path to: ${cleanedPath}`);
+      }
+    }
+
     // Use our getImagePaths utility to get the primary URL
     const possiblePaths = getImagePaths(cleanedPath);
 
@@ -116,8 +143,10 @@ export const getImageUrl = (imagePath: string | null | undefined): string => {
 };
 
 export const Config = {
-  API_URL: baseUrl,
   ROOT_URL: rootUrl,
   IS_ANDROID: Platform.OS === "android",
   IS_IOS: Platform.OS === "ios",
 };
+
+// Export API_URL as the base URL for use throughout the app
+export const API_URL = baseUrl;

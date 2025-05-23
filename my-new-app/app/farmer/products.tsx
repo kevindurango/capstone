@@ -356,17 +356,28 @@ export default function FarmerProducts() {
 
       // Add a parameter to include location data in the response
       const response = await fetch(
-        `${IPConfig.API_BASE_URL}/farmer/farmer_products.php?user_id=${user.user_id}&include_location=true`
+        `${IPConfig.API_BASE_URL}/farmer/farmer_products.php?user_id=${user.user_id}&include_location=true&t=${Date.now()}`
       );
       const statsResponse = await fetch(
-        `${IPConfig.API_BASE_URL}/farmer/farmer_products.php?user_id=${user.user_id}&stats=true`
+        `${IPConfig.API_BASE_URL}/farmer/farmer_products.php?user_id=${user.user_id}&stats=true&t=${Date.now()}`
       );
 
       const data = await response.json();
       const statsData = await statsResponse.json();
 
       if (data.success) {
-        const products = data.products || [];
+        const productsRaw = data.products || [];
+
+        // Process each product to ensure image paths are correct
+        const products = productsRaw.map((product: Product) => {
+          if (product.image) {
+            // Make sure image path is correctly formatted
+            // Remove any duplicate slashes or path issues
+            const cleanImagePath = product.image.replace(/\/+/g, "/").trim();
+            return { ...product, image: cleanImagePath };
+          }
+          return product;
+        });
 
         // Pre-validate image URLs (run in parallel)
         if (products.length > 0) {
@@ -913,7 +924,6 @@ export default function FarmerProducts() {
       setIsLoading(false);
     }
   };
-
   // Delete a product
   const handleDeleteProduct = (productId: number) => {
     Alert.alert(
@@ -927,9 +937,16 @@ export default function FarmerProducts() {
           onPress: async () => {
             try {
               setIsLoading(true);
+              if (!user?.user_id) {
+                Alert.alert("Error", "User ID not found. Please log in again.");
+                return;
+              }
 
-              // Use ProductService to delete product
-              const result = await productService.deleteProduct(productId);
+              // Use ProductService to delete product with user ID
+              const result = await productService.deleteProduct(
+                productId,
+                user.user_id
+              );
 
               if (result.success) {
                 Alert.alert("Success", "Product deleted successfully");
@@ -961,11 +978,18 @@ export default function FarmerProducts() {
       console.log(
         `[FarmerProducts] Checking image URL for product ${productId}: ${url}`
       );
-      const response = await fetch(url, {
+
+      // Add cache busting parameter to prevent browser caching
+      const cacheBuster = `?t=${new Date().getTime()}`;
+      const urlWithCacheBuster = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
+
+      const response = await fetch(urlWithCacheBuster, {
         method: "HEAD",
         headers: {
-          "Cache-Control": "no-store",
+          // Strengthen cache control headers
+          "Cache-Control": "no-cache, no-store, must-revalidate",
           Pragma: "no-cache",
+          Expires: "0",
         },
       });
 
@@ -978,6 +1002,7 @@ export default function FarmerProducts() {
           status,
           contentType,
           isImage: contentType.startsWith("image/"),
+          url: urlWithCacheBuster,
         }
       );
 

@@ -34,23 +34,43 @@ const ProductItem = React.memo(({ item, onAddToCart }: ProductItemProps) => {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
   const buttonScale = useState(new Animated.Value(1))[0];
-
-  // Log the image path for debugging when the component mounts
+  // Enhanced image path debugging when the component mounts
   useEffect(() => {
     // Check if item has image_url or image property
     const imagePath = item.image_url || item.image;
 
     if (imagePath) {
-      console.log(`[Market] Original image path: ${imagePath}`);
+      console.log(
+        `[Market] Product ${item.id} original image path: ${imagePath}`
+      );
       try {
-        const fullUrl = getImageUrl(imagePath);
-        console.log(`[Market] Transformed image URL: ${fullUrl}`);
+        // Add additional check to ensure path is properly formatted
+        // If path doesn't start with http:// or https:// and doesn't start with uploads/
+        // we'll try to fix it by adding uploads/products/ prefix
+        let pathToProcess = imagePath;
+        if (
+          !pathToProcess.startsWith("http") &&
+          !pathToProcess.startsWith("uploads/")
+        ) {
+          console.log(
+            `[Market] Path doesn't have proper prefix, adding uploads/products/ prefix`
+          );
+          pathToProcess = `uploads/products/${pathToProcess}`;
+        }
+
+        const fullUrl = getImageUrl(pathToProcess);
+        console.log(
+          `[Market] Product ${item.id} transformed image URL: ${fullUrl}`
+        );
       } catch (error) {
-        console.error("[Market] Error getting image URL:", error);
+        console.error(
+          `[Market] Error getting image URL for product ${item.id}:`,
+          error
+        );
         setImageError(true);
       }
     } else {
-      console.log("[Market] No image available for this product");
+      console.log(`[Market] No image available for product ${item.id}`);
       setImageError(true);
     }
   }, [item]);
@@ -97,10 +117,54 @@ const ProductItem = React.memo(({ item, onAddToCart }: ProductItemProps) => {
       );
     }
   };
-
   // Get the correct image path from either image_url or image property
+  // with enhanced path normalization
   const getImagePath = () => {
-    return item.image_url || item.image || null;
+    const imagePath = item.image_url || item.image || null;
+
+    // If no image path at all, return default image
+    if (!imagePath || imagePath === "http://192.168.1.12/capstone/public/") {
+      return "uploads/products/product-default.png";
+    }
+
+    let normalizedPath = imagePath;
+
+    // Remove server URL prefix if it exists (handle multiple possible prefixes)
+    const serverPrefixes = [
+      "http://192.168.1.12/capstone/public/",
+      "http://192.168.1.12/capstone/",
+      "http://192.168.1.12/",
+    ];
+    for (const prefix of serverPrefixes) {
+      if (normalizedPath.startsWith(prefix)) {
+        normalizedPath = normalizedPath.replace(prefix, "");
+        break;
+      }
+    }
+
+    // Remove any 'public/' prefix if present
+    if (normalizedPath.startsWith("public/")) {
+      normalizedPath = normalizedPath.replace("public/", "");
+    }
+
+    // If path doesn't include uploads/products/, extract filename and prepend the correct path
+    if (!normalizedPath.includes("uploads/products/")) {
+      const filename = normalizedPath.split("/").pop(); // Get the filename
+      if (filename) {
+        normalizedPath = `uploads/products/${filename}`;
+      } else {
+        return "uploads/products/product-default.png";
+      }
+    } else {
+      // Extract everything after uploads/products/ to ensure consistent path
+      const parts = normalizedPath.split("uploads/products/");
+      normalizedPath = `uploads/products/${parts[parts.length - 1]}`;
+    }
+
+    // Clean up any double slashes and trim
+    normalizedPath = normalizedPath.replace(/\/+/g, "/").trim();
+
+    return normalizedPath;
   };
 
   return (

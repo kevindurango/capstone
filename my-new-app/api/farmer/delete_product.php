@@ -46,8 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'DEL
         // Get database connection
         $conn = getConnection();
         
-        // Start transaction
-        $conn->begin_transaction();
+        // Start transaction manually (compatible with all MySQLi versions)
+        $conn->query('START TRANSACTION');
+        $transaction_started = true;
         
         // Check if product exists and belongs to the user
         $stmt = $conn->prepare("SELECT p.*, u.role_id FROM products p
@@ -113,7 +114,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'DEL
         $log_stmt->execute();
         
         // Commit transaction
-        $conn->commit();
+        $conn->query('COMMIT');
+        $transaction_started = false;
         
         // Delete product image if exists
         if ($image_path && file_exists('../../' . $image_path)) {
@@ -126,17 +128,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'DEL
         
     } catch (Exception $e) {
         // Rollback transaction on error
-        if (isset($conn) && $conn->ping()) {
-            if ($conn->inTransaction()) {
-                $conn->rollback();
-            }
+        if (isset($transaction_started) && $transaction_started) {
+            $conn->query('ROLLBACK');
         }
         
         $response['message'] = $e->getMessage();
         error_log("Delete product error: " . $e->getMessage());
     } finally {
         // Close connection
-        if (isset($conn) && $conn->ping()) {
+        if (isset($conn)) {
             $conn->close();
         }
     }

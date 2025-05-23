@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "my-new-app",
+    "name": "Farmers App",
     "slug": "my-new-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "farmersmarket",
     "userInterfaceStyle": "automatic",
     "sdkVersion": "52.0.0",
     "newArchEnabled": true,
@@ -18,7 +18,17 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"]
+      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"],
+      "package": "com.municipalagriculturesoffice.farmersapp",
+      "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
+      "jsEngine": "hermes",
+      "buildProperties": {
+        "keystore": "./android/app/release.keystore",
+        "keystorePassword": "kevin4567",
+        "keyAlias": "my-key-alias",
+        "keyPassword": "kevin4567"
+      }
     },
     "web": {
       "bundler": "metro",
@@ -39,6 +49,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "64aaef4d-4417-4837-ace7-d7d41a6dfd27"
+      }
     }
   }
 }

@@ -250,8 +250,7 @@ const MarketContent: React.FC = () => {
       ]
     );
   };
-
-  // Add the checkImageUrl helper function from products.tsx
+  // Add the checkImageUrl helper function - updated to match products.tsx implementation
   const checkImageUrl = async (url: string | null, productId: number) => {
     try {
       // If URL is null or empty, return early
@@ -264,14 +263,14 @@ const MarketContent: React.FC = () => {
         `[Market] Checking image URL for product ${productId}: ${url}`
       );
 
-      // Add cache busting parameter to prevent browser caching
-      const cacheBuster = `?t=${new Date().getTime()}`;
-      const urlWithCacheBuster = `${url}${cacheBuster}`;
+      // Add a strong cache busting parameter
+      const cacheBuster = `${new Date().getTime()}`;
+      const urlWithCacheBuster = `${url}${url.includes("?") ? "&" : "?"}t=${cacheBuster}`;
 
       const response = await fetch(urlWithCacheBuster, {
         method: "HEAD",
         headers: {
-          // Strengthen cache control headers
+          // Use stronger cache control headers like in products.tsx
           "Cache-Control": "no-cache, no-store, must-revalidate",
           Pragma: "no-cache",
           Expires: "0",
@@ -298,6 +297,59 @@ const MarketContent: React.FC = () => {
         error
       );
       return { exists: false, isImage: false };
+    }
+  };
+
+  // Process products to ensure consistent image paths
+  const processProductImages = (product: Product) => {
+    if (!product.image) return product;
+
+    try {
+      // Clean the image path by removing any duplicate slashes and trim
+      let cleanImagePath = product.image.replace(/\/+/g, "/").trim();
+
+      // Remove server URL prefixes if present
+      const serverPrefixes = [
+        "http://192.168.1.12/capstone/public/",
+        "http://192.168.1.12/capstone/",
+        "http://192.168.1.12/",
+      ];
+      for (const prefix of serverPrefixes) {
+        if (cleanImagePath.startsWith(prefix)) {
+          cleanImagePath = cleanImagePath.replace(prefix, "");
+          break;
+        }
+      }
+
+      // Remove 'public/' prefix if present
+      if (cleanImagePath.startsWith("public/")) {
+        cleanImagePath = cleanImagePath.replace("public/", "");
+      }
+
+      // Ensure proper path structure
+      if (!cleanImagePath.includes("uploads/products/")) {
+        const filename = cleanImagePath.split("/").pop();
+        if (filename) {
+          cleanImagePath = `uploads/products/${filename}`;
+        } else {
+          cleanImagePath = "uploads/products/product-default.png";
+        }
+      } else {
+        // Extract everything after uploads/products/ to ensure consistent path
+        const parts = cleanImagePath.split("uploads/products/");
+        cleanImagePath = `uploads/products/${parts[parts.length - 1]}`;
+      }
+
+      console.log(
+        `[Market] Normalized image path for product ${product.id}: ${cleanImagePath}`
+      );
+      return { ...product, image: cleanImagePath };
+    } catch (error) {
+      console.error(
+        `[Market] Error processing image path for product ${product.id}:`,
+        error
+      );
+      return { ...product, image: "uploads/products/product-default.png" };
     }
   };
 
@@ -337,82 +389,45 @@ const MarketContent: React.FC = () => {
             setProducts([]);
             setHasMore(false);
           } else {
-            // Pre-validate image URLs when products are loaded
-            if (fetchedProducts.length > 0) {
+            // Process each product's image path
+            const processedProducts = fetchedProducts.map(processProductImages);
+
+            try {
+              // Check each product's image URL in parallel
+              const imageChecks = await Promise.all(
+                processedProducts
+                  .filter((p: Product) => p.image)
+                  .map(async (product: Product) => {
+                    const imageUrl = getImageUrl(product.image!);
+                    const result = await checkImageUrl(imageUrl, product.id);
+                    return {
+                      productId: product.id,
+                      url: imageUrl,
+                      ...result,
+                    };
+                  })
+              );
+
               console.log(
-                `[Market] Pre-validating images for ${fetchedProducts.length} products`
+                "[Market] Image validation results:",
+                imageChecks.map(
+                  (r) => `Product ${r.productId}: ${r.exists ? "OK" : "FAIL"}`
+                )
               );
-
-              // Process each product to ensure image paths are correct
-              const processedProducts = fetchedProducts.map(
-                (product: Product) => {
-                  if (product.image) {
-                    // Make sure image path is correctly formatted
-                    // Remove any duplicate slashes or path issues
-                    const cleanImagePath = product.image
-                      .replace(/\/+/g, "/")
-                      .trim();
-                    return { ...product, image: cleanImagePath };
-                  }
-                  return product;
-                }
-              );
-
-              // Check each product's image URL in parallel with improved cache busting
-              try {
-                const imageChecks = await Promise.all(
-                  processedProducts
-                    .filter((p: Product) => p.image) // Only check products with images
-                    .map(async (product: Product) => {
-                      try {
-                        const imageUrl = getImageUrl(product.image!);
-                        const result = await checkImageUrl(
-                          imageUrl,
-                          product.id
-                        );
-                        return {
-                          productId: product.id,
-                          url: imageUrl,
-                          ...result,
-                        };
-                      } catch (err) {
-                        console.error(
-                          `[Market] Error processing image for product ${product.id}:`,
-                          err
-                        );
-                        return {
-                          productId: product.id,
-                          url: null,
-                          exists: false,
-                          isImage: false,
-                        };
-                      }
-                    })
-                );
-
-                console.log("[Market] Image validation results:", imageChecks);
-              } catch (imageError) {
-                console.error("[Market] Error validating images:", imageError);
-              }
-
-              // Update products with processed ones
-              fetchedProducts = processedProducts;
+            } catch (imageError) {
+              console.error("[Market] Error validating images:", imageError);
             }
 
-            // Update products list
+            // Update products with processed ones
             if (reset) {
-              setProducts(fetchedProducts);
+              setProducts(processedProducts);
             } else {
-              setProducts((prev) => [...prev, ...fetchedProducts]);
+              setProducts((prev) => [...prev, ...processedProducts]);
             }
 
-            // Determine if there are more products to load
-            // We check the actual number of returned products against the limit as a safeguard
+            // Update pagination
             const hasMore = fetchedProducts.length === limit;
             setHasMore(hasMore);
-            console.log("[Market] Has more products:", hasMore);
-
-            // Update offset for next fetch
             if (reset) {
               setOffset(limit);
             } else {
@@ -420,7 +435,7 @@ const MarketContent: React.FC = () => {
             }
           }
 
-          // Store total count (note: if the API returns 0, we'll use the actual product count)
+          // Store total count
           const total = response.data.total || fetchedProducts.length;
           setTotalCount(total);
         } else {
@@ -432,31 +447,21 @@ const MarketContent: React.FC = () => {
         }
       } catch (error: any) {
         console.error("[Market] Fetch error:", error);
-
-        // If it's a network error, automatically try resetting the API URL
         if (error.message === "Network request failed") {
-          console.log(
-            "[Market] Network error detected, attempting to reset API URL"
-          );
-
           try {
-            // Reset the API URL to the updated IP address
             const result = await marketService.resetApiConfiguration();
-
             if (result.success) {
               Alert.alert(
                 "Connection Updated",
                 "The server address has been updated. Trying again...",
                 [{ text: "OK", onPress: () => fetchProducts(true) }]
               );
-              return; // Exit early as we'll retry with the new URL
+              return;
             }
           } catch (resetError) {
             console.error("[Market] Error resetting API URL:", resetError);
           }
         }
-
-        // Display error message to user
         Alert.alert(
           "Error Loading Products",
           error.message || "Something went wrong. Please try again later."

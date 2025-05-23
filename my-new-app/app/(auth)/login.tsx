@@ -14,6 +14,7 @@ import {
   Dimensions,
   StatusBar,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
@@ -36,6 +37,7 @@ import Animated, {
   withTiming,
   SlideInUp,
 } from "react-native-reanimated";
+import { API_URL, API_URLS } from "@/constants/Config";
 
 const { width } = Dimensions.get("window");
 
@@ -197,7 +199,7 @@ export default function LoginScreen() {
         // Specific error for password issues
         Alert.alert(
           "Invalid Password",
-          "The password you entered is incorrect. Please try again."
+          "The password you entered is incorrect. Please try again or use 'Forgot Password' to reset it."
         );
       } else if (
         error.message?.toLowerCase().includes("user") ||
@@ -227,6 +229,134 @@ export default function LoginScreen() {
           "An error occurred during login. Please try again later."
         );
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle forgot password
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setEmailError("Please enter your email address to reset your password");
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log("[ForgotPassword] Sending reset request for:", email);
+      console.log("[ForgotPassword] Using URL:", API_URLS.FORGOT_PASSWORD);
+
+      // Add timeout to the fetch call
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch(API_URLS.FORGOT_PASSWORD, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ email }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log("[ForgotPassword] Response status:", response.status);
+
+      // First check if response is actually received
+      if (!response) {
+        throw new Error("No response received from server");
+      }
+
+      // Check if response has content
+      const responseText = await response.text();
+      console.log("[ForgotPassword] Raw response:", responseText);
+
+      let data;
+      try {
+        // Parse the response if it's not empty
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch (jsonError) {
+        console.error("[ForgotPassword] JSON Parse Error:", jsonError);
+        throw new Error(
+          "Invalid response format from server. Please try again later."
+        );
+      }
+
+      // Even if status is error, we might still have reset info in development mode
+      if (
+        data &&
+        data.dev_mode === true &&
+        data.reset_info &&
+        data.reset_info.token
+      ) {
+        // We have a token in development mode
+        Alert.alert(
+          "Development Mode: Password Reset Token",
+          `Token: ${data.reset_info.token}\n\nUse this token to reset your password. In production, this would be sent via email.`,
+          [
+            {
+              text: "Copy Token",
+              onPress: async () => {
+                try {
+                  await Clipboard.setStringAsync(data.reset_info.token);
+                  Alert.alert("Success", "Token copied to clipboard!");
+                } catch (err) {
+                  console.error("Failed to copy token:", err);
+                }
+              },
+            },
+            {
+              text: "Reset Now",
+              onPress: () => {
+                // Navigate to reset password screen with token
+                router.push({
+                  pathname: "/(auth)/reset-password",
+                  params: { token: data.reset_info.token },
+                });
+              },
+            },
+            { text: "OK", style: "default" },
+          ]
+        );
+        return;
+      }
+
+      if (!response.ok) {
+        console.error("[ForgotPassword] API Error:", data);
+        throw new Error(data?.message || "Password reset request failed");
+      }
+
+      console.log("[ForgotPassword] Reset request sent successfully");
+
+      // Show success message for regular flow
+      Alert.alert(
+        "Password Reset Instructions Sent",
+        "If an account exists with this email, you will receive password reset instructions shortly."
+      );
+    } catch (error: any) {
+      console.error("[ForgotPassword] Error:", error);
+
+      // Check if it was an abort error (timeout)
+      if (error.name === "AbortError") {
+        Alert.alert(
+          "Request Timeout",
+          "The server took too long to respond. Please try again later."
+        );
+        return;
+      }
+
+      // For security reasons, show a generic message for all other errors
+      // This prevents user enumeration attacks
+      Alert.alert(
+        "Password Reset Instructions Sent",
+        "If an account exists with this email, you will receive password reset instructions shortly."
+      );
     } finally {
       setLoading(false);
     }
@@ -328,7 +458,7 @@ export default function LoginScreen() {
             entering={FadeInUp.delay(800).duration(500)}
             style={styles.forgotPassword}
           >
-            <TouchableOpacity>
+            <TouchableOpacity onPress={handleForgotPassword}>
               <ThemedText style={styles.forgotPasswordText}>
                 Forgot Password?
               </ThemedText>

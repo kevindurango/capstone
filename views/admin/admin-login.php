@@ -159,9 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <!-- Login Form -->
 <div class="login-card">
-    <div class="logo-container">
-        <img src="../../public/assets/admin-logo.png" alt="Admin Logo" class="logo">
-    </div>
+
     
     <!-- Display error message if any -->
     <?php if (isset($error)): ?>

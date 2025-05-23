@@ -197,6 +197,25 @@ try {
 
     error_log("[DEBUG] Using dynamic image base URL: $imageBaseUrl");
 
+    // Normalize the image path
+    function normalizeImagePath($image) {
+        if (empty($image)) return null;
+        
+        // Remove any leading slashes
+        $image = ltrim($image, '/');
+        
+        // If path already has correct format, return it
+        if (preg_match('#^uploads/products/[^/]+$#', $image)) {
+            return $image;
+        }
+        
+        // Extract just the filename
+        $filename = basename($image);
+        
+        // Return standard format
+        return 'uploads/products/' . $filename;
+    }
+
     while ($row = $result->fetch_assoc()) {
         // Handle missing columns with defaults
         $farmName = isset($row['farm_name']) && !empty($row['farm_name']) ? $row['farm_name'] : 'Farm Unknown';
@@ -212,41 +231,24 @@ try {
         $unit = isset($row['unit_type']) ? $row['unit_type'] : 'piece';
         
         // Handle image URL with dynamic base URL
-        $imageUrl = null;
-        if (!empty($row['image']) && $row['image'] != 'Array') {
-            $image = $row['image'];
-            // Log the raw image value for debugging
-            error_log("[DEBUG] Raw image value for product ID {$row['product_id']}: " . $image);
-            
-            // Normalize the image path
-            if (strpos($image, 'uploads/') === 0) {
-                // Image path already starts with uploads/
-                $imagePath = $image;
-            } elseif (strpos($image, 'products/') === 0 || strpos($image, 'uploads/products/') === 0) {
-                // Handle paths like uploads/products/... or products/...
-                $imagePath = $image;
-            } elseif (strpos($image, '/') === false) {
-                // Image is just a filename, prefix with uploads/
-                $imagePath = 'uploads/' . $image;
-            } else {
-                // Other format, use as is
-                $imagePath = $image;
-            }
-            
-            // Construct complete URL
-            $imageUrl = $imageBaseUrl . '/' . $imagePath;
-            error_log("[DEBUG] Constructed image URL: " . $imageUrl);
-            
-            // Optional: Check if file exists
-            // This can be commented out if it affects performance
-            $serverPath = $_SERVER['DOCUMENT_ROOT'] . '/capstone/public/' . $imagePath;
-            if (!file_exists($serverPath)) {
-                error_log("[WARNING] Image file not found at server path: " . $serverPath);
-                $imageUrl = $imageBaseUrl . '/uploads/default-placeholder.png';
-            }
+        $image = $row['image'];
+        if (!empty($image) && $image !== 'Array') {
+            $imagePath = normalizeImagePath($image);
+            error_log("[DEBUG] Normalized image path for product ID {$row['product_id']}: " . $imagePath);
         } else {
-            // Handle empty or 'Array' values
-            error_log("[DEBUG] Invalid or missing image for product ID {$row['product_id']}: " . ($row['image'] ?? 'NULL'));
+            $imagePath = null;
+            error_log("[DEBUG] No valid image for product ID {$row['product_id']}");
+        }
+        
+        // Construct complete URL
+        $imageUrl = $imageBaseUrl . '/' . $imagePath;
+        error_log("[DEBUG] Constructed image URL: " . $imageUrl);
+        
+        // Optional: Check if file exists
+        // This can be commented out if it affects performance
+        $serverPath = $_SERVER['DOCUMENT_ROOT'] . '/capstone/public/' . $imagePath;
+        if (!file_exists($serverPath)) {
+            error_log("[WARNING] Image file not found at server path: " . $serverPath);
             $imageUrl = $imageBaseUrl . '/uploads/default-placeholder.png';
         }
         

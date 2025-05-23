@@ -5184,3 +5184,31 @@
 [20-May-2025 10:54:29 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 8, Order ID: 8, Consumer ID: 40
 [20-May-2025 10:54:29 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 16, Order ID: 16, Consumer ID: 40
 [20-May-2025 10:54:29 Europe/Berlin] [PICKUP_DEBUG] Found 19 pickups for user_id: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Processing pickup request: GET
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Database connection successful
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Handling GET request
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] GET params - user_id: 40, order_id: none
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] FILTERING PICKUPS FOR USER ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found 20 orders for user_id: 40. Order IDs: 1,2,3,4,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Executing pickup query with 20 order IDs for user_id: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 18, Order ID: 18, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 19, Order ID: 19, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 14, Order ID: 14, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 20, Order ID: 20, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 21, Order ID: 21, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 22, Order ID: 22, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 17, Order ID: 17, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 12, Order ID: 12, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 15, Order ID: 15, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 13, Order ID: 13, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 3, Order ID: 3, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 2, Order ID: 2, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 4, Order ID: 4, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 9, Order ID: 9, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 10, Order ID: 10, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 11, Order ID: 11, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 1, Order ID: 1, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 8, Order ID: 8, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 16, Order ID: 16, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found pickup - ID: 23, Order ID: 23, Consumer ID: 40
+[22-May-2025 22:37:02 Europe/Berlin] [PICKUP_DEBUG] Found 20 pickups for user_id: 40
