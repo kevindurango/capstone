@@ -41,6 +41,15 @@ interface Field {
   farmer_id: number;
 }
 
+// Interface for season
+interface Season {
+  season_id: number;
+  season_name: string;
+  start_month: number;
+  end_month: number;
+  description: string;
+}
+
 export default function AddProduct() {
   const { isAuthenticated, isFarmer, user } = useAuth();
   const router = useRouter();
@@ -56,6 +65,12 @@ export default function AddProduct() {
     image: null as any,
     barangay_id: null as number | null,
     field_id: null as number | null,
+    // Add new fields for geographical and production data
+    estimated_production: "",
+    production_unit: "kilogram",
+    planted_area: "",
+    area_unit: "hectare",
+    season_id: null as number | null,
   });
 
   // States
@@ -63,6 +78,7 @@ export default function AddProduct() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [barangays, setBarangays] = useState<Barangay[]>([]);
   const [fields, setFields] = useState<Field[]>([]);
+  const [seasons, setSeasons] = useState<Season[]>([]);
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
   const [isFieldModalVisible, setIsFieldModalVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -90,6 +106,7 @@ export default function AddProduct() {
     fetchCategories();
     fetchBarangays();
     fetchFields();
+    fetchSeasons();
   }, []);
 
   // Function to fetch categories
@@ -163,6 +180,30 @@ export default function AddProduct() {
         "Error",
         "Failed to fetch fields. Please check your connection."
       );
+    }
+  };
+
+  // Function to fetch seasons
+  const fetchSeasons = async () => {
+    try {
+      const response = await fetch(`${IPConfig.API_BASE_URL}/farmer/crop_seasons.php`);
+      const data = await response.json();
+
+      if (data.success) {
+        setSeasons(data.seasons || []);
+      } else {
+        console.error("Error fetching seasons:", data.message);
+      }
+    } catch (error) {
+      console.error("Error fetching seasons:", error);
+      // Fallback season data
+      setSeasons([
+        { season_id: 1, season_name: "Dry Season", start_month: 11, end_month: 4, description: "November to April" },
+        { season_id: 2, season_name: "Wet Season", start_month: 5, end_month: 10, description: "May to October" },
+        { season_id: 3, season_name: "First Cropping", start_month: 11, end_month: 2, description: "November to February" },
+        { season_id: 4, season_name: "Second Cropping", start_month: 3, end_month: 6, description: "March to June" },
+        { season_id: 5, season_name: "Third Cropping", start_month: 7, end_month: 10, description: "July to October" },
+      ]);
     }
   };
 

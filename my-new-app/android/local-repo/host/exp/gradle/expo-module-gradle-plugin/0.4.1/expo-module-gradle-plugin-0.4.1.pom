@@ -1,0 +1,8 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>host.exp.gradle</groupId>
+  <artifactId>expo-module-gradle-plugin</artifactId>
+  <version>0.4.1</version>
+  <name>Expo Module Gradle Plugin</name>
+  <description>A Gradle plugin for Expo modules</description>
+</project>
