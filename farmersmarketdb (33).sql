@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 17, 2025 at 10:05 AM
+-- Generation Time: May 26, 2025 at 06:42 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -25,11 +25,11 @@ DELIMITER $$
 --
 -- Procedures
 --
-CREATE DEFINER=`root`@`localhost` PROCEDURE `update_order_status` (IN `p_order_id` INT, IN `p_new_status` VARCHAR(50))   BEGIN
+CREATE PROCEDURE `update_order_status` (IN `p_order_id` INT, IN `p_new_status` VARCHAR(50))   BEGIN
     DECLARE valid_status BOOLEAN;
     
-    -- Check if status is valid
-    IF p_new_status IN ('pending', 'confirmed', 'completed', 'canceled') THEN
+    -- Check if status is valid (updated to match the enum values in the orders table)
+    IF p_new_status IN ('pending', 'processing', 'ready', 'completed', 'canceled') THEN
         SET valid_status = TRUE;
     ELSE
         SET valid_status = FALSE;
@@ -48,7 +48,7 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `update_order_status` (IN `p_order_i
         VALUES (CONCAT('System updated order #', p_order_id, ' status to ', p_new_status), NOW());
     ELSE
         SIGNAL SQLSTATE '45000' 
-        SET MESSAGE_TEXT = 'Invalid order status. Must be: pending, confirmed, completed, or canceled';
+        SET MESSAGE_TEXT = 'Invalid order status. Must be: pending, processing, ready, completed, or canceled';
     END IF;
 END$$
 
@@ -331,7 +331,359 @@ INSERT INTO `activitylogs` (`log_id`, `user_id`, `action`, `action_date`) VALUES
 (265, 45, 'Farmer logged in.', '2025-05-17 07:17:13'),
 (266, 45, 'User logged out', '2025-05-17 07:17:22'),
 (267, 40, 'User logged in.', '2025-05-17 07:17:47'),
-(268, 40, 'Payment processed for order #15 using cash_on_pickup. Status: pending', '2025-05-17 07:20:17');
+(268, 40, 'Payment processed for order #15 using cash_on_pickup. Status: pending', '2025-05-17 07:20:17'),
+(269, NULL, 'Updated order status validation trigger to match table enum values', '2025-05-17 08:44:37'),
+(270, 40, 'User logged out', '2025-05-17 08:58:29'),
+(271, 23, 'Updated order #15 status to ready', '2025-05-17 08:58:41'),
+(272, 23, 'Updated order #15 status to ready', '2025-05-17 08:58:45'),
+(273, 23, 'Updated order #15 status to ready', '2025-05-17 09:00:42'),
+(274, 23, 'Updated order #13 status to completed', '2025-05-17 09:00:47'),
+(275, 23, 'Updated order #13 status to ready', '2025-05-17 09:01:09'),
+(276, 23, 'Updated order #13 status to ready', '2025-05-17 09:06:36'),
+(277, 23, 'Updated order #12 status to processing', '2025-05-17 09:07:09'),
+(278, 23, 'Updated order #11 status to ready', '2025-05-17 09:07:30'),
+(279, 23, 'Updated order #10 status to completed', '2025-05-17 09:07:35'),
+(280, 23, 'Updated order #9 status to processing', '2025-05-17 09:14:21'),
+(281, 40, 'User logged in.', '2025-05-17 09:14:52'),
+(282, 23, 'Updated order #14 status to processing', '2025-05-17 09:25:37'),
+(283, 23, 'Updated order #13 status to processing', '2025-05-17 09:25:40'),
+(284, 23, 'Updated order #15 status to pending', '2025-05-17 09:34:59'),
+(285, 23, 'Updated order #15 status to processing', '2025-05-17 09:35:03'),
+(286, 23, 'Manager logged in.', '2025-05-17 14:06:13'),
+(287, 21, 'Admin logged in', '2025-05-17 14:06:32'),
+(303, 40, 'User logged out', '2025-05-17 14:35:43'),
+(304, 21, 'Admin logged in', '2025-05-18 02:15:36'),
+(305, 23, 'Manager logged in.', '2025-05-18 02:16:32'),
+(306, 21, 'Admin logged in', '2025-05-18 02:20:22'),
+(307, 23, 'Manager logged in.', '2025-05-18 02:42:38'),
+(308, 23, 'Manager logged out', '2025-05-18 02:52:20'),
+(309, 21, 'Admin logged in', '2025-05-18 02:53:02'),
+(310, 21, 'Updated full details for product #75', '2025-05-18 02:58:46'),
+(311, 21, 'Admin logged out', '2025-05-18 02:58:52'),
+(312, 23, 'Manager logged in.', '2025-05-18 02:58:57'),
+(313, 23, 'Manager logged out', '2025-05-18 03:06:23'),
+(314, 21, 'Admin logged in', '2025-05-18 03:06:26'),
+(315, 21, 'Updated full details for product #75', '2025-05-18 03:06:35'),
+(316, 21, 'Updated full details for product #69', '2025-05-18 03:06:53'),
+(317, 21, 'Updated full details for product #69', '2025-05-18 03:07:05'),
+(318, 21, 'Admin logged out', '2025-05-18 03:07:22'),
+(319, 23, 'Manager logged in.', '2025-05-18 03:07:27'),
+(320, 23, 'Manager pendinged product ID: 75', '2025-05-18 03:45:55'),
+(321, 23, 'Updated product #75 status to pending', '2025-05-18 03:45:55'),
+(322, 23, 'Manager approveded product ID: 75', '2025-05-18 03:46:04'),
+(323, 23, 'Updated product #75 status to approved', '2025-05-18 03:46:04'),
+(324, 23, 'Manager logged out', '2025-05-18 03:46:25'),
+(325, 21, 'Admin logged in', '2025-05-18 03:46:27'),
+(326, 23, 'Manager logged in.', '2025-05-18 04:43:21'),
+(327, 23, 'Manager logged out', '2025-05-18 04:43:57'),
+(328, 21, 'Admin logged in', '2025-05-18 04:44:00'),
+(329, 23, 'Manager logged in.', '2025-05-18 04:44:12'),
+(330, 23, 'Manager logged out', '2025-05-18 04:48:33'),
+(331, 21, 'Admin logged in', '2025-05-18 04:48:41'),
+(332, 23, 'Manager logged in.', '2025-05-18 04:48:51'),
+(333, 23, 'Updated planted area information for product ID: 75', '2025-05-18 04:50:24'),
+(334, 24, 'Organization Head logged in successfully', '2025-05-18 04:51:20'),
+(335, 24, 'Organization Head logged in.', '2025-05-18 04:51:20'),
+(336, 24, 'Organization Head logged in.', '2025-05-18 04:52:08'),
+(337, 24, 'Organization Head logged in.', '2025-05-18 04:54:55'),
+(338, 24, 'Organization Head logged in.', '2025-05-18 04:54:59'),
+(339, 24, 'Organization Head logged in.', '2025-05-18 04:55:00'),
+(340, 24, 'Organization Head logged in.', '2025-05-18 04:55:22'),
+(341, 24, 'Organization Head logged in.', '2025-05-18 04:56:26'),
+(342, 24, 'Organization Head logged in.', '2025-05-18 04:56:33'),
+(343, 24, 'Organization Head logged in.', '2025-05-18 05:03:24'),
+(344, 24, 'Organization Head logged in.', '2025-05-18 05:07:55'),
+(345, 24, 'Updated order #15 status to pending', '2025-05-18 05:18:35'),
+(346, 24, 'Updated order #15 status to completed', '2025-05-18 05:20:32'),
+(347, 24, 'Updated order #15 status to ready', '2025-05-18 05:53:31'),
+(348, 24, 'Updated order #15 status to pending', '2025-05-18 05:54:42'),
+(349, 24, 'Updated farmer details for user ID: 44', '2025-05-18 05:55:50'),
+(350, 24, 'Organization Head logged in.', '2025-05-18 05:57:44'),
+(351, 24, 'Organization Head logged in.', '2025-05-18 05:57:50'),
+(352, 24, 'Organization Head logged in.', '2025-05-18 05:58:00'),
+(353, 24, 'Organization Head logged in.', '2025-05-18 05:58:01'),
+(354, 24, 'Organization Head logged out.', '2025-05-18 05:58:01'),
+(355, 45, 'Farmer logged in.', '2025-05-18 06:15:44'),
+(356, 45, 'User logged out', '2025-05-18 06:18:00'),
+(357, 45, 'Farmer logged in.', '2025-05-18 06:18:07'),
+(358, 45, 'User logged out', '2025-05-18 06:19:42'),
+(359, 45, 'Farmer logged in.', '2025-05-18 06:19:50'),
+(360, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 06:48:18'),
+(361, 45, 'Farmer ID: 45 updated product ID: 75 details - Name: Test, Price: 10, Stock: 1000, Unit: bunch', '2025-05-18 06:49:20'),
+(362, 45, 'Farmer ID: 45 updated product ID: 75 details - Name: Test, Price: 10, Stock: 1000, Unit: bunch', '2025-05-18 06:58:27'),
+(363, 23, 'Manager logged in.', '2025-05-18 07:00:01'),
+(364, 21, 'Admin logged in', '2025-05-18 07:00:26'),
+(365, 21, 'Admin logged out', '2025-05-18 07:14:05'),
+(366, 23, 'Manager logged in.', '2025-05-18 07:14:11'),
+(367, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 08:45:26'),
+(368, 45, 'Farmer ID: 45 updated product ID: 75 details - Name: Test, Price: 10, Stock: 1000, Unit: bunch', '2025-05-18 08:47:29'),
+(369, 45, 'Farmer ID: 45 updated product ID: 75 details - Name: Test, Price: 10, Stock: 1000, Unit: bunch', '2025-05-18 08:47:54'),
+(370, 45, 'Farmer ID: 45 updated product ID: 75 details - Name: Test, Price: 10, Stock: 1000, Unit: bunch', '2025-05-18 08:48:33'),
+(371, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 09:09:51'),
+(372, 45, 'Farmer ID: 45 updated product ID: 75 details - Name: Test, Price: 10, Stock: 1000, Unit: bunch', '2025-05-18 10:03:48'),
+(373, 45, 'Farmer ID: 45 updated product ID: 75 details - Name: Test, Price: 10, Stock: 1000, Unit: bunch', '2025-05-18 12:58:33'),
+(374, 45, 'Farmer ID: 45 updated product ID: 75 details - Name: Test, Price: 10, Stock: 1000, Unit: bunch', '2025-05-18 13:03:39'),
+(375, 23, 'Manager logged in.', '2025-05-18 14:08:55'),
+(376, 23, 'Manager pendinged product ID: 75', '2025-05-18 15:13:13'),
+(377, 23, 'Updated product #75 status to pending', '2025-05-18 15:13:13'),
+(378, 45, 'Farmer ID: 45 updated product ID: 75 details - Name: Test, Price: 10, Stock: 1000, Unit: bunch', '2025-05-18 15:40:22'),
+(379, 45, 'Farmer ID: 45 updated product ID: 75 details - Name: Test, Price: 10, Stock: 1000, Unit: bunch', '2025-05-18 15:40:22'),
+(380, 45, 'Farmer ID: 45 updated product ID: 65 details - Name: Tagabang (Winged Bean), Price: 40, Stock: 85, Unit: kilogram', '2025-05-18 16:08:50'),
+(381, 45, 'Farmer ID: 45 updated product ID: 65 details - Name: Tagabang (Winged Bean), Price: 40, Stock: 85, Unit: kilogram', '2025-05-18 16:18:34'),
+(382, 45, 'Farmer ID: 45 updated product ID: 65 details - Name: Tagabang (Winged Bean), Price: 40, Stock: 85, Unit: kilogram', '2025-05-18 16:18:52'),
+(383, 45, 'Farmer ID: 45 updated product ID: 65 details - Name: Tagabang (Winged Bean), Price: 40, Stock: 85, Unit: kilogram', '2025-05-18 16:20:41'),
+(384, 45, 'Farmer ID: 45 updated product ID: 65 details - Name: Tagabang (Winged Bean), Price: 40, Stock: 85, Unit: kilogram', '2025-05-18 16:22:02'),
+(385, 45, 'Farmer ID: 45 updated product ID: 65 details - Name: Tagabang (Winged Bean), Price: 40, Stock: 85, Unit: kilogram', '2025-05-18 16:22:12'),
+(386, 45, 'Farmer ID: 45 updated product ID: 65 details - Name: Tagabang (Winged Bean), Price: 40, Stock: 500, Unit: kilogram', '2025-05-18 16:22:46'),
+(387, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 16:24:27'),
+(388, 45, 'Farmer ID: 45 added new product: Test product upload (ID: 76) with unit type: bag', '2025-05-18 16:29:03'),
+(389, 45, 'Farmer ID: 45 updated product ID: 76 details - Name: Test product upload, Price: 20, Stock: 50, Unit: bag', '2025-05-18 16:29:45'),
+(390, 45, 'Farmer ID: 45 updated product ID: 76 details - Name: Test product upload, Price: 20, Stock: 50, Unit: bag', '2025-05-18 16:30:04'),
+(391, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:16:21'),
+(392, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:16:55'),
+(393, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:19:17'),
+(394, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:22:14'),
+(395, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:25:43'),
+(396, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:25:46'),
+(397, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:28:43'),
+(398, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:28:47'),
+(399, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:33:37'),
+(400, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-18 17:33:37'),
+(401, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:33:45'),
+(402, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-18 17:33:45'),
+(403, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:38:16'),
+(404, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-18 17:38:16'),
+(405, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:38:27'),
+(406, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-18 17:38:27'),
+(407, 45, 'Updated order #15 status to processing', '2025-05-18 17:38:31'),
+(408, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:38:31'),
+(409, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-18 17:38:31'),
+(410, 45, 'Updated order #15 status to ready', '2025-05-18 17:38:39'),
+(411, 45, 'Farmer ID: 45 viewed their orders', '2025-05-18 17:38:39'),
+(412, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-18 17:38:39'),
+(413, 45, 'User logged out', '2025-05-18 18:04:30'),
+(414, 40, 'User logged in.', '2025-05-18 18:04:44'),
+(415, 40, 'User logged out', '2025-05-18 22:11:56'),
+(416, 45, 'Farmer logged in.', '2025-05-19 01:13:12'),
+(417, 45, 'Farmer ID: 45 viewed their orders', '2025-05-19 01:55:14'),
+(418, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-19 01:55:14'),
+(419, 45, 'Farmer ID: 45 viewed their orders', '2025-05-19 01:55:18'),
+(420, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-19 01:55:18'),
+(421, 45, 'Updated order #15 status to completed', '2025-05-19 01:55:23'),
+(422, 45, 'Farmer ID: 45 viewed their orders', '2025-05-19 01:55:23'),
+(423, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-19 01:55:23'),
+(424, 45, 'Farmer ID: 45 viewed their orders', '2025-05-19 01:55:31'),
+(425, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-19 01:55:31'),
+(426, 23, 'Updated order #15 status to pending', '2025-05-19 01:55:58'),
+(427, 45, 'Farmer ID: 45 viewed their orders', '2025-05-19 01:56:03'),
+(428, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-19 01:56:03'),
+(429, 45, 'User logged out', '2025-05-19 02:16:09'),
+(430, 40, 'User logged in.', '2025-05-19 02:16:22'),
+(431, 40, 'Payment processed for order #17 using cash_on_pickup. Status: pending', '2025-05-19 02:16:46'),
+(432, 40, 'User logged out', '2025-05-19 02:18:40'),
+(433, 21, 'Admin logged in', '2025-05-19 02:54:32'),
+(434, 45, 'Farmer logged in.', '2025-05-19 03:06:06'),
+(435, 45, 'User logged out', '2025-05-19 03:07:16'),
+(436, 40, 'User logged in.', '2025-05-19 03:07:35'),
+(437, 40, 'Payment processed for order #18 using cash_on_pickup. Status: pending', '2025-05-19 03:08:15'),
+(438, 40, 'User logged out', '2025-05-19 03:10:37'),
+(439, 45, 'Farmer logged in.', '2025-05-19 03:16:37'),
+(440, 45, 'User logged out', '2025-05-19 03:17:11'),
+(441, 40, 'User logged in.', '2025-05-19 03:17:20'),
+(442, 40, 'Payment processed for order #19 using cash_on_pickup. Status: pending', '2025-05-19 03:17:56'),
+(443, 40, 'User logged out', '2025-05-19 03:20:11'),
+(444, 45, 'Farmer logged in.', '2025-05-19 03:49:53'),
+(445, 45, 'Farmer ID: 45 added new product: Pastil (ID: 77) with unit type: box', '2025-05-19 03:50:36'),
+(446, 21, 'Admin approveded product ID: 77', '2025-05-19 03:51:09'),
+(447, 21, 'Approved product with ID: 77', '2025-05-19 03:51:09'),
+(448, 21, 'Admin rejecteded product ID: 77. Notes: baho', '2025-05-19 03:51:40'),
+(449, 21, 'Rejected product with ID: 77', '2025-05-19 03:51:40'),
+(450, 45, 'Farmer ID: 45 updated product ID: 77 details - Name: Pastil, Price: 50, Stock: 100, Unit: piece', '2025-05-19 03:52:15'),
+(451, 21, 'Admin approveded product ID: 77', '2025-05-19 03:52:51'),
+(452, 21, 'Approved product with ID: 77', '2025-05-19 03:52:51'),
+(453, 45, 'User logged out', '2025-05-19 03:52:57'),
+(454, 40, 'User logged in.', '2025-05-19 03:53:10'),
+(455, 40, 'Payment processed for order #20 using cash_on_pickup. Status: pending', '2025-05-19 03:54:16'),
+(456, 40, 'Payment processed for order #21 using gcash. Status: completed', '2025-05-20 08:37:15'),
+(457, 40, 'Payment processed for order #22 using gcash. Status: completed', '2025-05-20 08:51:03'),
+(458, 23, 'Manager logged in.', '2025-05-20 09:46:17'),
+(459, 40, 'User logged out', '2025-05-20 09:48:53'),
+(460, 45, 'Farmer logged in.', '2025-05-20 09:50:45'),
+(461, 45, 'Farmer logged in.', '2025-05-20 09:51:07'),
+(462, 45, 'Farmer ID: 45 updated product ID: 65 details - Name: Tagabang (Winged Bean), Price: 40, Stock: 500, Unit: kilogram', '2025-05-20 09:54:31'),
+(463, 45, 'User logged out', '2025-05-20 09:55:13'),
+(464, 40, 'User logged in.', '2025-05-20 09:55:46'),
+(465, 40, 'User logged out', '2025-05-20 10:10:20'),
+(466, 46, 'User registered: dayn', '2025-05-21 03:09:52'),
+(467, 46, 'User logged in.', '2025-05-21 03:10:10'),
+(468, 46, 'User logged out', '2025-05-21 03:10:14'),
+(469, 46, 'User logged in.', '2025-05-21 03:57:09'),
+(470, 46, 'User logged out', '2025-05-21 04:16:38'),
+(471, 46, 'Password reset completed for user ID: 46', '2025-05-21 07:31:27'),
+(472, 46, 'User logged in.', '2025-05-21 07:31:39'),
+(473, 24, 'Organization Head logged in successfully', '2025-05-22 05:04:14'),
+(474, 24, 'Organization Head logged in.', '2025-05-22 05:04:14'),
+(475, 24, 'Organization Head logged out.', '2025-05-22 05:05:55'),
+(476, 23, 'Manager logged in.', '2025-05-22 05:06:14'),
+(477, 23, 'Unauthorized access attempt to product management', '2025-05-22 05:46:50'),
+(478, 46, 'User logged out', '2025-05-22 09:56:20'),
+(479, 40, 'User logged in.', '2025-05-22 09:56:34'),
+(480, 40, 'User logged out', '2025-05-22 09:57:10'),
+(481, 45, 'Farmer logged in.', '2025-05-22 09:57:23'),
+(482, 45, 'Farmer ID: 45 viewed their orders', '2025-05-22 10:15:29'),
+(483, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-22 10:15:29'),
+(484, 21, 'Admin logged in', '2025-05-22 19:31:38'),
+(485, 23, 'Manager logged in.', '2025-05-22 19:31:54'),
+(486, 24, 'Organization Head logged in successfully', '2025-05-22 19:32:15'),
+(487, 24, 'Organization Head logged in.', '2025-05-22 19:32:16'),
+(488, 45, 'Farmer ID: 45 deleted product ID: 76', '2025-05-22 20:35:07'),
+(489, 45, 'User logged out', '2025-05-22 20:35:18'),
+(490, 40, 'User logged in.', '2025-05-22 20:35:31'),
+(491, 40, 'User logged in.', '2025-05-22 20:57:58'),
+(492, 40, 'User logged out', '2025-05-22 20:59:49'),
+(493, 45, 'Farmer logged in.', '2025-05-22 20:59:59'),
+(494, 45, 'Farmer ID: 45 viewed their orders', '2025-05-22 21:00:03'),
+(495, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-22 21:00:03'),
+(496, 45, 'Farmer ID: 45 viewed their orders', '2025-05-22 21:02:41'),
+(497, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-22 21:02:41'),
+(498, 45, 'Farmer ID: 45 viewed their orders', '2025-05-23 06:55:20'),
+(499, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-23 06:55:20'),
+(500, 45, 'User logged out', '2025-05-23 06:56:12'),
+(501, 40, 'User logged in.', '2025-05-23 06:56:22'),
+(502, 40, 'User logged out', '2025-05-23 06:57:00'),
+(503, 40, 'User logged in.', '2025-05-23 06:57:11'),
+(504, 40, 'User logged out', '2025-05-23 06:57:29'),
+(505, 40, 'User logged in.', '2025-05-23 06:58:30'),
+(506, 40, 'User logged out', '2025-05-23 07:01:15'),
+(507, 45, 'Farmer logged in.', '2025-05-23 07:01:32'),
+(508, 45, 'Farmer ID: 45 updated product ID: 77 details - Name: Test, Price: 50, Stock: 99, Unit: piece', '2025-05-23 07:03:24'),
+(509, 45, 'Farmer ID: 45 deleted product ID: 65', '2025-05-23 07:03:28'),
+(510, 45, 'User logged out', '2025-05-23 07:03:45'),
+(511, 40, 'User logged in.', '2025-05-23 07:04:00'),
+(512, 23, 'Manager logged in.', '2025-05-23 07:09:57'),
+(513, 40, 'User logged out', '2025-05-23 07:10:37'),
+(514, 45, 'Farmer logged in.', '2025-05-23 07:10:51'),
+(515, 45, 'User logged out', '2025-05-23 07:11:10'),
+(516, 40, 'User logged in.', '2025-05-23 07:11:23'),
+(517, 40, 'User logged in.', '2025-05-23 07:23:56'),
+(518, 40, 'User logged out', '2025-05-23 07:35:13'),
+(519, 40, 'User logged in.', '2025-05-23 07:35:24'),
+(520, 40, 'User logged out', '2025-05-23 07:44:43'),
+(521, 45, 'Farmer logged in.', '2025-05-23 07:45:04'),
+(522, 45, 'Farmer ID: 45 updated product ID: 77 details - Name: Test, Price: 50, Stock: 99, Unit: piece', '2025-05-23 07:46:20'),
+(523, 45, 'Farmer ID: 45 updated product ID: 77 details - Name: Test, Price: 50, Stock: 99, Unit: piece', '2025-05-23 07:46:26'),
+(524, 45, 'Farmer ID: 45 updated product ID: 77 details - Name: Test, Price: 50, Stock: 99, Unit: piece', '2025-05-23 07:46:27'),
+(525, 45, 'Farmer ID: 45 updated product ID: 77 details - Name: Shats, Price: 50, Stock: 99, Unit: piece', '2025-05-23 07:47:22'),
+(526, 45, 'User logged out', '2025-05-23 07:47:39'),
+(527, 40, 'User logged in.', '2025-05-23 07:49:09'),
+(528, 40, 'User logged out', '2025-05-23 13:30:21'),
+(529, 45, 'Farmer logged in.', '2025-05-23 13:30:35'),
+(530, 23, 'Manager logged out', '2025-05-23 13:31:37'),
+(531, 21, 'Admin logged in', '2025-05-23 13:31:49'),
+(532, 21, 'Updated full details for product #66', '2025-05-23 13:36:13'),
+(533, 21, 'Updated full details for product #64', '2025-05-23 13:37:14'),
+(534, 21, 'Updated full details for product #63', '2025-05-23 13:38:49'),
+(535, 45, 'User logged out', '2025-05-23 13:39:05'),
+(536, 40, 'User logged in.', '2025-05-23 13:39:18'),
+(537, 21, 'Updated full details for product #8', '2025-05-23 13:40:29'),
+(538, 40, 'User logged out', '2025-05-23 13:51:36'),
+(539, 45, 'Farmer logged in.', '2025-05-23 13:52:12'),
+(540, 45, 'Farmer logged in.', '2025-05-23 14:00:11'),
+(541, 45, 'Farmer ID: 45 added new product: Test (ID: 78) with unit type: box', '2025-05-23 14:01:45'),
+(542, 45, 'Farmer ID: 45 updated product ID: 78 details - Name: Test, Price: 50, Stock: 100, Unit: box', '2025-05-23 14:01:59'),
+(543, 45, 'Farmer ID: 45 deleted product ID: 78', '2025-05-23 14:02:18'),
+(544, 45, 'Farmer ID: 45 added new product: Test 1 (ID: 79) with unit type: piece', '2025-05-23 14:07:31'),
+(545, 21, 'Admin logged out', '2025-05-23 14:21:07'),
+(546, 23, 'Manager logged in.', '2025-05-23 14:21:19'),
+(547, 45, 'Farmer ID: 45 updated product ID: 79 details - Name: Test 1, Price: 50, Stock: 500, Unit: piece', '2025-05-23 19:27:10'),
+(548, 45, 'Farmer ID: 45 updated product ID: 79 details - Name: Test 1, Price: 50, Stock: 500, Unit: piece', '2025-05-23 19:28:20'),
+(549, 45, 'Farmer ID: 45 updated product ID: 79 details - Name: Test 1, Price: 50, Stock: 500, Unit: piece', '2025-05-23 20:31:23'),
+(550, 45, 'Farmer ID: 45 updated product ID: 79 details - Name: Test 1, Price: 50, Stock: 500, Unit: piece', '2025-05-23 20:31:30'),
+(551, 45, 'Farmer ID: 45 updated product ID: 79 details - Name: Test 1, Price: 50, Stock: 500, Unit: piece', '2025-05-23 20:31:52'),
+(552, 45, 'Farmer ID: 45 viewed their orders', '2025-05-23 20:38:36'),
+(553, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-23 20:38:36'),
+(554, 45, 'User logged out', '2025-05-23 20:38:58'),
+(555, 40, 'User logged in.', '2025-05-23 20:39:08'),
+(556, 45, 'User logged out', '2025-05-24 02:53:42'),
+(557, 40, 'User logged in.', '2025-05-24 02:54:05'),
+(558, 40, 'User logged out', '2025-05-24 03:13:19'),
+(559, 45, 'Farmer logged in.', '2025-05-24 03:13:47'),
+(560, 45, 'Farmer ID: 45 viewed their orders', '2025-05-24 03:15:59'),
+(561, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-24 03:16:00'),
+(562, 40, 'User logged out', '2025-05-24 07:05:01'),
+(563, 45, 'Farmer logged in.', '2025-05-24 07:06:15'),
+(564, 45, 'Farmer ID: 45 viewed their orders', '2025-05-24 07:06:34'),
+(565, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-24 07:06:35'),
+(566, 45, 'Farmer ID: 45 viewed their orders', '2025-05-24 10:21:52'),
+(567, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-24 10:21:52'),
+(568, 45, 'Farmer ID: 45 viewed their orders', '2025-05-24 12:02:21'),
+(569, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-24 12:02:21'),
+(570, 45, 'User logged out', '2025-05-24 14:08:34'),
+(571, 45, 'Farmer logged in.', '2025-05-24 14:38:09'),
+(572, 45, 'Farmer logged in.', '2025-05-25 00:53:58'),
+(573, 45, 'User logged out', '2025-05-26 00:59:06'),
+(574, 40, 'User logged in.', '2025-05-26 01:00:47'),
+(575, 40, 'Payment processed for order #24 using cash_on_pickup. Status: pending', '2025-05-26 01:01:22'),
+(576, 40, 'User logged out', '2025-05-26 01:04:56'),
+(577, 45, 'Farmer logged in.', '2025-05-26 01:05:41'),
+(578, 45, 'Farmer ID: 45 updated product ID: 77 details - Name: Test, Price: 50, Stock: 99, Unit: piece', '2025-05-26 01:06:22'),
+(579, 45, 'Farmer ID: 45 updated product ID: 77 details - Name: Test, Price: 50, Stock: 99, Unit: piece', '2025-05-26 01:07:35'),
+(580, 45, 'Farmer ID: 45 viewed their orders', '2025-05-26 01:09:53'),
+(581, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-26 01:09:53'),
+(582, 45, 'Farmer ID: 45 viewed their orders', '2025-05-26 01:46:47'),
+(583, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-26 01:46:47'),
+(584, 45, 'Updated order #24 status to processing', '2025-05-26 01:47:04'),
+(585, 45, 'Farmer ID: 45 viewed their orders', '2025-05-26 01:47:04'),
+(586, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-26 01:47:04'),
+(587, 45, 'Farmer ID: 45 viewed their orders', '2025-05-26 01:47:51'),
+(588, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-26 01:47:51'),
+(589, 45, 'Updated order #24 status to ready', '2025-05-26 01:47:58'),
+(590, 45, 'Farmer ID: 45 viewed their orders', '2025-05-26 01:47:59'),
+(591, 45, 'Farmer ID: 45 viewed their order statistics', '2025-05-26 01:47:59'),
+(592, 45, 'User logged out', '2025-05-26 01:48:29'),
+(593, NULL, 'Main login page visited', '2025-05-26 16:07:29'),
+(594, NULL, 'Main login page visited', '2025-05-26 16:07:34'),
+(595, NULL, 'Main login page visited', '2025-05-26 16:07:35'),
+(596, NULL, 'Main login page visited', '2025-05-26 16:07:36'),
+(597, NULL, 'Main login page visited', '2025-05-26 16:07:38'),
+(598, NULL, 'Main login page visited', '2025-05-26 16:07:39'),
+(599, NULL, 'Main login page visited', '2025-05-26 16:07:40'),
+(600, NULL, 'Main login page visited', '2025-05-26 16:07:41'),
+(601, NULL, 'Main login page visited', '2025-05-26 16:07:41'),
+(602, NULL, 'Main login page visited', '2025-05-26 16:07:41'),
+(603, NULL, 'Main login page visited', '2025-05-26 16:07:43'),
+(604, NULL, 'Main login page visited', '2025-05-26 16:07:43'),
+(605, NULL, 'Main login page visited', '2025-05-26 16:07:43'),
+(606, NULL, 'Main login page visited', '2025-05-26 16:07:43'),
+(607, NULL, 'Main login page visited', '2025-05-26 16:07:43'),
+(608, NULL, 'Main login page visited', '2025-05-26 16:07:48'),
+(609, NULL, 'Main login page visited', '2025-05-26 16:07:52'),
+(610, NULL, 'Main login page visited', '2025-05-26 16:07:52'),
+(611, NULL, 'Main login page visited', '2025-05-26 16:07:54'),
+(612, NULL, 'Main login page visited', '2025-05-26 16:07:56'),
+(613, NULL, 'Main login page visited', '2025-05-26 16:08:29'),
+(614, NULL, 'Main login page visited', '2025-05-26 16:08:31'),
+(615, NULL, 'Main login page visited', '2025-05-26 16:08:32'),
+(616, NULL, 'Main login page visited', '2025-05-26 16:08:32'),
+(617, NULL, 'Main login page visited', '2025-05-26 16:08:42'),
+(618, NULL, 'Main login page visited', '2025-05-26 16:08:43'),
+(619, NULL, 'Main login page visited', '2025-05-26 16:08:44'),
+(620, NULL, 'Main login page visited', '2025-05-26 16:08:46'),
+(621, NULL, 'Main login page visited', '2025-05-26 16:09:02'),
+(622, NULL, 'Main login page visited', '2025-05-26 16:09:04'),
+(623, NULL, 'Main login page visited', '2025-05-26 16:09:05'),
+(624, NULL, 'Main login page visited', '2025-05-26 16:09:06'),
+(625, NULL, 'Main login page visited', '2025-05-26 16:11:10'),
+(626, NULL, 'Main login page visited', '2025-05-26 16:13:51'),
+(627, NULL, 'Main login page visited', '2025-05-26 16:13:53'),
+(628, NULL, 'Main login page visited', '2025-05-26 16:13:54'),
+(629, NULL, 'Main login page visited', '2025-05-26 16:13:57'),
+(630, NULL, 'Main login page visited', '2025-05-26 16:14:21'),
+(631, NULL, 'Main login page visited', '2025-05-26 16:14:23'),
+(632, NULL, 'Main login page visited', '2025-05-26 16:16:02'),
+(633, NULL, 'Main login page visited', '2025-05-26 16:17:36'),
+(634, NULL, 'Main login page visited', '2025-05-26 16:18:46'),
+(635, NULL, 'Updated order status procedure to match table enum values', '2025-05-26 16:42:39');
 
 -- --------------------------------------------------------
 
@@ -546,7 +898,6 @@ INSERT INTO `barangay_products` (`id`, `barangay_id`, `product_id`, `estimated_p
 (125, 1, 71, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
 (126, 1, 68, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
 (127, 1, 64, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
-(128, 1, 65, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
 (129, 1, 66, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
 (131, 1, 46, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
 (132, 1, 44, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL),
@@ -560,8 +911,6 @@ INSERT INTO `barangay_products` (`id`, `barangay_id`, `product_id`, `estimated_p
 (143, 1, 64, 850.00, 'bunch', 2025, 1, 1.70, 'hectare', NULL),
 (144, 12, 64, 780.00, 'bunch', 2025, 2, 1.50, 'hectare', 12),
 (145, 14, 64, 660.00, 'bunch', 2025, 4, 1.30, 'hectare', NULL),
-(146, 4, 65, 280.00, 'kilogram', 2025, 2, 0.60, 'hectare', NULL),
-(147, 11, 65, 320.00, 'kilogram', 2025, 3, 0.70, 'hectare', NULL),
 (148, 8, 66, 180.00, 'bunch', 2025, 1, 0.40, 'hectare', NULL),
 (149, 15, 66, 210.00, 'bunch', 2025, 2, 0.50, 'hectare', 7),
 (150, 2, 67, 260.00, 'kilogram', 2025, 3, 0.60, 'hectare', NULL),
@@ -587,7 +936,7 @@ INSERT INTO `barangay_products` (`id`, `barangay_id`, `product_id`, `estimated_p
 (170, 12, 47, 620.00, 'bunch', 2025, 3, 1.30, 'hectare', NULL),
 (171, 8, 49, 390.00, 'kilogram', 2025, 3, 0.95, 'hectare', NULL),
 (172, 15, 49, 420.00, 'kilogram', 2025, 3, 1.05, 'hectare', NULL),
-(173, 16, 75, 0.00, 'kilogram', 2025, 1, 0.00, 'hectare', NULL);
+(179, 7, 77, 0.00, 'box', 2025, 1, 0.00, 'hectare', 13);
 
 -- --------------------------------------------------------
 
@@ -645,7 +994,7 @@ INSERT INTO `farmer_details` (`detail_id`, `user_id`, `farm_name`, `farm_type`, 
 (4, 41, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (5, 42, 'Maria santos', 'Rice Farm', 'Test', 'Test', 'Test', 292.00, 66.00, 'Test', 9),
 (6, 43, 'Reyes Family Farm', 'Rice Farm', 'Valencia Sustainable Rice Production Certificate (2023), Integrated Pest Management Certified, Community Seed Banking Program Member', NULL, NULL, 28.00, NULL, 'Malabo Highway', 10),
-(7, 44, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(7, 44, '', 'Vegetable Farm', '', NULL, NULL, 0.00, NULL, '', NULL),
 (8, 45, 'Teresas Farm', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
@@ -683,12 +1032,13 @@ INSERT INTO `farmer_fields` (`field_id`, `farmer_id`, `barangay_id`, `field_name
 (10, 43, 9, 'Lunga Spice Garden', 2.40, 'Mixed Crop', 'Growing area for turmeric and other spices', '9.2780,123.2460', '2025-03-25 06:15:00'),
 (11, 44, 14, 'Sagbang Vegetable Fields', 8.75, 'Vegetable Farm', 'Main vegetable production area', '9.2650,123.2340', '2025-03-10 00:30:00'),
 (12, 44, 12, 'Palinpinon Banana Plantation', 4.50, 'Fruit Orchard', 'Dedicated to Lakatan banana production', '9.2720,123.2410', '2025-03-12 02:15:00'),
-(13, 45, 7, 'Jawa Fruit Paradise', 9.30, 'Fruit Orchard', 'Primary orchard for fruit varieties', '9.2840,123.2530', '2025-03-05 01:00:00'),
+(13, 45, 7, 'Jawa Fruit Paradise', 10.00, 'Fruit Orchard', 'Primary orchard for fruit varieties', '9.2840,123.2530', '2025-03-05 01:00:00'),
 (14, 45, 13, 'Puhagan Root Crop Field', 5.80, 'Root Crop Farm', 'Specialized in root crops like Ube', '9.2760,123.2480', '2025-03-08 03:30:00'),
 (15, 45, 7, 'Jawa Vegetable Plots', 4.20, 'Vegetable Farm', 'Secondary growing area for vegetables', '9.2830,123.2520', '2025-03-09 06:45:00'),
 (16, 41, 3, 'Bongbong Family Farm', 7.50, 'Mixed Crop', 'Traditional family-owned farming plot', '9.2790,123.2430', '2025-04-09 23:30:00'),
 (17, 41, 2, 'Balili Riverside Field', 3.20, 'Vegetable Farm', 'Located near water source for easy irrigation', '9.2670,123.2370', '2025-04-12 01:45:00'),
-(18, 19, 4, 'Cambucad Citrus Grove', 2.80, 'Fruit Orchard', 'Citrus fruits growing area, good for Dalandan and Kalamansi', '9.2542,123.2150', '2025-04-02 01:15:00');
+(18, 19, 4, 'Cambucad Citrus Grove', 2.80, 'Fruit Orchard', 'Citrus fruits growing area, good for Dalandan and Kalamansi', '9.2542,123.2150', '2025-04-02 01:15:00'),
+(20, 45, 6, 'Test', 100.00, 'Mixed Crop', '', '9.810917893', '2025-05-23 14:04:38');
 
 -- --------------------------------------------------------
 
@@ -781,7 +1131,10 @@ INSERT INTO `notifications` (`notification_id`, `user_id`, `message`, `is_read`,
 (6, 19, 'Good news! Your product \"Malunggay (Moringa)\" has been approved and is now available in the marketplace.', 0, '2025-04-23 02:22:34', 'product_approved', 45),
 (7, 19, 'Good news! Your product \"Kalamansi\" has been approved and is now available in the marketplace.', 0, '2025-05-02 08:16:01', 'product_approved', 53),
 (8, 45, 'Good news! Your product \"Test\" has been approved and is now available in the marketplace.', 0, '2025-05-14 15:49:15', 'product_approved', 75),
-(9, 20, 'Good news! Your product \"Lanzones\" has been approved and is now available in the marketplace.', 0, '2025-05-15 00:19:16', 'product_approved', 49);
+(9, 20, 'Good news! Your product \"Lanzones\" has been approved and is now available in the marketplace.', 0, '2025-05-15 00:19:16', 'product_approved', 49),
+(10, 45, 'Good news! Your product \"Pastil\" has been approved and is now available in the marketplace.', 0, '2025-05-19 03:51:09', 'product_approved', 77),
+(11, 45, 'Your product \"Pastil\" has been rejected. Reason: baho', 0, '2025-05-19 03:51:40', 'product_rejected', 77),
+(12, 45, 'Good news! Your product \"Pastil\" has been approved and is now available in the marketplace.', 0, '2025-05-19 03:52:51', 'product_approved', 77);
 
 -- --------------------------------------------------------
 
@@ -856,8 +1209,25 @@ INSERT INTO `orderitems` (`order_item_id`, `order_id`, `product_id`, `quantity`,
 (52, 15, 70, 1, 15.00),
 (53, 15, 71, 1, 70.00),
 (54, 15, 72, 1, 350.00),
-(55, 15, 75, 1, 10.00),
-(56, 15, 63, 1, 90.00);
+(55, 15, NULL, 1, 10.00),
+(56, 15, 63, 1, 90.00),
+(57, 16, 10, 1, 45.00),
+(58, 17, 68, 1, 55.00),
+(59, 17, 69, 1, 95.02),
+(60, 17, 70, 1, 15.00),
+(61, 18, 70, 1, 15.00),
+(62, 18, 71, 1, 70.00),
+(63, 18, 45, 1, 12.50),
+(64, 19, 48, 2, 75.00),
+(65, 19, 49, 2, 120.00),
+(66, 20, 77, 1, 50.00),
+(67, 21, 62, 1, 120.00),
+(68, 22, 62, 1, 120.00),
+(69, 23, 64, 1, 65.00),
+(70, 24, 66, 1, 30.00),
+(71, 24, 67, 1, 35.00),
+(72, 24, 68, 1, 55.00),
+(73, 24, 69, 1, 95.02);
 
 -- --------------------------------------------------------
 
@@ -886,22 +1256,31 @@ INSERT INTO `orders` (`order_id`, `consumer_id`, `order_status`, `order_date`, `
 (6, 38, 'pending', '2025-04-27 07:38:39', 'Municipal Agriculture Office'),
 (7, 38, 'pending', '2025-04-27 09:13:35', 'Municipal Agriculture Office'),
 (8, 40, 'pending', '2025-04-27 19:49:00', 'Municipal Agriculture Office'),
-(9, 40, 'pending', '2025-04-29 04:29:02', 'Municipal Agriculture Office'),
-(10, 40, 'pending', '2025-04-29 09:41:02', 'Municipal Agriculture Office'),
-(11, 40, 'pending', '2025-04-29 13:03:14', 'Municipal Agriculture Office'),
-(12, 40, 'pending', '2025-05-10 18:28:59', 'Municipal Agriculture Office'),
-(13, 40, 'pending', '2025-05-15 00:13:14', 'Municipal Agriculture Office'),
-(14, 40, 'completed', '2025-05-16 06:03:11', 'Municipal Agriculture Office'),
-(15, 40, 'pending', '2025-05-17 07:20:14', 'Municipal Agriculture Office');
+(9, 40, 'processing', '2025-04-29 04:29:02', 'Municipal Agriculture Office'),
+(10, 40, 'completed', '2025-04-29 09:41:02', 'Municipal Agriculture Office'),
+(11, 40, 'ready', '2025-04-29 13:03:14', 'Municipal Agriculture Office'),
+(12, 40, 'processing', '2025-05-10 18:28:59', 'Municipal Agriculture Office'),
+(13, 40, 'processing', '2025-05-15 00:13:14', 'Municipal Agriculture Office'),
+(14, 40, 'processing', '2025-05-16 06:03:11', 'Municipal Agriculture Office'),
+(15, 40, 'pending', '2025-05-17 07:20:14', 'Municipal Agriculture Office'),
+(16, 40, 'pending', '2025-05-18 18:06:13', 'Municipal Agriculture Office'),
+(17, 40, 'pending', '2025-05-19 02:16:39', 'Municipal Agriculture Office'),
+(18, 40, 'pending', '2025-05-19 03:08:10', 'Municipal Agriculture Office'),
+(19, 40, 'pending', '2025-05-19 03:17:49', 'Municipal Agriculture Office'),
+(20, 40, 'pending', '2025-05-19 03:54:12', 'Municipal Agriculture Office'),
+(21, 40, 'completed', '2025-05-20 08:14:03', 'Municipal Agriculture Office'),
+(22, 40, 'completed', '2025-05-20 08:50:41', 'Municipal Agriculture Office'),
+(23, 40, 'pending', '2025-05-20 08:54:41', 'Municipal Agriculture Office'),
+(24, 40, 'ready', '2025-05-26 01:01:17', 'Municipal Agriculture Office');
 
 --
 -- Triggers `orders`
 --
 DELIMITER $$
 CREATE TRIGGER `validate_order_status` BEFORE UPDATE ON `orders` FOR EACH ROW BEGIN
-    IF NEW.order_status NOT IN ('pending', 'confirmed', 'completed', 'canceled') THEN
+    IF NEW.order_status NOT IN ('pending', 'processing', 'ready', 'completed', 'canceled') THEN
         SIGNAL SQLSTATE '45000' 
-        SET MESSAGE_TEXT = 'Invalid order status. Must be: pending, confirmed, completed, or canceled';
+        SET MESSAGE_TEXT = 'Invalid order status. Must be: pending, processing, ready, completed, or canceled';
     END IF;
 END
 $$
@@ -934,13 +1313,46 @@ INSERT INTO `organizations` (`organization_id`, `name`, `description`, `address`
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `password_reset_tokens`
+--
+
+CREATE TABLE `password_reset_tokens` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `token` varchar(255) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `expires_at` timestamp NOT NULL DEFAULT (current_timestamp() + interval 24 hour),
+  `used` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `password_reset_tokens`
+--
+
+INSERT INTO `password_reset_tokens` (`id`, `user_id`, `token`, `created_at`, `expires_at`, `used`) VALUES
+(1, 46, 'ab5681ae75baf468a13aa5e25b0d63435a187e226e4395deef4d150f6f46e3da', '2025-05-21 07:13:23', '2025-05-22 01:13:23', 1),
+(2, 46, '9d8e2c74add70462ae95c5db038d6df92e025d30745bb1d0190b733d51e934ba', '2025-05-21 07:13:26', '2025-05-22 01:13:26', 1),
+(3, 46, '62e67cddc38482e0e29cdbb88660b7e18a6a0e47b66891408fab8dd566d43732', '2025-05-21 07:13:27', '2025-05-22 01:13:27', 1),
+(4, 46, '4e4944fb52547e7672f0987bc75e3b2e24f59d3e8cd1f1cca6a02eb577ac9a6b', '2025-05-21 07:17:46', '2025-05-22 01:17:46', 1),
+(5, 46, '62d2893eca97bea8cf0adf162bfb36d27140b34a5bdb493618fd8a104715b372', '2025-05-21 07:17:49', '2025-05-22 01:17:49', 1),
+(6, 46, '2066f10ae495b0f21b54dcdd04a7e10ebdc8512e0f2c29e66d6552cd7a3d6ae2', '2025-05-21 07:19:30', '2025-05-22 01:19:30', 1),
+(7, 46, '3013820fbe5787f3507a84894747182bcff3bbc5593e4f3d851f1df2e62e0e2f', '2025-05-21 07:20:07', '2025-05-22 01:20:07', 1),
+(8, 46, '623d33f839c8ed7fc639e47188f6c2c46c6f79b26cc95abc3870b932fe7a9987', '2025-05-21 07:21:03', '2025-05-22 01:21:03', 1),
+(9, 46, 'e09ed58823cf3138d863a154069a89477510df4ffa4e48016e96c8dc49b9e0eb', '2025-05-21 07:23:10', '2025-05-22 01:23:10', 1),
+(10, 46, '87e9d32eb4a817f290559641d9eeb665b5c8423e7c83ca62c5373bfba970e61d', '2025-05-21 07:25:38', '2025-05-22 01:25:38', 1),
+(11, 46, '43eda822a31d659ed7b9f6a7797d3499f13c329ec18fc1f72d7f44b0e1859ae5', '2025-05-21 07:27:32', '2025-05-22 01:27:32', 1),
+(12, 46, '00e32a5d4289019d08bae94ed5a024ad0b5c7c5ad37031643c2973658b47c1bd', '2025-05-21 07:30:36', '2025-05-22 01:30:36', 1);
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `payments`
 --
 
 CREATE TABLE `payments` (
   `payment_id` int(11) NOT NULL,
   `order_id` int(11) DEFAULT NULL,
-  `payment_method` enum('credit_card','paypal','bank_transfer','cash_on_pickup') NOT NULL,
+  `payment_method` enum('credit_card','paypal','bank_transfer','cash_on_pickup','gcash') NOT NULL,
   `method_id` int(11) NOT NULL,
   `payment_status` enum('pending','completed','failed') DEFAULT 'pending',
   `payment_date` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -973,7 +1385,14 @@ INSERT INTO `payments` (`payment_id`, `order_id`, `payment_method`, `method_id`,
 (14, 12, 'cash_on_pickup', 4, 'pending', '2025-05-10 18:29:02', 40, 235.00, 'CP-12-20250510-1C9C', NULL, 0, NULL),
 (15, 13, 'cash_on_pickup', 4, 'pending', '2025-05-15 00:13:58', 40, 325.00, 'CP-13-20250515-4B0C', NULL, 0, NULL),
 (16, 14, 'cash_on_pickup', 4, 'pending', '2025-05-16 06:03:36', 40, 760.00, 'CP-14-20250516-F87F', NULL, 0, NULL),
-(17, 15, 'cash_on_pickup', 4, 'pending', '2025-05-17 07:20:17', 40, 725.00, 'CP-15-20250517-2172', NULL, 0, NULL);
+(17, 15, 'cash_on_pickup', 4, 'pending', '2025-05-17 07:20:17', 40, 725.00, 'CP-15-20250517-2172', NULL, 0, NULL),
+(18, 17, 'cash_on_pickup', 4, 'pending', '2025-05-19 02:16:46', 40, 165.00, 'CP-17-20250519-C003', NULL, 0, NULL),
+(19, 18, 'cash_on_pickup', 4, 'pending', '2025-05-19 03:08:15', 40, 97.00, 'CP-18-20250519-82A7', NULL, 0, NULL),
+(20, 19, 'cash_on_pickup', 4, 'pending', '2025-05-19 03:17:56', 40, 390.00, 'CP-19-20250519-A362', NULL, 0, NULL),
+(21, 20, 'cash_on_pickup', 4, 'pending', '2025-05-19 03:54:16', 40, 50.00, 'CP-20-20250519-3E73', NULL, 0, NULL),
+(22, 21, 'gcash', 5, 'completed', '2025-05-20 08:37:15', 40, 120.00, '68890075456890', NULL, 0, NULL),
+(23, 22, 'gcash', 5, 'completed', '2025-05-20 08:51:03', 40, 120.00, '6282819191', NULL, 0, NULL),
+(24, 24, 'cash_on_pickup', 4, 'pending', '2025-05-26 01:01:22', 40, 215.00, 'CP-24-20250526-F610', NULL, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -990,6 +1409,28 @@ CREATE TABLE `payment_credit_cards` (
   `card_expiry_year` smallint(6) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `payment_gcash`
+--
+
+CREATE TABLE `payment_gcash` (
+  `id` int(11) NOT NULL,
+  `payment_id` int(11) NOT NULL,
+  `phone_number` varchar(20) NOT NULL,
+  `reference_id` varchar(100) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `payment_gcash`
+--
+
+INSERT INTO `payment_gcash` (`id`, `payment_id`, `phone_number`, `reference_id`, `created_at`) VALUES
+(1, 22, '09658852335', '68890075456890', '2025-05-20 08:37:15'),
+(2, 23, '09653365523', '6282819191', '2025-05-20 08:51:03');
 
 -- --------------------------------------------------------
 
@@ -1012,7 +1453,8 @@ INSERT INTO `payment_methods` (`method_id`, `method_name`, `is_active`, `created
 (1, 'credit_card', 1, '2025-04-24 06:32:38'),
 (2, 'paypal', 1, '2025-04-24 06:32:38'),
 (3, 'bank_transfer', 1, '2025-04-24 06:32:38'),
-(4, 'cash_on_pickup', 1, '2025-04-24 06:32:38');
+(4, 'cash_on_pickup', 1, '2025-04-24 06:32:38'),
+(5, 'gcash', 1, '2025-05-20 08:07:35');
 
 -- --------------------------------------------------------
 
@@ -1064,7 +1506,14 @@ INSERT INTO `payment_status_history` (`history_id`, `payment_id`, `status`, `not
 (14, 14, 'pending', NULL, '2025-05-10 18:29:02'),
 (15, 15, 'pending', NULL, '2025-05-15 00:13:58'),
 (16, 16, 'pending', NULL, '2025-05-16 06:03:36'),
-(17, 17, 'pending', NULL, '2025-05-17 07:20:17');
+(17, 17, 'pending', NULL, '2025-05-17 07:20:17'),
+(18, 18, 'pending', NULL, '2025-05-19 02:16:46'),
+(19, 19, 'pending', NULL, '2025-05-19 03:08:15'),
+(20, 20, 'pending', NULL, '2025-05-19 03:17:56'),
+(21, 21, 'pending', NULL, '2025-05-19 03:54:16'),
+(22, 22, 'completed', NULL, '2025-05-20 08:37:15'),
+(23, 23, 'completed', NULL, '2025-05-20 08:51:03'),
+(24, 24, 'pending', NULL, '2025-05-26 01:01:22');
 
 -- --------------------------------------------------------
 
@@ -1089,21 +1538,30 @@ CREATE TABLE `pickups` (
 --
 
 INSERT INTO `pickups` (`pickup_id`, `order_id`, `payment_id`, `pickup_status`, `pickup_date`, `pickup_location`, `pickup_notes`, `office_location`, `contact_person`) VALUES
-(1, 1, 2, 'pending', '2025-04-30 02:00:00', 'Municipal Agriculture Office', NULL, 'Municipal Agriculture Office', NULL),
+(1, 1, 2, 'ready', '2025-04-29 18:00:00', 'Municipal Agriculture Office', '', 'Municipal Agriculture Office', ''),
 (2, 2, 3, 'pending', '2025-04-30 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
 (3, 3, 5, 'pending', '2025-04-30 02:00:00', 'Municipal Agriculture Office', NULL, 'Municipal Agriculture Office', NULL),
 (4, 4, 6, 'pending', '2025-04-30 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
-(5, 5, 7, 'pending', '2025-04-30 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(5, 5, 7, 'ready', '2025-04-29 16:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', ''),
 (6, 6, 8, 'pending', '2025-05-08 00:00:00', 'Municipal Agriculture Office', 'Bring your own eco bag\r\n\r\n', 'Municipal Agriculture Office', ''),
 (7, 7, 9, 'pending', '2025-05-10 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
 (8, 8, 10, 'pending', '2025-04-28 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
 (9, 9, 11, 'pending', '2025-04-30 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
 (10, 10, 12, 'pending', '2025-04-30 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
 (11, 11, 13, 'pending', '2025-04-30 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
-(12, 12, 14, 'pending', '2025-05-20 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(12, 12, 14, 'ready', '2025-05-19 16:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', ''),
 (13, 13, 15, 'pending', '2025-05-16 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
-(14, 14, 16, 'pending', '2025-05-27 16:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
-(15, 15, 17, 'pending', '2025-05-18 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL);
+(14, 14, 16, 'ready', '2025-05-26 16:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', ''),
+(15, 15, 17, 'pending', '2025-05-18 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(16, 16, NULL, 'pending', '1970-01-01 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(17, 17, 18, 'pending', '2025-05-20 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(18, 18, 19, 'pending', '2025-05-29 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(19, 19, 20, 'pending', '2025-05-29 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(20, 20, 21, 'pending', '2025-05-22 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(21, 21, 22, 'pending', '2025-05-21 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(22, 22, 23, 'pending', '2025-05-21 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(23, 23, NULL, 'pending', NULL, 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL),
+(24, 24, 24, 'pending', '2025-05-27 00:00:00', 'Municipal Agriculture Office', 'Municipal Agriculture Office', 'Municipal Agriculture Office', NULL);
 
 --
 -- Triggers `pickups`
@@ -1200,13 +1658,8 @@ INSERT INTO `productcategorymapping` (`product_id`, `category_id`) VALUES
 (62, 1),
 (62, 17),
 (63, 1),
-(63, 17),
 (64, 1),
-(64, 20),
-(65, 2),
-(65, 27),
 (66, 6),
-(66, 12),
 (67, 16),
 (68, 5),
 (69, 5),
@@ -1214,7 +1667,8 @@ INSERT INTO `productcategorymapping` (`product_id`, `category_id`) VALUES
 (71, 18),
 (72, 21),
 (73, 21),
-(75, 21);
+(77, 14),
+(79, 29);
 
 -- --------------------------------------------------------
 
@@ -1241,33 +1695,33 @@ CREATE TABLE `products` (
 --
 
 INSERT INTO `products` (`product_id`, `name`, `description`, `price`, `farmer_id`, `status`, `created_at`, `updated_at`, `image`, `stock`, `unit_type`) VALUES
-(8, 'Red Rice', 'Organic red rice grown in the highlands of Ayungon. Rich in antioxidants with a nutty flavor and slightly chewy texture. Harvested using traditional methods by local farmers. Grown by local farmers in Valencia, Negros Oriental.', 85.00, 20, 'approved', '2024-12-12 06:45:15', '2025-05-05 03:35:38', 'uploads/products/680a3d2670179_rice.png', 350, 'kilogram'),
+(8, 'Red Rice', 'Organic red rice grown in the highlands of Valencia. Rich in antioxidants with a nutty flavor and slightly chewy texture. Harvested using traditional methods by local farmers. Grown by local farmers in Valencia, Negros Oriental.', 85.00, 20, 'approved', '2024-12-12 06:45:15', '2025-05-23 13:40:29', 'uploads/products/680a3d2670179_rice.png', 350, 'kilogram'),
 (9, 'Lemon Basil (Sangig)', 'Locally grown aromatic lemon basil, perfect for salads, teas, and Filipino dishes. The leaves have a strong citrus scent and distinctive flavor that enhances both savory and sweet recipes. Grown by local farmers in Valencia, Negros Oriental.', 15.00, 20, 'approved', '2024-12-12 06:45:15', '2025-05-02 10:05:33', NULL, 100, 'bunch'),
-(10, 'Purple Sweet Potatoes (Kamote)', 'Nutrient-rich purple sweet potatoes grown in the volcanic soil of Valencia. These purple-fleshed varieties have higher antioxidant content than regular varieties, with a sweet flavor perfect for both savory dishes and desserts.', 45.00, 20, 'approved', '2024-12-12 06:45:15', '2025-05-05 03:35:38', 'uploads/products/67ffb25bb3be3_IMG_0041.JPG', 180, 'kilogram'),
+(10, 'Purple Sweet Potatoes (Kamote)', 'Nutrient-rich purple sweet potatoes grown in the volcanic soil of Valencia. These purple-fleshed varieties have higher antioxidant content than regular varieties, with a sweet flavor perfect for both savory dishes and desserts.', 45.00, 20, 'approved', '2024-12-12 06:45:15', '2025-05-18 18:06:13', 'uploads/products/67ffb25bb3be3_IMG_0041.JPG', 179, 'kilogram'),
 (44, 'Kangkong (Water Spinach)', 'Fresh water spinach harvested from clean water sources. Great for stir-fry dishes.', 25.00, 19, 'pending', '2025-04-09 15:39:55', '2025-04-09 15:39:55', NULL, 80, 'bunch'),
-(45, 'Fresh Malunggay (Moringa)', 'Highly nutritious moringa leaves harvested from Palinpinon farms. Known locally as the \"miracle tree\" due to its exceptional nutrient profile. Perfect for soups, stews, and as a health supplement. Grown by local farmers in Valencia, Negros Oriental.', 12.50, 19, 'approved', '2025-04-09 15:39:55', '2025-05-02 10:05:33', 'uploads/products/67ff925ccd2bf_kalamunggay.png', 250, 'bunch'),
+(45, 'Fresh Malunggay (Moringa)', 'Highly nutritious moringa leaves harvested from Palinpinon farms. Known locally as the \"miracle tree\" due to its exceptional nutrient profile. Perfect for soups, stews, and as a health supplement. Grown by local farmers in Valencia, Negros Oriental.', 12.50, 19, 'approved', '2025-04-09 15:39:55', '2025-05-19 03:08:10', 'uploads/products/67ff925ccd2bf_kalamunggay.png', 249, 'bunch'),
 (46, 'Pechay (Bok Choy)', 'Crisp and fresh bok choy. Excellent for stir-fry and soups.', 30.00, 19, 'pending', '2025-04-09 15:39:55', '2025-04-09 15:39:55', NULL, 90, 'bunch'),
 (47, 'Saging Saba (Cooking Banana)', 'Traditional cooking bananas. Perfect for turon and other Filipino desserts.', 50.00, 20, 'approved', '2025-04-09 15:39:55', '2025-05-10 18:34:02', NULL, 100, 'bunch'),
-(48, 'Santol (Cotton Fruit)', 'Sweet and tangy santol fruits from the orchards of Balili. These medium-sized fruits have a perfect balance of sweet and sour flavors. The white pulp can be eaten fresh or made into preserves and candies. Grown by local farmers in Valencia, Negros Oriental.', 75.00, 20, 'approved', '2025-04-09 15:39:55', '2025-05-05 03:35:38', 'uploads/products/680b5ccc98dd2_santol.png', 120, 'kilogram'),
-(49, 'Lanzones', 'Sweet and fragrant lanzones from Camiguin. Limited seasonal availability.', 120.00, 20, 'approved', '2025-04-09 15:39:55', '2025-05-15 00:19:16', NULL, 30, 'kilogram'),
+(48, 'Santol (Cotton Fruit)', 'Sweet and tangy santol fruits from the orchards of Balili. These medium-sized fruits have a perfect balance of sweet and sour flavors. The white pulp can be eaten fresh or made into preserves and candies. Grown by local farmers in Valencia, Negros Oriental.', 75.00, 20, 'approved', '2025-04-09 15:39:55', '2025-05-19 03:17:49', 'uploads/products/680b5ccc98dd2_santol.png', 118, 'kilogram'),
+(49, 'Lanzones', 'Sweet and fragrant lanzones from Camiguin. Limited seasonal availability.', 120.00, 20, 'approved', '2025-04-09 15:39:55', '2025-05-19 03:17:49', NULL, 28, 'kilogram'),
 (53, 'Organic Kalamansi (Philippine Lime)', 'Small, fragrant citrus fruits essential to Filipino cuisine. These organically grown kalamansi from Valencia are more flavorful than commercial varieties. Used for juices, marinades, and as a natural cleaning agent.', 60.00, 19, 'approved', '2025-04-09 15:39:55', '2025-05-02 10:05:33', 'uploads/products/67f92d14676cb_calamansi.png', 200, 'kilogram'),
 (54, 'Dalandan (Philippine Orange)', 'Sweet and juicy local oranges harvested from Cambucad area. These green-skinned citrus fruits have a refreshing sweet-tart flavor, more juice content and thinner skin than imported varieties. Perfect for fresh juice. Grown by local farmers in Valencia, Negros Oriental.', 80.00, 19, 'approved', '2025-04-09 15:39:55', '2025-05-05 03:35:38', NULL, 150, 'kilogram'),
 (56, 'Sayote (Chayote)', 'Crisp, pale green squash grown in the cooler highland regions of Valencia. These versatile vegetables have a mild flavor that absorbs the taste of whatever they&#039;re cooked with. Popular in soups, stir-fries, and Filipino vegetable dishes.', 35.00, 20, 'approved', '2025-04-09 15:39:55', '2025-05-05 03:35:38', 'uploads/products/680ae57d79969_sayote.png', 230, 'kilogram'),
 (57, 'Repolyo (Cabbage)', 'Fresh, compact cabbage heads grown in the cool mountain farms of Sagbang. These cabbages have tightly packed, crisp leaves perfect for salads, soups, and traditional Filipino dishes like lumpia and pancit. Grown by local farmers in Valencia, Negros Oriental.', 50.00, 20, 'approved', '2025-04-09 15:39:55', '2025-05-05 03:35:38', 'uploads/products/680ae4e249743_cabbage.png', 180, 'kilogram'),
 (58, 'Organic Carrots', 'Sweet, crunchy carrots organically grown in nutrient-rich soil from the highland farms of Jawa. These bright orange root vegetables have exceptional flavor and are perfect for soups, stews, and salads. Grown by local farmers in Valencia, Negros Oriental.', 65.00, 20, 'approved', '2025-04-09 15:39:55', '2025-05-02 10:05:33', 'uploads/products/67ff9240ab00e_67f9cdf83a9bf_carrots.png', 210, 'kilogram'),
-(62, 'Lanzones (Lansium)', 'Sweet and juicy lanzones grown in the highlands of Valencia. These yellow-brown skinned fruits have translucent, sweet flesh arranged in segments. Seasonally available during late summer to early fall.', 120.00, 42, 'approved', '2025-05-02 10:05:33', '2025-05-16 06:03:11', NULL, 79, 'kilogram'),
-(63, 'Duhat (Java Plum)', 'Dark purple to black berries with sweet-tart flesh harvested from trees in Dobdob. Rich in antioxidants and has cooling properties according to traditional medicine. Available seasonally from May to July.', 90.00, 43, 'approved', '2025-05-02 10:05:33', '2025-05-17 07:20:14', NULL, 57, 'kilogram'),
-(64, 'Lakatan Banana', 'Sweet, aromatic Lakatan bananas grown in Palinpinon. These golden yellow bananas have firmer flesh than regular varieties with a distinct sweet flavor and aroma. Harvested at optimal ripeness.', 65.00, 44, 'approved', '2025-05-02 10:05:33', '2025-05-05 03:35:38', NULL, 150, 'bunch'),
-(65, 'Tagabang (Winged Bean)', 'Locally grown winged beans with distinctive four-angled edges. The entire plant is edible - young pods, mature seeds, shoots, flowers, and tubers. Rich in protein and commonly used in local dishes.', 40.00, 45, 'approved', '2025-05-02 10:05:33', '2025-05-02 10:05:33', NULL, 85, 'kilogram'),
-(66, 'Alugbati (Malabar Spinach)', 'Glossy, thick leaves with a mild flavor harvested from vines in West Balabag. This heat-loving green vegetable is rich in vitamins and minerals. Used in soups, stir-fries, and blanched as a side dish.', 30.00, 42, 'approved', '2025-05-02 10:05:33', '2025-05-02 10:05:33', NULL, 120, 'bunch'),
-(67, 'Bataw (Hyacinth Bean)', 'Purple-tinged flat bean pods grown in Balili area. Young pods are tender and delicious while mature seeds can be dried and used in soups and stews. A traditional vegetable in local cuisine.', 35.00, 43, 'approved', '2025-05-02 10:05:33', '2025-05-16 06:03:11', 'uploads/products/6819a071b685c_bataw.png', 87, 'kilogram'),
-(68, 'Gabi (Taro)', 'Starchy taro corms with nutty flavor harvested in Lunga. The underground corm has brown skin and white to lavender flesh. Used in both savory dishes and desserts like ginataang gabi.', 55.00, 44, 'approved', '2025-05-02 10:05:33', '2025-05-16 06:03:11', 'uploads/products/681994a72affe_gabi.png', 97, 'kilogram'),
-(69, 'Ube (Purple Yam)', 'Vibrant purple yams grown in volcanic soil of Puhagan. These root crops have an intensely sweet, nutty flavor and vivid purple color. Perfect for traditional Filipino desserts and pastries.', 95.00, 45, 'approved', '2025-05-02 10:05:33', '2025-05-17 07:20:14', 'uploads/products/68199431b2a50_ube.png', 70, 'kilogram'),
-(70, 'Tanglad (Lemongrass)', 'Aromatic lemongrass stalks from Liptong farms. This fragrant herb has a subtle citrus flavor and is used in teas, soups, and as a flavoring for rice and meat dishes. Also valued for medicinal properties.', 15.00, 42, 'approved', '2025-05-02 10:05:33', '2025-05-17 07:20:14', 'uploads/products/681993ccd01e0_lemongrass.png', 196, 'bunch'),
-(71, 'Luyang Dilaw (Turmeric)', 'Fresh turmeric rhizomes with bright orange flesh grown in Caidiocan. This aromatic spice has earthy, peppery flavor and powerful anti-inflammatory properties. Used in cooking and traditional medicine.', 70.00, 43, 'approved', '2025-05-02 10:05:33', '2025-05-17 07:20:14', 'uploads/products/68199357e5de2_turmeric.png', 57, 'kilogram'),
+(62, 'Lanzones (Lansium)', 'Sweet and juicy lanzones grown in the highlands of Valencia. These yellow-brown skinned fruits have translucent, sweet flesh arranged in segments. Seasonally available during late summer to early fall.', 120.00, 42, 'approved', '2025-05-02 10:05:33', '2025-05-20 08:50:41', NULL, 77, 'kilogram'),
+(63, 'Duhat (Java Plum)', 'Dark purple to black berries with sweet-tart flesh harvested from trees in Dobdob. Rich in antioxidants and has cooling properties according to traditional medicine. Available seasonally from May to July.', 90.00, 43, 'approved', '2025-05-02 10:05:33', '2025-05-23 13:38:49', 'uploads/products/68307a69ddf78_duhat.png', 57, 'kilogram'),
+(64, 'Lakatan Banana', 'Sweet, aromatic Lakatan bananas grown in Palinpinon. These golden yellow bananas have firmer flesh than regular varieties with a distinct sweet flavor and aroma. Harvested at optimal ripeness.', 65.00, 44, 'approved', '2025-05-02 10:05:33', '2025-05-23 13:37:14', 'uploads/products/68307a0a8e07d_banana.png', 149, 'bunch'),
+(66, 'Alugbati (Malabar Spinach)', 'Glossy, thick leaves with a mild flavor harvested from vines in West Balabag. This heat-loving green vegetable is rich in vitamins and minerals. Used in soups, stir-fries, and blanched as a side dish.', 30.00, 42, 'approved', '2025-05-02 10:05:33', '2025-05-26 01:01:17', 'uploads/products/683079cd6d4fa_alugbati.png', 119, 'bunch'),
+(67, 'Bataw (Hyacinth Bean)', 'Purple-tinged flat bean pods grown in Balili area. Young pods are tender and delicious while mature seeds can be dried and used in soups and stews. A traditional vegetable in local cuisine.', 35.00, 43, 'approved', '2025-05-02 10:05:33', '2025-05-26 01:01:17', 'uploads/products/6819a071b685c_bataw.png', 86, 'kilogram'),
+(68, 'Gabi (Taro)', 'Starchy taro corms with nutty flavor harvested in Lunga. The underground corm has brown skin and white to lavender flesh. Used in both savory dishes and desserts like ginataang gabi.', 55.00, 44, 'approved', '2025-05-02 10:05:33', '2025-05-26 01:01:17', 'uploads/products/681994a72affe_gabi.png', 95, 'kilogram'),
+(69, 'Ube (Purple Yam)', 'Vibrant purple yams grown in volcanic soil of Puhagan. These root crops have an intensely sweet, nutty flavor and vivid purple color. Perfect for traditional Filipino desserts and pastries.', 95.02, 45, 'approved', '2025-05-02 10:05:33', '2025-05-26 01:01:17', 'uploads/products/68199431b2a50_ube.png', 498, 'kilogram'),
+(70, 'Tanglad (Lemongrass)', 'Aromatic lemongrass stalks from Liptong farms. This fragrant herb has a subtle citrus flavor and is used in teas, soups, and as a flavoring for rice and meat dishes. Also valued for medicinal properties.', 15.00, 42, 'approved', '2025-05-02 10:05:33', '2025-05-19 03:08:10', 'uploads/products/681993ccd01e0_lemongrass.png', 194, 'bunch'),
+(71, 'Luyang Dilaw (Turmeric)', 'Fresh turmeric rhizomes with bright orange flesh grown in Caidiocan. This aromatic spice has earthy, peppery flavor and powerful anti-inflammatory properties. Used in cooking and traditional medicine.', 70.00, 43, 'approved', '2025-05-02 10:05:33', '2025-05-19 03:08:10', 'uploads/products/68199357e5de2_turmeric.png', 56, 'kilogram'),
 (72, 'Arabica Coffee Beans', 'Shade-grown Arabica coffee beans from the highlands of Valencia. These carefully processed beans have complex flavor notes of chocolate, citrus, and caramel. Grown at higher elevations for superior quality.', 350.00, 44, 'approved', '2025-05-02 10:05:33', '2025-05-17 07:20:14', 'uploads/products/6819930fd9d75_arabica.png', 39, 'kilogram'),
 (73, 'Cacao Beans', 'Fermented and dried cacao beans from Balayagmanok farms. These premium beans have rich chocolate flavor with fruity notes. Perfect for making artisanal chocolate or traditional tablea for hot chocolate.', 280.00, 45, 'approved', '2025-05-02 10:05:33', '2025-05-16 06:03:11', 'uploads/products/681992bf5de22_cacao.png', 54, 'kilogram'),
-(75, 'Test', 'Test', 10.00, 45, 'approved', '2025-05-08 23:47:43', '2025-05-17 07:20:14', 'uploads/products/product_6822e694ca326.jpeg', 999, 'bunch');
+(77, 'Test', 'Test', 50.00, 45, 'approved', '2025-05-19 03:50:36', '2025-05-26 01:07:35', 'public/uploads/products/product_6833bed7cb6bd.jpeg', 99, 'piece'),
+(79, 'Test 1', 'Test 1', 50.00, 45, 'pending', '2025-05-23 14:07:31', '2025-05-23 20:31:52', 'public/uploads/products/product_6830db387ca99.jpeg', 500, 'piece');
 
 -- --------------------------------------------------------
 
@@ -1370,7 +1824,8 @@ INSERT INTO `users` (`user_id`, `username`, `password`, `email`, `role_id`, `cre
 (42, 'maria_santos', '$2y$10$qscTdRvuJJ9bMZ/jAOoPU.wtrwelRlG0FslV1VbDkleQ6IYrXgqGy', 'maria.santos@example.com', 2, '2025-05-02 02:13:08', '2025-05-09 06:34:59', 'Maria', 'Santos', '09123456789', 'Valencia'),
 (43, 'pedro_reyes', '$2y$10$YojLIxMejrv/2ahwh48qcuVku5DciDYko1mhClXG9/YOQcJ43nSoS', 'pedro.reyes@example.com', 2, '2025-05-02 02:13:08', '2025-05-02 02:13:08', 'Pedro', 'Reyes', '09234567890', 'Valencia'),
 (44, 'juan_dela_cruz', '$2y$10$fBvQ2NwLTeBndzQpPKs.S.9kK8Y9Nbw2980bS7xyLZ8AjIKIEOxCe', 'juan.cruz@example.com', 2, '2025-05-02 02:13:08', '2025-05-06 04:52:32', 'Juan', 'Dela Cruz', '09345678901', 'Valencia'),
-(45, 'teresa_gomez', '$2y$10$dUelFxuSwUuQgaqRITDyKuy3a/S.Nnsww9uWI0Lg7WbzrqWHcJsfK', 'teresa.gomez@example.com', 2, '2025-05-02 02:13:08', '2025-05-06 16:12:36', 'Teresa', 'Gomez', '09456789012', 'Valencia');
+(45, 'teresa_gomez', '$2y$10$dUelFxuSwUuQgaqRITDyKuy3a/S.Nnsww9uWI0Lg7WbzrqWHcJsfK', 'teresa.gomez@example.com', 2, '2025-05-02 02:13:08', '2025-05-06 16:12:36', 'Teresa', 'Gomez', '09456789012', 'Valencia'),
+(46, 'dayn', '$2y$10$VOmW.qsgEzo9dzL3a3wwqe/luWHGdPg3xk9RrJGMKQDGspzsFQdjy', 'dayn@gmail.com', 1, '2025-05-21 03:09:52', '2025-05-21 07:31:27', 'Dayn', '', '9658853312', 'Maslog');
 
 -- --------------------------------------------------------
 
@@ -1574,6 +2029,13 @@ ALTER TABLE `organizations`
   ADD PRIMARY KEY (`organization_id`);
 
 --
+-- Indexes for table `password_reset_tokens`
+--
+ALTER TABLE `password_reset_tokens`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
+
+--
 -- Indexes for table `payments`
 --
 ALTER TABLE `payments`
@@ -1590,6 +2052,13 @@ ALTER TABLE `payments`
 ALTER TABLE `payment_credit_cards`
   ADD PRIMARY KEY (`card_id`),
   ADD KEY `idx_payment_cards` (`payment_id`);
+
+--
+-- Indexes for table `payment_gcash`
+--
+ALTER TABLE `payment_gcash`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_payment_id` (`payment_id`);
 
 --
 -- Indexes for table `payment_methods`
@@ -1687,7 +2156,7 @@ ALTER TABLE `user_organizations`
 -- AUTO_INCREMENT for table `activitylogs`
 --
 ALTER TABLE `activitylogs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=269;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=636;
 
 --
 -- AUTO_INCREMENT for table `audittrail`
@@ -1705,7 +2174,7 @@ ALTER TABLE `barangays`
 -- AUTO_INCREMENT for table `barangay_products`
 --
 ALTER TABLE `barangay_products`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=174;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=183;
 
 --
 -- AUTO_INCREMENT for table `crop_seasons`
@@ -1723,7 +2192,7 @@ ALTER TABLE `farmer_details`
 -- AUTO_INCREMENT for table `farmer_fields`
 --
 ALTER TABLE `farmer_fields`
-  MODIFY `field_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `field_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
 -- AUTO_INCREMENT for table `feedback`
@@ -1741,19 +2210,19 @@ ALTER TABLE `feedback_responses`
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `orderitems`
 --
 ALTER TABLE `orderitems`
-  MODIFY `order_item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=57;
+  MODIFY `order_item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=74;
 
 --
 -- AUTO_INCREMENT for table `orders`
 --
 ALTER TABLE `orders`
-  MODIFY `order_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `order_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
 -- AUTO_INCREMENT for table `organizations`
@@ -1762,10 +2231,16 @@ ALTER TABLE `organizations`
   MODIFY `organization_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
+-- AUTO_INCREMENT for table `password_reset_tokens`
+--
+ALTER TABLE `password_reset_tokens`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+
+--
 -- AUTO_INCREMENT for table `payments`
 --
 ALTER TABLE `payments`
-  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
 -- AUTO_INCREMENT for table `payment_credit_cards`
@@ -1774,10 +2249,16 @@ ALTER TABLE `payment_credit_cards`
   MODIFY `card_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `payment_gcash`
+--
+ALTER TABLE `payment_gcash`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
 -- AUTO_INCREMENT for table `payment_methods`
 --
 ALTER TABLE `payment_methods`
-  MODIFY `method_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `method_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `payment_retries`
@@ -1789,13 +2270,13 @@ ALTER TABLE `payment_retries`
 -- AUTO_INCREMENT for table `payment_status_history`
 --
 ALTER TABLE `payment_status_history`
-  MODIFY `history_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `history_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
 -- AUTO_INCREMENT for table `pickups`
 --
 ALTER TABLE `pickups`
-  MODIFY `pickup_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `pickup_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
 -- AUTO_INCREMENT for table `productcategories`
@@ -1807,7 +2288,7 @@ ALTER TABLE `productcategories`
 -- AUTO_INCREMENT for table `products`
 --
 ALTER TABLE `products`
-  MODIFY `product_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=76;
+  MODIFY `product_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
 
 --
 -- AUTO_INCREMENT for table `product_seasons`
@@ -1825,7 +2306,7 @@ ALTER TABLE `roles`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=46;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
 
 --
 -- AUTO_INCREMENT for table `user_organizations`
@@ -1909,6 +2390,12 @@ ALTER TABLE `orders`
   ADD CONSTRAINT `orders_ibfk_1` FOREIGN KEY (`consumer_id`) REFERENCES `users` (`user_id`);
 
 --
+-- Constraints for table `password_reset_tokens`
+--
+ALTER TABLE `password_reset_tokens`
+  ADD CONSTRAINT `password_reset_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `payments`
 --
 ALTER TABLE `payments`
@@ -1921,6 +2408,12 @@ ALTER TABLE `payments`
 --
 ALTER TABLE `payment_credit_cards`
   ADD CONSTRAINT `payment_credit_cards_ibfk_1` FOREIGN KEY (`payment_id`) REFERENCES `payments` (`payment_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `payment_gcash`
+--
+ALTER TABLE `payment_gcash`
+  ADD CONSTRAINT `fk_payment_gcash_payment` FOREIGN KEY (`payment_id`) REFERENCES `payments` (`payment_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `payment_retries`

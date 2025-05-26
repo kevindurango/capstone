@@ -93,3 +93,11 @@
 [18-May-2025 10:37:53 Europe/Berlin] Columns in barangay_products: id, barangay_id, product_id, estimated_production, production_unit, year, season_id, planted_area, area_unit, field_id
 [18-May-2025 17:13:09 Europe/Berlin] Columns in barangay_products: id, barangay_id, product_id, estimated_production, production_unit, year, season_id, planted_area, area_unit, field_id
 [23-May-2025 16:21:42 Europe/Berlin] Columns in barangay_products: id, barangay_id, product_id, estimated_production, production_unit, year, season_id, planted_area, area_unit, field_id
+[26-May-2025 18:55:28 Europe/Berlin] [DEBUG] Starting login process
+[26-May-2025 18:55:28 Europe/Berlin] [DEBUG] Raw input received: {"email":"largoangelinegrime@gmail.com","password":"1234567"}
+[26-May-2025 18:55:28 Europe/Berlin] [DEBUG] User found: largoangelinegrime
+[26-May-2025 18:55:28 Europe/Berlin] [ERROR] Password verification failed
+[26-May-2025 18:55:28 Europe/Berlin] [ERROR] Login failed: Invalid password
+[26-May-2025 18:55:33 Europe/Berlin] [DEBUG] Starting login process
+[26-May-2025 18:55:33 Europe/Berlin] [DEBUG] Raw input received: {"email":"largoangelinegrime@gmail.com","password":"12345678"}
+[26-May-2025 18:55:33 Europe/Berlin] [DEBUG] User found: largoangelinegrime

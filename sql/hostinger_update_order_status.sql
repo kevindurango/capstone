@@ -1,17 +1,16 @@
--- SQL Script to update the order status stored procedure
--- Created on: May 17, 2025
+-- Hostinger-compatible update_order_status procedure
+-- Remove the DEFINER clause to avoid permission issues
 
 -- Drop the existing procedure first
 DROP PROCEDURE IF EXISTS update_order_status;
 
--- Create the updated procedure with enum values matching the table structure
 DELIMITER $$
 
 CREATE PROCEDURE `update_order_status` (IN `p_order_id` INT, IN `p_new_status` VARCHAR(50))
 BEGIN
     DECLARE valid_status BOOLEAN;
     
-    -- Check if status is valid (updated to match the enum values in the orders table)
+    -- Check if status is valid
     IF p_new_status IN ('pending', 'processing', 'ready', 'completed', 'canceled') THEN
         SET valid_status = TRUE;
     ELSE
@@ -36,7 +35,3 @@ BEGIN
 END$$
 
 DELIMITER ;
-
--- Log the change
-INSERT INTO activitylogs (action, action_date)
-VALUES ('Updated order status procedure to match table enum values', NOW());
