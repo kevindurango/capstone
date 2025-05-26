@@ -22,13 +22,7 @@
       "package": "com.municipalagriculturesoffice.farmersapp",
       "versionCode": 1,
       "googleServicesFile": "./google-services.json",
-      "jsEngine": "hermes",
-      "buildProperties": {
-        "keystore": "./android/app/release.keystore",
-        "keystorePassword": "kevin4567",
-        "keyAlias": "my-key-alias",
-        "keyPassword": "kevin4567"
-      }
+      "jsEngine": "hermes"
     },
     "web": {
       "bundler": "metro",
@@ -55,7 +49,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "64aaef4d-4417-4837-ace7-d7d41a6dfd27"
+        "projectId": "5776119d-285d-4de6-802c-7787591c0075"
       }
     }
   }

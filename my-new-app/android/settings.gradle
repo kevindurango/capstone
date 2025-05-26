@@ -1,6 +1,41 @@
 pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+        // Add local repository for expo-module-gradle-plugin
+        maven {
+            url new File(rootDir, "local-repo")
+        }
+        maven {
+            url new File(['node', '--print', "require.resolve('expo/package.json')"].execute(null, rootDir).text.trim(), '../maven')
+            content {
+                includeGroup "host.exp.expo"
+                includeGroup "host.exp.gradle"
+            }
+        }
+        maven {
+            url new File(['node', '--print', "require.resolve('expo/package.json')"].execute(null, rootDir).text.trim(), '../node_modules')
+        }
+        maven {
+            url new File(['node', '--print', "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim(), '../node_modules')
+        }
+        maven {
+            url new File(rootDir, "../node_modules")
+        }
+    }
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == 'expo-module-gradle-plugin') {
+                // Disable this plugin entirely
+                useVersion '0.4.1'
+                useModule('host.exp.gradle:expo-module-gradle-plugin:0.4.1')
+            }
+        }
+    }
     includeBuild(new File(["node", "--print", "require.resolve('@react-native/gradle-plugin/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().toString())
 }
+
 plugins { id("com.facebook.react.settings") }
 
 extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
@@ -21,7 +56,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   }
 }
 
-rootProject.name = 'my-new-app'
+rootProject.name = 'Farmers App'
 
 dependencyResolutionManagement {
   versionCatalogs {

@@ -13,16 +13,36 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        maven {
+            // The Maven repository containing the Expo modules
+            url "$rootDir/../node_modules/expo/maven"
+        }
+        maven {
+            // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
+            url("$rootDir/../node_modules/react-native/android")
+        }
+        maven {
+            // For modules in node_modules
+            url "$rootDir/../node_modules"
+        }
+        maven {
+            url(new File(["node", "--print", "require.resolve('expo/package.json')"].execute(null, rootDir).text.trim(), "../maven"))
+            content {
+                includeGroupByRegex "com\\.expo.*"
+            }
+        }
     }
     dependencies {
         classpath 'com.google.gms:google-services:4.4.1'
-        classpath('com.android.tools.build:gradle')
+        classpath "com.android.tools.build:gradle:7.4.2"
         classpath('com.facebook.react:react-native-gradle-plugin')
         classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
+        // Remove the explicit expo-module-gradle-plugin classpath dependency
     }
 }
 
-apply plugin: "com.facebook.react.rootproject"
+// Move this before allprojects
+apply from: new File(rootDir, "../expo-modules-core-fix.gradle")
 
 allprojects {
     repositories {
@@ -34,9 +54,26 @@ allprojects {
             // Android JSC is installed from npm
             url(new File(['node', '--print', "require.resolve('jsc-android/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim(), '../dist'))
         }
+        maven {
+            // Add Expo modules repository
+            url(new File(['node', '--print', "require.resolve('expo/package.json')"].execute(null, rootDir).text.trim(), '../maven'))
+            content {
+                includeGroupByRegex "com\\.expo.*"
+            }
+        }
+        maven {
+            // For modules in node_modules
+            url "$rootDir/../node_modules"
+        }
 
         google()
         mavenCentral()
         maven { url 'https://www.jitpack.io' }
+    }
+    
+    configurations.all {
+        resolutionStrategy {
+            force 'com.android.tools.build:gradle:7.4.2'
+        }
     }
 }

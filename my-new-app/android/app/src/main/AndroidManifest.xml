@@ -28,6 +28,7 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="farmersmarket"/>
         <data android:scheme="com.municipalagriculturesoffice.farmersapp"/>
+        <data android:scheme="exp+my-new-app"/>
       </intent-filter>
     </activity>
   </application>

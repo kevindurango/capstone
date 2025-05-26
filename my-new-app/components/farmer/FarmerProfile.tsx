@@ -20,11 +20,21 @@ import { AuthContext } from "../../contexts/AuthContext";
 import { ThemedText } from "../ThemedText";
 import FarmerFields from "./FarmerFields";
 import { getApiBaseUrlSync } from "@/services/apiConfig";
-import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
-import { NavigationContainer } from "@react-navigation/native";
+import {
+  createMaterialTopTabNavigator,
+  MaterialTopTabNavigationEventMap,
+} from "@react-navigation/material-top-tabs";
+import {
+  NavigationHelpers,
+  ParamListBase,
+  TabNavigationState,
+} from "@react-navigation/native";
 import SafeTopTabBar from "../SafeTopTabBar";
 import { getImageUrl } from "@/constants/Config"; // Import getImageUrl function
 import { useRouter } from "expo-router"; // Import useRouter from expo-router
+import { MaterialTopTabDescriptorMap } from "@react-navigation/material-top-tabs/lib/typescript/src/types";
+import { SceneRendererProps } from "react-native-tab-view";
+import { JSX } from "react/jsx-runtime";
 
 // Use the standardized API URL from apiConfig
 const API_URL = getApiBaseUrlSync();
@@ -438,7 +448,9 @@ const FarmerProfile: React.FC<FarmerProfileProps> = ({
                 style={styles.profileImage}
                 onError={() => {
                   console.error(
-                    `[Profile] Failed to load image: ${getImageUrl(profileImage)}`
+                    `[Profile] Failed to load image: ${getImageUrl(
+                      profileImage
+                    )}`
                   );
                   setImageError(true);
                 }}
@@ -869,44 +881,52 @@ const FarmerProfile: React.FC<FarmerProfileProps> = ({
         </TouchableOpacity>
       </View>
 
-      <NavigationContainer independent={true} key={refreshFieldsTrigger}>
-        <Tab.Navigator
-          initialRouteName={getInitialRouteName()}
-          tabBar={(props) => <SafeTopTabBar {...props} />}
-          screenOptions={{
-            tabBarActiveTintColor: COLORS.primary,
-            tabBarInactiveTintColor: "#666",
-            tabBarLabelStyle: { fontSize: 14, fontWeight: "bold" },
-            tabBarStyle: { backgroundColor: "#fff" },
-            tabBarIndicatorStyle: { backgroundColor: COLORS.primary },
+      <Tab.Navigator
+        initialRouteName={getInitialRouteName()}
+        tabBar={(
+          props: JSX.IntrinsicAttributes &
+            SceneRendererProps & {
+              state: TabNavigationState<ParamListBase>;
+              navigation: NavigationHelpers<
+                ParamListBase,
+                MaterialTopTabNavigationEventMap
+              >;
+              descriptors: MaterialTopTabDescriptorMap;
+            }
+        ) => <SafeTopTabBar {...props} />}
+        screenOptions={{
+          tabBarActiveTintColor: COLORS.primary,
+          tabBarInactiveTintColor: "#666",
+          tabBarLabelStyle: { fontSize: 14, fontWeight: "bold" },
+          tabBarStyle: { backgroundColor: "#fff" },
+          tabBarIndicatorStyle: { backgroundColor: COLORS.primary },
+        }}
+      >
+        <Tab.Screen
+          name="Profile"
+          component={ProfileInfoTab}
+          options={{
+            tabBarItemStyle: { width: "auto" },
+            tabBarLabelStyle: { fontSize: 14 },
           }}
-        >
-          <Tab.Screen
-            name="Profile"
-            component={ProfileInfoTab}
-            options={{
-              tabBarItemStyle: { width: "auto" },
-              tabBarLabelStyle: { fontSize: 14 },
-            }}
-          />
-          <Tab.Screen
-            name="Farm Details"
-            component={FarmDetailsTab}
-            options={{
-              tabBarItemStyle: { width: "auto" },
-              tabBarLabelStyle: { fontSize: 14 },
-            }}
-          />
-          <Tab.Screen
-            name="Fields"
-            component={FieldsTab}
-            options={{
-              tabBarItemStyle: { width: "auto" },
-              tabBarLabelStyle: { fontSize: 14 },
-            }}
-          />
-        </Tab.Navigator>
-      </NavigationContainer>
+        />
+        <Tab.Screen
+          name="Farm Details"
+          component={FarmDetailsTab}
+          options={{
+            tabBarItemStyle: { width: "auto" },
+            tabBarLabelStyle: { fontSize: 14 },
+          }}
+        />
+        <Tab.Screen
+          name="Fields"
+          component={FieldsTab}
+          options={{
+            tabBarItemStyle: { width: "auto" },
+            tabBarLabelStyle: { fontSize: 14 },
+          }}
+        />
+      </Tab.Navigator>
     </SafeAreaView>
   );
 };

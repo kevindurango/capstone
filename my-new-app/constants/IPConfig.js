@@ -4,16 +4,22 @@
  */
 import { Platform } from "react-native";
 
-export const LOCAL_IP_ADDRESS = "192.168.1.12"; // This is the working IP address
+// Define both development and production URLs
+const DEV_IP_ADDRESS = "192.168.1.12";
+const PROD_IP_ADDRESS = "192.168.1.12"; // Using same IP for now, change this to your production server IP when deploying
+
+// Use development IP in dev mode, production IP in release mode
+export const LOCAL_IP_ADDRESS = __DEV__ ? DEV_IP_ADDRESS : PROD_IP_ADDRESS;
 
 // Platform-specific base URL
 const getPlatformSpecificUrl = () => {
   if (Platform.OS === "web") {
-    // Web can use localhost
-    return "http://localhost/capstone/my-new-app/api";
+    // Web can use localhost in dev, but needs production URL in release
+    return __DEV__
+      ? "http://localhost/capstone/my-new-app/api"
+      : `http://${PROD_IP_ADDRESS}/capstone/my-new-app/api`;
   } else {
-    // Mobile devices need to use the actual IP address
-    // Removed trailing slash to prevent double-slash in URLs
+    // Mobile devices use IP address based on environment
     return `http://${LOCAL_IP_ADDRESS}/capstone/my-new-app/api`;
   }
 };

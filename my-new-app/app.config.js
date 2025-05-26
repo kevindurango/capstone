@@ -31,6 +31,39 @@ if (isProduction && expoConfig.android) {
   };
 }
 
-export default {
+module.exports = {
   expo: expoConfig,
+  name: "Farmers App",
+  slug: "my-new-app",
+  version: "1.0.0",
+  orientation: "portrait",
+  icon: "./assets/images/icon.png",
+  scheme: "farmersmarket",
+  userInterfaceStyle: "automatic",
+  splash: {
+    image: "./assets/images/splash-icon.png",
+    resizeMode: "contain",
+    backgroundColor: "#ffffff",
+  },
+  assetBundlePatterns: ["**/*"],
+  ios: {
+    supportsTablet: true,
+  },
+  android: {
+    adaptiveIcon: {
+      foregroundImage: "./assets/images/adaptive-icon.png",
+      backgroundColor: "#ffffff",
+    },
+    package: "com.municipalagriculturesoffice.farmersapp",
+    permissions: ["INTERNET", "ACCESS_NETWORK_STATE"],
+  },
+  plugins: ["expo-router"],
+  experiments: {
+    typedRoutes: true,
+  },
+  extra: {
+    router: {
+      origin: false,
+    },
+  },
 };

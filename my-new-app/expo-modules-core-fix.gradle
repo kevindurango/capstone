@@ -1,0 +1,88 @@
+// This is a patch file to fix the issue with expo-modules-core
+// It overrides the problematic publication configuration
+import org.gradle.api.Project
+import org.gradle.api.publish.maven.MavenPublication
+
+def fixExpoModulesCoreSoftwareComponent = { Project project ->
+    // Ensure the maven-publish plugin is applied
+    if (!project.plugins.hasPlugin('maven-publish')) {
+        project.plugins.apply('maven-publish')
+    }
+
+    // Define the configuration action
+    def configAction = {
+        // Only apply to projects with maven-publish plugin
+        if (project.plugins.hasPlugin('maven-publish')) {
+            // Ensure the script is executed in the correct Gradle context
+            if (!project.hasProperty('publishing')) {
+                project.extensions.create('publishing', org.gradle.api.publish.PublishingExtension)
+            }
+            
+            // Configure publishing
+            project.publishing {
+                publications {
+                    // Create a new publication without referencing components directly
+                    maven(MavenPublication) {
+                        // Create an empty publication with just metadata
+                        groupId = project.group ?: "com.expo.modules"
+                        artifactId = project.name
+                        version = project.version ?: "1.0.0"
+                        
+                        // If it's an Android library project, try to add artifacts directly
+                        if (project.plugins.hasPlugin('com.android.library')) {
+                            def androidComponent = null
+                            try {
+                                // Try different component names
+                                androidComponent = project.components.find { component ->
+                                    component.name in ['release', 'debug', 'default']
+                                }
+                            } catch (Exception e) {
+                                logger.warn("Could not find components for ${project.name}: ${e.message}")
+                            }
+
+                            if (androidComponent) {
+                                from androidComponent
+                            } else {
+                                // Fallback to manual artifact configuration
+                                project.afterEvaluate {
+                                    if (project.android.hasProperty('libraryVariants')) {
+                                        project.android.libraryVariants.all { variant ->
+                                            if (variant.name == 'release') {
+                                                artifact(variant.outputs.first().outputFile) {
+                                                    extension 'aar'
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        logger.warn("No libraryVariants found for ${project.name}. Skipping artifact configuration.")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            logger.lifecycle("Fixed publishing configuration for ${project.name}")
+        }
+    }
+
+    // Apply configuration based on project evaluation state
+    if (project.state.executed) {
+        configAction.call()
+    } else {
+        project.afterEvaluate(configAction)
+    }
+}
+
+// Apply this fix to all Expo modules
+allprojects { subproject ->
+    // Apply to Expo modules only
+    if (subproject.name.startsWith('expo-') || 
+        (subproject.plugins.hasPlugin('com.android.library') && 
+         new File(subproject.projectDir, "src/main/java/expo").exists())) {
+        fixExpoModulesCoreSoftwareComponent(subproject)
+    }
+}
+
+// Export the function so it can be used
+ext.fixExpoModulesCoreSoftwareComponent = this.&fixExpoModulesCoreSoftwareComponent

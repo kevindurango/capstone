@@ -1,15 +1,15 @@
 {
   "project_info": {
     "project_number": "000000000000",
-    "project_id": "your-project-id",
-    "storage_bucket": "your-project-id.appspot.com"
+    "project_id": "farmersapp-project",
+    "storage_bucket": "farmersapp-project.appspot.com"
   },
   "client": [
     {
       "client_info": {
         "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
         "android_client_info": {
-          "package_name": "com.yourcompany.mynewapp"
+          "package_name": "com.municipalagriculturesoffice.farmersapp"
         }
       },
       "oauth_client": [],
